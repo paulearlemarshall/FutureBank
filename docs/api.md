@@ -48,6 +48,10 @@ Successful responses use `{ "data": ... }`. Errors use `{ "error": { "code", "me
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents" \
   -H "X-API-Key: $FUTUREBANK_API_KEY"
 
+# Read safe metadata for one slot (never returns a private Blob URL)
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/NATIONAL_ID" \
+  -H "Authorization: Bearer $FUTUREBANK_API_KEY"
+
 # Upload or replace the Passport slot (maximum 4 MB)
 curl -X PUT "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
   -H "X-API-Key: $FUTUREBANK_API_KEY" \
@@ -57,7 +61,14 @@ curl -X PUT "https://future-bank-demo.vercel.app/api/v1/customers/C000001/docume
 # Stream the authenticated file bytes
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT/content" \
   -H "X-API-Key: $FUTUREBANK_API_KEY" --output passport.jpg
+
+# Delete a slot (idempotent; reset restores Amelia Hart's seeded originals)
+curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.operator"
 ```
+
+`PUT` accepts one `multipart/form-data` field named `file` and returns `201` for an empty slot or `200` when replacing a file. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. All other document operations use the standard JSON envelope.
 
 ## OpenAPI
 
@@ -65,4 +76,4 @@ curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PAS
 - Runtime document: `/api/openapi.json`
 - API discovery: `/api/v1`
 
-The OpenAPI document lists every implemented route and the API-key security scheme. The OpenAPI endpoint is public so tooling can import it without first configuring authentication; business endpoints remain authenticated.
+The OpenAPI 3.0.3 document lists every implemented route with unique operation IDs, descriptions, typed success and error contracts, API-key and Bearer alternatives, actor selection, examples, upload constraints and raw binary document responses. The OpenAPI endpoint is public so tooling can import it without first configuring authentication; business endpoints remain authenticated.

@@ -61,8 +61,21 @@ export function safeContentDisposition(filename: string): string {
   return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
-export function binaryStreamResponse(stream: ReadableStream<Uint8Array>, mimeType: string, filename: string): Response {
-  return new Response(stream, { headers: { "Content-Type": mimeType, "Content-Disposition": safeContentDisposition(filename), "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+export function binaryStreamResponse(
+  stream: ReadableStream<Uint8Array>,
+  mimeType: string,
+  filename: string,
+  metadata: { sizeBytes?: number; etag?: string } = {},
+): Response {
+  const headers = new Headers({
+    "Content-Type": mimeType,
+    "Content-Disposition": safeContentDisposition(filename),
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  if (metadata.sizeBytes !== undefined) headers.set("Content-Length", String(metadata.sizeBytes));
+  if (metadata.etag) headers.set("ETag", metadata.etag);
+  return new Response(stream, { headers });
 }
 
 export function errorResponse(error: unknown): Response {

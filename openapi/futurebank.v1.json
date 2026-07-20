@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.0.0",
-    "description": "Authenticated read/write API for the fictional FutureBank core-banking demonstration. All data and screening results are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.1.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, payments, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -21,6 +21,9 @@
   "security": [
     {
       "ApiKeyAuth": []
+    },
+    {
+      "BearerAuth": []
     }
   ],
   "tags": [
@@ -74,9 +77,37 @@
         "summary": "Discover API resources",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Discovery"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "discoverApi",
+        "description": "Returns API identity, version, resource links and the public OpenAPI URL."
       }
     },
     "/dashboard": {
@@ -87,9 +118,39 @@
         "summary": "Get operational dashboard summary",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "Operational dashboard metrics; monetary values are decimal strings.",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getDashboard",
+        "description": "Returns current operational counts and exposure metrics for the authenticated caller."
       }
     },
     "/products": {
@@ -100,9 +161,40 @@
         "summary": "List active and inactive banking products",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Product"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listProducts",
+        "description": "Lists configured banking products, including inactive products."
       }
     },
     "/customers": {
@@ -124,9 +216,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerListItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listCustomers",
+        "description": "Lists customers with optional escaped text search and pagination."
       },
       "post": {
         "tags": [
@@ -155,10 +278,21 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postCustomers",
+        "description": "Create a fully populated customer. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/customers/{customerNumber}": {
@@ -174,12 +308,49 @@
         "summary": "Get a customer with identity, address, relationships and accounts",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/CustomerListItem"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Detailed customer fields.",
+                          "additionalProperties": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getCustomer",
+        "description": "Returns the complete CRM customer record, accounts, identity metadata, relationships and two document slots."
       },
       "patch": {
         "tags": [
@@ -192,7 +363,15 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Complete replacement values for the mutable CRM fields.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerWrite"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
@@ -200,8 +379,19 @@
           },
           "400": {
             "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "patchCustomersCustomerNumber",
+        "description": "Update a customer. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/customers/{customerNumber}/restrictions": {
@@ -249,10 +439,21 @@
           "201": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postCustomersCustomerNumberRestrictions",
+        "description": "Apply a customer restriction. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/customers/{customerNumber}/restrictions/{restrictionReference}/lift": {
@@ -294,10 +495,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postCustomersCustomerNumberRestrictionsRestrictionReferenceLift",
+        "description": "Lift a customer restriction. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/accounts": {
@@ -319,9 +531,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccountListItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listAccounts",
+        "description": "Lists accounts with optional escaped text search and pagination."
       },
       "post": {
         "tags": [
@@ -371,10 +614,21 @@
           "201": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postAccounts",
+        "description": "Open an account. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/accounts/{accountNumber}": {
@@ -390,12 +644,49 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AccountListItem"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Detailed account fields.",
+                          "additionalProperties": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getAccount",
+        "description": "Returns account, transaction, loan and arranged-overdraft detail."
       }
     },
     "/accounts/{accountNumber}/transactions": {
@@ -411,12 +702,43 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Transaction"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listAccountTransactions",
+        "description": "Returns statement transactions in deterministic order."
       }
     },
     "/accounts/{accountNumber}/status": {
@@ -464,10 +786,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "patchAccountsAccountNumberStatus",
+        "description": "Block, activate or close an account. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/beneficiaries": {
@@ -490,9 +823,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Beneficiary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listBeneficiaries",
+        "description": "Lists external payment beneficiaries."
       },
       "post": {
         "tags": [
@@ -505,16 +869,81 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Creates an active external beneficiary owned by the customer.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Beneficiary creation request.",
+                "required": [
+                  "customerNumber",
+                  "name",
+                  "bankName",
+                  "accountNumber",
+                  "currency"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "customerNumber": {
+                    "type": "string",
+                    "description": "Owning customer number."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Beneficiary name.",
+                    "minLength": 2
+                  },
+                  "bankName": {
+                    "type": "string",
+                    "description": "Beneficiary bank.",
+                    "minLength": 2
+                  },
+                  "accountNumber": {
+                    "type": "string",
+                    "description": "Local account number.",
+                    "minLength": 4
+                  },
+                  "iban": {
+                    "type": "string",
+                    "description": "Optional IBAN.",
+                    "nullable": true
+                  },
+                  "swiftBic": {
+                    "type": "string",
+                    "description": "Optional SWIFT/BIC.",
+                    "nullable": true
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Three-letter currency code.",
+                    "minLength": 3,
+                    "maxLength": 3
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "201": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postBeneficiaries",
+        "description": "Create a beneficiary. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/beneficiaries/{beneficiaryId}": {
@@ -563,10 +992,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "patchBeneficiariesBeneficiaryId",
+        "description": "Activate or deactivate a beneficiary. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/payments": {
@@ -592,9 +1032,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Payment"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listPayments",
+        "description": "Lists payments across booked, pending, rejected and expired states."
       },
       "post": {
         "tags": [
@@ -630,10 +1101,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postPayments",
+        "description": "Submit an internal or external payment. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/payments/{paymentReference}": {
@@ -649,12 +1131,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Payment"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getPayment",
+        "description": "Returns payment detail, active or historical hold, and approval work item."
       }
     },
     "/payments/{paymentReference}/decision": {
@@ -678,10 +1188,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postPaymentsPaymentReferenceDecision",
+        "description": "Approve or reject a pending payment. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/payments/expiry-run": {
@@ -699,10 +1220,18 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
           "403": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postPaymentsExpiryRun",
+        "description": "Expire stale pending payments and release holds. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases": {
@@ -713,9 +1242,40 @@
         "summary": "List KYC cases",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KycCaseSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listKycCases",
+        "description": "Lists onboarding, periodic review, trigger-event and remediation KYC cases."
       },
       "post": {
         "tags": [
@@ -759,10 +1319,21 @@
           "201": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCases",
+        "description": "Open a KYC case. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}": {
@@ -778,12 +1349,49 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/KycCaseSummary"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Complete KYC case workspace.",
+                          "additionalProperties": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getKycCase",
+        "description": "Returns CDD profile, risk, screening, evidence, restrictions and decision data."
       }
     },
     "/kyc-cases/{caseReference}/cdd": {
@@ -801,13 +1409,86 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Creates or replaces the case CDD profile. expectedCountries is a comma-separated list of country codes.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "CDD profile write request.",
+                "required": [
+                  "accountPurpose",
+                  "occupationOrBusiness",
+                  "expectedMonthlyCredits",
+                  "expectedMonthlyDebits",
+                  "expectedCountries",
+                  "cashUsage",
+                  "sourceOfFunds",
+                  "sourceOfWealth",
+                  "incomeOrTurnoverBand",
+                  "netWorthBand"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "accountPurpose": {
+                    "type": "string",
+                    "description": "Purpose of the relationship."
+                  },
+                  "occupationOrBusiness": {
+                    "type": "string",
+                    "description": "Occupation or business activity."
+                  },
+                  "expectedMonthlyCredits": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "expectedMonthlyDebits": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "expectedCountries": {
+                    "type": "string",
+                    "description": "Comma-separated expected countries."
+                  },
+                  "cashUsage": {
+                    "type": "string",
+                    "description": "Expected cash usage."
+                  },
+                  "sourceOfFunds": {
+                    "type": "string",
+                    "description": "Source of funds."
+                  },
+                  "sourceOfWealth": {
+                    "type": "string",
+                    "description": "Source of wealth."
+                  },
+                  "incomeOrTurnoverBand": {
+                    "type": "string",
+                    "description": "Income or turnover band."
+                  },
+                  "netWorthBand": {
+                    "type": "string",
+                    "description": "Net worth band."
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "patchKycCasesCaseReferenceCdd",
+        "description": "Create or update the CDD profile. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/evidence": {
@@ -825,13 +1506,70 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Records evidence metadata only; it does not upload a file.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "KYC evidence metadata request.",
+                "required": [
+                  "evidenceType",
+                  "documentReference",
+                  "source",
+                  "receivedAt"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "evidenceType": {
+                    "type": "string",
+                    "description": "Requirement/evidence type."
+                  },
+                  "documentReference": {
+                    "type": "string",
+                    "description": "Fictional document reference."
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Evidence source."
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "description": "Receipt date.",
+                    "format": "date"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "description": "Expiry date.",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "reviewerNotes": {
+                    "type": "string",
+                    "description": "Optional notes.",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "201": {
             "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCasesCaseReferenceEvidence",
+        "description": "Record fictional evidence metadata. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/evidence-verification": {
@@ -849,13 +1587,58 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Verifies or rejects recorded evidence.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Evidence verification request.",
+                "required": [
+                  "evidenceReference",
+                  "outcome",
+                  "reviewerNotes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "evidenceReference": {
+                    "type": "string",
+                    "description": "Evidence reference."
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "description": "Verification outcome.",
+                    "enum": [
+                      "VERIFIED",
+                      "REJECTED"
+                    ]
+                  },
+                  "reviewerNotes": {
+                    "type": "string",
+                    "description": "Mandatory reviewer rationale.",
+                    "minLength": 3
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCasesCaseReferenceEvidenceVerification",
+        "description": "Verify or reject evidence. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/screening": {
@@ -875,8 +1658,19 @@
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCasesCaseReferenceScreening",
+        "description": "Run fictional screening. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/screening-resolution": {
@@ -894,13 +1688,58 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Compliance resolution of a fictional possible match.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Screening resolution request.",
+                "required": [
+                  "screeningReference",
+                  "outcome",
+                  "comment"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "screeningReference": {
+                    "type": "string",
+                    "description": "Screening check reference."
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "description": "Resolution.",
+                    "enum": [
+                      "FALSE_POSITIVE",
+                      "CONFIRMED_MATCH"
+                    ]
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "Mandatory decision rationale.",
+                    "minLength": 5
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCasesCaseReferenceScreeningResolution",
+        "description": "Resolve a possible fictional match. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/submission": {
@@ -921,10 +1760,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCasesCaseReferenceSubmission",
+        "description": "Submit a complete KYC case for approval. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/decision": {
@@ -948,10 +1798,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postKycCasesCaseReferenceDecision",
+        "description": "Approve or reject a KYC case. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/overdrafts": {
@@ -962,9 +1823,40 @@
         "summary": "List overdraft facilities",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OverdraftFacilitySummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listOverdraftFacilities",
+        "description": "Lists arranged-overdraft facilities in all lifecycle states."
       },
       "post": {
         "tags": [
@@ -977,16 +1869,76 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Submits an arranged-overdraft application and creates an approval work item.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Overdraft application request.",
+                "required": [
+                  "accountNumber",
+                  "requestedLimit",
+                  "annualInterestRate",
+                  "purpose",
+                  "monthlyIncomeOrTurnover",
+                  "monthlyCommittedOutgoings",
+                  "riskGrade"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "accountNumber": {
+                    "type": "string",
+                    "description": "Eligible active current account."
+                  },
+                  "requestedLimit": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "annualInterestRate": {
+                    "type": "string",
+                    "description": "Annual percentage rate with up to four decimal places."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "Facility purpose.",
+                    "minLength": 5
+                  },
+                  "monthlyIncomeOrTurnover": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "monthlyCommittedOutgoings": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "riskGrade": {
+                    "type": "string",
+                    "description": "Internal risk grade, one to three characters.",
+                    "minLength": 1,
+                    "maxLength": 3
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "201": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postOverdrafts",
+        "description": "Submit an arranged-overdraft application. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/overdrafts/{facilityReference}": {
@@ -1002,12 +1954,49 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/OverdraftFacilitySummary"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Complete overdraft facility detail.",
+                          "additionalProperties": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getOverdraftFacility",
+        "description": "Returns facility pricing, utilization, headroom, limit history and alerts."
       }
     },
     "/overdrafts/{facilityReference}/limit-changes": {
@@ -1025,16 +2014,51 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Requests independent approval of a new limit.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Overdraft limit-change request.",
+                "required": [
+                  "requestedLimit",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "requestedLimit": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Business reason.",
+                    "minLength": 5
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "202": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postOverdraftsFacilityReferenceLimitChanges",
+        "description": "Request a limit change. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/overdrafts/{facilityReference}/decision": {
@@ -1058,10 +2082,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postOverdraftsFacilityReferenceDecision",
+        "description": "Approve or decline an overdraft application or change. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/overdrafts/{facilityReference}/status": {
@@ -1079,16 +2114,56 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Suspends further drawings or closes a cleared facility.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Overdraft status request.",
+                "required": [
+                  "action",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "description": "Status action.",
+                    "enum": [
+                      "SUSPEND",
+                      "CLOSE"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Mandatory rationale.",
+                    "minLength": 5
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postOverdraftsFacilityReferenceStatus",
+        "description": "Suspend or close a facility. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/overdraft-alerts/{alertReference}/resolution": {
@@ -1111,13 +2186,57 @@
           }
         ],
         "requestBody": {
-          "$ref": "#/components/requestBodies/Mutation"
+          "required": true,
+          "description": "Records the monitoring intervention and completes the related work item.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Overdraft alert resolution.",
+                "required": [
+                  "intervention",
+                  "comment"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "intervention": {
+                    "type": "string",
+                    "description": "Intervention outcome.",
+                    "enum": [
+                      "CONTACT_ATTEMPTED",
+                      "CUSTOMER_CONTACTED",
+                      "REPAYMENT_DISCUSSION",
+                      "LIMIT_REVIEW",
+                      "SUSPENSION",
+                      "NO_ACTION"
+                    ]
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "Mandatory outcome rationale.",
+                    "minLength": 5
+                  }
+                }
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postOverdraftAlertsAlertReferenceResolution",
+        "description": "Resolve an overdraft monitoring alert. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/work-items": {
@@ -1165,9 +2284,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WorkQueueItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listWorkItems",
+        "description": "Lists and filters maker-checker work queue items."
       }
     },
     "/work-items/{workItemReference}": {
@@ -1183,12 +2333,49 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/WorkQueueItem"
+                        },
+                        {
+                          "type": "object",
+                          "description": "Work item event history.",
+                          "additionalProperties": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getWorkItem",
+        "description": "Returns a work item and its complete transition history."
       }
     },
     "/work-items/{workItemReference}/claim": {
@@ -1212,10 +2399,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postWorkItemsWorkItemReferenceClaim",
+        "description": "Claim a work item. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/work-items/{workItemReference}/release": {
@@ -1239,10 +2437,21 @@
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
           },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "409": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "postWorkItemsWorkItemReferenceRelease",
+        "description": "Release a claimed work item. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/audit-events": {
@@ -1264,9 +2473,40 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditEvent"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listAuditEvents",
+        "description": "Lists metadata-only audit events. Private document bytes and Blob locations are excluded."
       }
     },
     "/customers/{customerNumber}/documents": {
@@ -1282,7 +2522,29 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerDocumentSlot"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error"
@@ -1295,8 +2557,13 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "listCustomerDocumentSlots",
+        "description": "Returns exactly the PASSPORT and NATIONAL_ID slots; each contains safe metadata or empty=true."
       }
     },
     "/customers/{customerNumber}/documents/{slot}": {
@@ -1315,7 +2582,24 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DocumentMeta"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error"
@@ -1328,15 +2612,20 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "getCustomerDocumentMetadata",
+        "description": "Returns safe metadata for one Passport or National ID slot. File bytes are available from the /content operation."
       },
       "put": {
         "tags": [
           "Documents"
         ],
         "summary": "Upload or replace a customer document",
-        "description": "Requires a staff actor with KYC_GATHER. Maximum file size is 4 MB.",
+        "description": "Uploads or replaces one private Passport or National ID file. Requires KYC_GATHER; accepts JPEG, PNG or PDF up to exactly 4 MiB after MIME and file-signature validation.",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
@@ -1360,12 +2649,14 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Non-empty JPEG, PNG or PDF whose declared MIME type matches its file signature; maximum 4,194,304 bytes."
                   }
                 }
               }
             }
-          }
+          },
+          "description": "A single multipart part named file. The route rejects other Content-Types with 415."
         },
         "responses": {
           "200": {
@@ -1374,6 +2665,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/DocumentMeta"
@@ -1389,6 +2685,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/DocumentMeta"
@@ -1409,15 +2710,22 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "putCustomerDocument"
       },
       "delete": {
         "tags": [
           "Documents"
         ],
         "summary": "Delete a customer document",
-        "description": "Requires a staff actor with KYC_GATHER.",
+        "description": "Idempotently deletes one customer file slot. Requires KYC_GATHER and never changes identity-document metadata.",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
@@ -1431,65 +2739,21 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/Success"
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
-    "/customers/{customerNumber}/documents/{slot}/content": {
-      "get": {
-        "tags": [
-          "Documents"
-        ],
-        "summary": "Stream private document content",
-        "description": "Returns raw authenticated file bytes rather than the standard JSON envelope.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/CustomerNumber"
-          },
-          {
-            "$ref": "#/components/parameters/DocumentSlot"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Document content",
-            "headers": {
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
+            "description": "Successful response.",
             "content": {
-              "image/jpeg": {
+              "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "image/png": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
+                  "type": "object",
+                  "description": "Successful response envelope.",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DeleteDocumentResult"
+                    }
+                  }
                 }
               }
             }
@@ -1505,8 +2769,104 @@
           },
           "404": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "operationId": "deleteCustomerDocument"
+      }
+    },
+    "/customers/{customerNumber}/documents/{slot}/content": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Stream private document content",
+        "description": "Streams authenticated private Passport or National ID bytes. This operation is not JSON-wrapped and is never cacheable.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomerNumber"
+          },
+          {
+            "$ref": "#/components/parameters/DocumentSlot"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document content",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment disposition containing a sanitized filename.",
+                "schema": {
+                  "type": "string",
+                  "example": "attachment; filename=Passport-AmeliaHart.jpg"
+                }
+              },
+              "Content-Length": {
+                "description": "Exact file size in bytes.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "ETag": {
+                "description": "Private Blob entity tag.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Always no-store.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Raw image/jpeg file bytes."
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Raw image/png file bytes."
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Raw application/pdf file bytes."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getCustomerDocumentContent"
       }
     }
   },
@@ -1516,7 +2876,13 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "The same key may also be sent as Authorization: Bearer <key>."
+        "description": "The FUTUREBANK_API_KEY supplied in X-API-Key."
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API key",
+        "description": "The FUTUREBANK_API_KEY supplied as an HTTP Bearer token. This is an alternative to X-API-Key, not a staff OAuth token."
       }
     },
     "parameters": {
@@ -1524,7 +2890,7 @@
         "name": "X-Staff-Username",
         "in": "header",
         "required": false,
-        "description": "Active seeded staff actor. Defaults to bp.operator. Role permissions and maker-checker controls still apply.",
+        "description": "Active staff username used as the audit actor. Required for writes. Permissions and maker-checker separation are evaluated for this user.",
         "schema": {
           "type": "string",
           "example": "bp.operator"
@@ -1626,7 +2992,8 @@
       "Money": {
         "type": "string",
         "pattern": "^[0-9]+(\\.[0-9]{1,2})?$",
-        "example": "1250.00"
+        "example": "1250.00",
+        "description": "Money API data contract."
       },
       "ActionState": {
         "type": "object",
@@ -1654,7 +3021,8 @@
               }
             }
           }
-        }
+        },
+        "description": "ActionState API data contract."
       },
       "Error": {
         "type": "object",
@@ -1681,6 +3049,13 @@
               }
             }
           }
+        },
+        "description": "Error API data contract.",
+        "example": {
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "A valid API key is required."
+          }
         }
       },
       "CustomerWrite": {
@@ -1698,7 +3073,8 @@
             "RETAIL": "#/components/schemas/RetailCustomerWrite",
             "SME": "#/components/schemas/SmeCustomerWrite"
           }
-        }
+        },
+        "description": "CustomerWrite API data contract."
       },
       "CustomerWriteBase": {
         "type": "object",
@@ -1903,7 +3279,8 @@
               }
             }
           }
-        ]
+        ],
+        "description": "CustomerWriteBase API data contract."
       },
       "RetailCustomerWrite": {
         "allOf": [
@@ -1939,7 +3316,8 @@
               }
             }
           }
-        ]
+        ],
+        "description": "RetailCustomerWrite API data contract."
       },
       "SmeCustomerWrite": {
         "allOf": [
@@ -1970,7 +3348,8 @@
               }
             }
           }
-        ]
+        ],
+        "description": "SmeCustomerWrite API data contract."
       },
       "PaymentWrite": {
         "type": "object",
@@ -2007,18 +3386,16 @@
             "minLength": 3,
             "maxLength": 140
           }
-        }
-      },
-      "MutationRequest": {
-        "type": "object",
-        "additionalProperties": true
+        },
+        "description": "PaymentWrite API data contract."
       },
       "DocumentSlot": {
         "type": "string",
         "enum": [
           "PASSPORT",
           "NATIONAL_ID"
-        ]
+        ],
+        "description": "Fixed customer file slot. Only Passport and National ID are supported."
       },
       "DocumentMeta": {
         "type": "object",
@@ -2036,7 +3413,8 @@
             "$ref": "#/components/schemas/DocumentSlot"
           },
           "filename": {
-            "type": "string"
+            "type": "string",
+            "description": "filename document metadata field."
           },
           "mimeType": {
             "type": "string",
@@ -2044,21 +3422,26 @@
               "image/jpeg",
               "image/png",
               "application/pdf"
-            ]
+            ],
+            "description": "mimeType document metadata field."
           },
           "sizeBytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 4194304
+            "maximum": 4194304,
+            "description": "sizeBytes document metadata field."
           },
           "uploadedBy": {
-            "type": "string"
+            "type": "string",
+            "description": "uploadedBy document metadata field."
           },
           "uploadedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "uploadedAt document metadata field."
           }
-        }
+        },
+        "description": "Safe document metadata. Private Blob URLs, paths, hashes and file bytes are never returned."
       },
       "EmptyDocumentSlot": {
         "type": "object",
@@ -2077,7 +3460,8 @@
               true
             ]
           }
-        }
+        },
+        "description": "EmptyDocumentSlot API data contract."
       },
       "CustomerDocumentSlot": {
         "oneOf": [
@@ -2087,20 +3471,1047 @@
           {
             "$ref": "#/components/schemas/EmptyDocumentSlot"
           }
-        ]
-      }
-    },
-    "requestBodies": {
-      "Mutation": {
-        "required": true,
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/MutationRequest"
-            }
+        ],
+        "description": "CustomerDocumentSlot API data contract."
+      },
+      "Address": {
+        "type": "object",
+        "description": "A postal address held in CRM.",
+        "required": [
+          "id",
+          "type",
+          "line1",
+          "city",
+          "postalCode",
+          "country"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable address identifier."
+          },
+          "type": {
+            "type": "string",
+            "description": "Address classification."
+          },
+          "line1": {
+            "type": "string",
+            "description": "First address line."
+          },
+          "line2": {
+            "type": "string",
+            "description": "Optional second address line.",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "description": "City."
+          },
+          "region": {
+            "type": "string",
+            "description": "State, emirate or region.",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "Postal code."
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO-style country code or seeded country value."
           }
         }
       },
+      "Contact": {
+        "type": "object",
+        "description": "A customer contact channel.",
+        "required": [
+          "id",
+          "type",
+          "value",
+          "preferred"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable contact identifier."
+          },
+          "type": {
+            "type": "string",
+            "description": "EMAIL, MOBILE or another supported channel."
+          },
+          "value": {
+            "type": "string",
+            "description": "Contact value."
+          },
+          "preferred": {
+            "type": "boolean",
+            "description": "Whether this is the preferred channel."
+          }
+        }
+      },
+      "IdentityDocument": {
+        "type": "object",
+        "description": "Identity-document metadata; this is distinct from the private uploaded file.",
+        "required": [
+          "id",
+          "type",
+          "documentNumber",
+          "issuingCountry",
+          "issuedAt",
+          "expiresAt",
+          "verificationStatus"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identity record identifier."
+          },
+          "type": {
+            "type": "string",
+            "description": "Document type."
+          },
+          "documentNumber": {
+            "type": "string",
+            "description": "Passport or national identity number."
+          },
+          "issuingCountry": {
+            "type": "string",
+            "description": "Issuing country."
+          },
+          "issuedAt": {
+            "type": "string",
+            "description": "Issue date.",
+            "format": "date"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Expiry date.",
+            "format": "date"
+          },
+          "verificationStatus": {
+            "type": "string",
+            "description": "Verification lifecycle state.",
+            "enum": [
+              "NOT_VERIFIED",
+              "PENDING",
+              "VERIFIED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "verificationMethod": {
+            "type": "string",
+            "description": "Verification method, when available.",
+            "nullable": true
+          },
+          "expiryAlertAt": {
+            "type": "string",
+            "description": "Expiry alert date.",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "Relationship": {
+        "type": "object",
+        "description": "Relationship to another customer, controller or beneficial owner.",
+        "required": [
+          "id",
+          "relatedCustomerNumber",
+          "relatedDisplayName",
+          "relationshipType",
+          "beneficialOwner",
+          "verificationStatus"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable relationship identifier."
+          },
+          "relatedCustomerNumber": {
+            "type": "string",
+            "description": "Related FutureBank customer number."
+          },
+          "relatedDisplayName": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "relationshipType": {
+            "type": "string",
+            "description": "Relationship classification."
+          },
+          "ownershipPercent": {
+            "type": "string",
+            "description": "Ownership percentage as a decimal string.",
+            "nullable": true
+          },
+          "controlType": {
+            "type": "string",
+            "description": "Control classification.",
+            "nullable": true
+          },
+          "beneficialOwner": {
+            "type": "boolean",
+            "description": "Whether the related party is a beneficial owner."
+          },
+          "verificationStatus": {
+            "type": "string",
+            "description": "Verification state.",
+            "enum": [
+              "NOT_VERIFIED",
+              "PENDING",
+              "VERIFIED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "description": "A banking product available for account opening.",
+        "required": [
+          "code",
+          "name",
+          "kind",
+          "currency",
+          "interestRate",
+          "minimumOpeningBalance",
+          "active"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable product code."
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Account kind.",
+            "enum": [
+              "CURRENT",
+              "SAVINGS",
+              "TERM_DEPOSIT",
+              "FOREIGN_CURRENCY",
+              "LOAN"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "interestRate": {
+            "type": "string",
+            "description": "Annual percentage rate as a decimal string."
+          },
+          "minimumOpeningBalance": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether new accounts may be opened."
+          }
+        }
+      },
+      "CustomerListItem": {
+        "type": "object",
+        "description": "Customer search result.",
+        "required": [
+          "customerNumber",
+          "rimNumber",
+          "partyType",
+          "displayName",
+          "status",
+          "kycStatus",
+          "riskRating",
+          "nationality",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "customerNumber": {
+            "type": "string",
+            "description": "Stable CRM customer number.",
+            "example": "C000001"
+          },
+          "rimNumber": {
+            "type": "string",
+            "description": "Relationship information management number.",
+            "example": "RIM000001"
+          },
+          "partyType": {
+            "type": "string",
+            "description": "Customer party type.",
+            "enum": [
+              "RETAIL",
+              "SME"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Retail full name or SME legal name."
+          },
+          "status": {
+            "type": "string",
+            "description": "Customer relationship status.",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "RESTRICTED"
+            ]
+          },
+          "kycStatus": {
+            "type": "string",
+            "description": "Current KYC summary.",
+            "enum": [
+              "NOT_STARTED",
+              "IN_PROGRESS",
+              "AWAITING_INFORMATION",
+              "PENDING_APPROVAL",
+              "APPROVED",
+              "DUE",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "riskRating": {
+            "type": "string",
+            "description": "Current risk rating.",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          },
+          "nationality": {
+            "type": "string",
+            "description": "Nationality or country of incorporation."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Last update timestamp.",
+            "format": "date-time"
+          }
+        }
+      },
+      "AccountListItem": {
+        "type": "object",
+        "description": "Bank account list result.",
+        "required": [
+          "accountNumber",
+          "customerNumber",
+          "customerName",
+          "productCode",
+          "productName",
+          "kind",
+          "currency",
+          "balance",
+          "availableBalance",
+          "status",
+          "readOnly",
+          "openedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "accountNumber": {
+            "type": "string",
+            "description": "Stable account number.",
+            "example": "1000000001"
+          },
+          "customerNumber": {
+            "type": "string",
+            "description": "Owning customer number."
+          },
+          "customerName": {
+            "type": "string",
+            "description": "Owning customer display name."
+          },
+          "productCode": {
+            "type": "string",
+            "description": "Product code."
+          },
+          "productName": {
+            "type": "string",
+            "description": "Product name."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Account kind.",
+            "enum": [
+              "CURRENT",
+              "SAVINGS",
+              "TERM_DEPOSIT",
+              "FOREIGN_CURRENCY",
+              "LOAN"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "availableBalance": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "status": {
+            "type": "string",
+            "description": "Account state.",
+            "enum": [
+              "ACTIVE",
+              "BLOCKED",
+              "CLOSED"
+            ]
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Whether API/UI debit mutations are disabled."
+          },
+          "openedAt": {
+            "type": "string",
+            "description": "Opening date.",
+            "format": "date"
+          }
+        }
+      },
+      "Transaction": {
+        "type": "object",
+        "description": "A booked or pending account movement.",
+        "required": [
+          "reference",
+          "bookedAt",
+          "valueDate",
+          "description",
+          "type",
+          "direction",
+          "amount",
+          "currency",
+          "balanceAfter",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Transaction reference."
+          },
+          "bookedAt": {
+            "type": "string",
+            "description": "Booking timestamp.",
+            "format": "date-time"
+          },
+          "valueDate": {
+            "type": "string",
+            "description": "Value date.",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "description": "Statement narrative."
+          },
+          "type": {
+            "type": "string",
+            "description": "Transaction type."
+          },
+          "direction": {
+            "type": "string",
+            "description": "Ledger direction.",
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "balanceAfter": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "counterparty": {
+            "type": "string",
+            "description": "Counterparty name or reference.",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Payment lifecycle state.",
+            "enum": [
+              "BOOKED",
+              "PENDING",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          }
+        }
+      },
+      "Beneficiary": {
+        "type": "object",
+        "description": "External payment beneficiary.",
+        "required": [
+          "id",
+          "customerNumber",
+          "name",
+          "bankName",
+          "accountNumber",
+          "currency",
+          "status",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Beneficiary identifier."
+          },
+          "customerNumber": {
+            "type": "string",
+            "description": "Owning customer number."
+          },
+          "name": {
+            "type": "string",
+            "description": "Beneficiary name."
+          },
+          "bankName": {
+            "type": "string",
+            "description": "Beneficiary bank."
+          },
+          "accountNumber": {
+            "type": "string",
+            "description": "Local account number."
+          },
+          "iban": {
+            "type": "string",
+            "description": "IBAN when supplied.",
+            "nullable": true
+          },
+          "swiftBic": {
+            "type": "string",
+            "description": "SWIFT/BIC when supplied.",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "status": {
+            "type": "string",
+            "description": "Beneficiary state.",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation timestamp.",
+            "format": "date-time"
+          }
+        }
+      },
+      "WorkQueueItem": {
+        "type": "object",
+        "description": "Maker-checker work queue item.",
+        "required": [
+          "reference",
+          "type",
+          "status",
+          "priority",
+          "entityType",
+          "entityReference",
+          "title",
+          "requiredRole",
+          "createdBy",
+          "dueAt",
+          "version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Work item reference."
+          },
+          "type": {
+            "type": "string",
+            "description": "Approval or alert type.",
+            "enum": [
+              "KYC_APPROVAL",
+              "PAYMENT_APPROVAL",
+              "OVERDRAFT_APPROVAL",
+              "OVERDRAFT_CHANGE",
+              "OVERDRAFT_ALERT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Work item state.",
+            "enum": [
+              "OPEN",
+              "ASSIGNED",
+              "APPROVED",
+              "REJECTED",
+              "CANCELLED",
+              "COMPLETED"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "description": "Priority.",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "description": "Controlled entity type."
+          },
+          "entityReference": {
+            "type": "string",
+            "description": "Controlled entity reference."
+          },
+          "title": {
+            "type": "string",
+            "description": "Queue title."
+          },
+          "requiredRole": {
+            "type": "string",
+            "description": "Role required to act.",
+            "enum": [
+              "OPERATOR",
+              "SUPERVISOR",
+              "COMPLIANCE",
+              "ADMIN"
+            ]
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Maker username."
+          },
+          "assignedTo": {
+            "type": "string",
+            "description": "Assignee username.",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "Due timestamp.",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optimistic concurrency version required by decisions and assignment changes."
+          }
+        }
+      },
+      "AccountHold": {
+        "type": "object",
+        "description": "Funds reserved for a pending payment without a ledger movement.",
+        "required": [
+          "reference",
+          "accountNumber",
+          "paymentReference",
+          "amount",
+          "currency",
+          "status",
+          "expiresAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Hold reference."
+          },
+          "accountNumber": {
+            "type": "string",
+            "description": "Account number."
+          },
+          "paymentReference": {
+            "type": "string",
+            "description": "Payment reference."
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "status": {
+            "type": "string",
+            "description": "Hold lifecycle state.",
+            "enum": [
+              "ACTIVE",
+              "RELEASED",
+              "CONSUMED",
+              "EXPIRED"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Expiry timestamp.",
+            "format": "date-time"
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "description": "Payment detail including approval hold and work item.",
+        "required": [
+          "reference",
+          "type",
+          "status",
+          "sourceAccountNumber",
+          "customerNumber",
+          "customerName",
+          "destinationReference",
+          "amount",
+          "currency",
+          "description",
+          "initiatedBy",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Payment reference."
+          },
+          "type": {
+            "type": "string",
+            "description": "Payment type.",
+            "enum": [
+              "INTERNAL",
+              "EXTERNAL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle state.",
+            "enum": [
+              "BOOKED",
+              "PENDING",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string",
+            "description": "Debited account number."
+          },
+          "customerNumber": {
+            "type": "string",
+            "description": "Owning customer number."
+          },
+          "customerName": {
+            "type": "string",
+            "description": "Customer display name."
+          },
+          "destinationReference": {
+            "type": "string",
+            "description": "Destination account number or beneficiary identifier."
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "description": {
+            "type": "string",
+            "description": "Payment narrative."
+          },
+          "approvalReason": {
+            "type": "string",
+            "description": "Reason approval was required.",
+            "nullable": true
+          },
+          "initiatedBy": {
+            "type": "string",
+            "description": "Maker username."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation timestamp.",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Pending-payment expiry timestamp.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hold": {
+            "$ref": "#/components/schemas/AccountHold",
+            "nullable": true
+          },
+          "workItem": {
+            "$ref": "#/components/schemas/WorkQueueItem",
+            "nullable": true
+          }
+        }
+      },
+      "KycCaseSummary": {
+        "type": "object",
+        "description": "KYC case register row.",
+        "required": [
+          "reference",
+          "customerNumber",
+          "customerName",
+          "type",
+          "jurisdiction",
+          "status",
+          "riskScore",
+          "riskRating",
+          "enhancedDueDiligence",
+          "dueAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "KYC case reference."
+          },
+          "customerNumber": {
+            "type": "string",
+            "description": "Customer number."
+          },
+          "customerName": {
+            "type": "string",
+            "description": "Customer display name."
+          },
+          "type": {
+            "type": "string",
+            "description": "Case type.",
+            "enum": [
+              "ONBOARDING",
+              "PERIODIC_REVIEW",
+              "TRIGGER_EVENT",
+              "REMEDIATION"
+            ]
+          },
+          "jurisdiction": {
+            "type": "string",
+            "description": "Policy jurisdiction."
+          },
+          "status": {
+            "type": "string",
+            "description": "Case state.",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "AWAITING_INFORMATION",
+              "PENDING_APPROVAL",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "riskScore": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Calculated demo-policy score."
+          },
+          "riskRating": {
+            "type": "string",
+            "description": "Calculated rating.",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          },
+          "enhancedDueDiligence": {
+            "type": "boolean",
+            "description": "Whether EDD is required."
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "Case due timestamp.",
+            "format": "date-time"
+          }
+        }
+      },
+      "OverdraftFacilitySummary": {
+        "type": "object",
+        "description": "Arranged-overdraft register row.",
+        "required": [
+          "reference",
+          "accountNumber",
+          "customerNumber",
+          "customerName",
+          "requestedLimit",
+          "approvedLimit",
+          "utilization",
+          "headroom",
+          "currency",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Facility reference."
+          },
+          "accountNumber": {
+            "type": "string",
+            "description": "Linked current account."
+          },
+          "customerNumber": {
+            "type": "string",
+            "description": "Owning customer."
+          },
+          "customerName": {
+            "type": "string",
+            "description": "Customer display name."
+          },
+          "requestedLimit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "approvedLimit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "utilization": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "headroom": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code."
+          },
+          "status": {
+            "type": "string",
+            "description": "Facility lifecycle state.",
+            "enum": [
+              "DRAFT",
+              "PENDING_APPROVAL",
+              "ACTIVE",
+              "DECLINED",
+              "PENDING_CHANGE",
+              "SUSPENDED",
+              "EXPIRED",
+              "CLOSED"
+            ]
+          },
+          "reviewDate": {
+            "type": "string",
+            "description": "Review date.",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "AuditEvent": {
+        "type": "object",
+        "description": "Append-only audit event without private file content or URLs.",
+        "required": [
+          "id",
+          "occurredAt",
+          "actorUsername",
+          "action",
+          "entityType",
+          "entityReference",
+          "correlationId"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Event identifier."
+          },
+          "occurredAt": {
+            "type": "string",
+            "description": "Event timestamp.",
+            "format": "date-time"
+          },
+          "actorUsername": {
+            "type": "string",
+            "description": "Actor username."
+          },
+          "action": {
+            "type": "string",
+            "description": "Action code."
+          },
+          "entityType": {
+            "type": "string",
+            "description": "Entity type."
+          },
+          "entityReference": {
+            "type": "string",
+            "description": "Entity reference."
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Request correlation identifier."
+          }
+        }
+      },
+      "DeleteDocumentResult": {
+        "type": "object",
+        "description": "Idempotent delete result.",
+        "required": [
+          "deleted"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "True when a document record existed and was deleted; false when the slot was already empty."
+          }
+        }
+      },
+      "Discovery": {
+        "type": "object",
+        "description": "API discovery links relative to /api/v1.",
+        "required": [
+          "name",
+          "version",
+          "resources",
+          "openapi"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "API name."
+          },
+          "version": {
+            "type": "string",
+            "description": "API version."
+          },
+          "resources": {
+            "type": "array",
+            "description": "Available top-level resource paths.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "openapi": {
+            "type": "string",
+            "description": "Public OpenAPI artifact URL."
+          }
+        }
+      }
+    },
+    "requestBodies": {
       "Decision": {
         "required": true,
         "content": {
@@ -2206,7 +4617,7 @@
         }
       },
       "Error": {
-        "description": "API error",
+        "description": "Structured API error. Authentication failures are 401, actor/permission failures are 403, missing entities are 404, conflicts are 409, unsupported upload media is 415, and unavailable dependencies are 503.",
         "content": {
           "application/json": {
             "schema": {
