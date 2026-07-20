@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-const tabs = ["Overview", "Accounts", "KYC", "Contact & address", "Relationships", "Audit"] as const;
+const tabs = ["Overview", "Accounts", "KYC", "Documents", "Contact & address", "Relationships", "Audit"] as const;
 
 export function CustomerTabs({
   customerNumber,

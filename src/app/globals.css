@@ -364,7 +364,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .login-help span:first-child { color: var(--danger); font-weight: 700; }
 .login-footer { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-top: 1px solid #c4d0d9; background: #234f70; color: #dce8ef; font-size: 10px; }
 
+.document-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.document-card { display: grid; align-content: start; gap: 12px; min-height: 340px; padding: 16px; border: 1px solid var(--line); border-radius: 4px; background: #f9fbfc; }
+.document-card h3 { margin: 0; color: var(--nav); font-size: 15px; }
+.document-preview { width: 100%; height: 210px; object-fit: contain; border: 1px solid var(--line); background: white; }
+.document-empty, .document-pdf { display: grid; place-items: center; min-height: 150px; border: 1px dashed #aebdca; color: var(--muted); background: white; }
+.document-upload-form { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.document-delete-form { display: flex; align-items: center; gap: 10px; }
+.document-upload-form input[type="file"] { width: 100%; padding: 7px; border: 1px solid var(--line); background: white; }
+.document-card form { margin: 0; }
+.danger-button { padding: 7px 12px; border: 1px solid #9f2732; border-radius: 3px; background: white; color: #8d1f2a; cursor: pointer; }
+
 @media (max-width: 1250px) {
   .workspace { padding-left: 20px; padding-right: 20px; }
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+@media (max-width: 800px) { .document-grid { grid-template-columns: 1fr; } }

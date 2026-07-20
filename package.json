@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",
+    "@vercel/blob": "2.6.1",
     "@vercel/functions": "^3.7.5",
     "better-auth": "^1.6.23",
     "drizzle-orm": "^0.45.2",
@@ -34,6 +35,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "12.1.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

@@ -20,6 +20,14 @@ async function main() {
   expectEqual("SME customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'SME'`), 3);
   expectEqual("unique RIM identifiers", await scalar(sql`select count(distinct rim_number)::int as value from customers where rim_number like 'RIM%'`), 9);
   expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 13);
+  expectEqual("customer document files", await scalar(sql`select count(*)::int as value from customer_document_files`), 2);
+  expectEqual("seeded Amelia document slots", await scalar(sql`
+    select count(*)::int as value from customer_document_files d join customers c on c.id = d.customer_id
+    where c.customer_number = 'C000001' and d.is_seeded and (
+      (d.slot = 'PASSPORT' and d.size_bytes = 58533 and d.sha256 = 'a808dc0678910d0eaab8d14e69674965760e976b49d1ef7199c74048233bc1b1') or
+      (d.slot = 'NATIONAL_ID' and d.size_bytes = 85430 and d.sha256 = 'a42d421f5a1133e95497081f51144fc8a6f7589a2b111a2577f2250c15151be3')
+    )
+  `), 2);
   expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 19);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);

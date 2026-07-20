@@ -1,0 +1,28 @@
+# Customer documents — implemented architecture
+
+FutureBank exposes two fixed customer file slots: `PASSPORT` and `NATIONAL_ID`. File bytes are held in a private Vercel Blob store; Neon holds the customer/slot relationship, safe display metadata, private blob locator, ETag and audit history. The existing `identity_documents` metadata table is intentionally unchanged.
+
+## Controls
+
+- Files must be non-empty JPEG, PNG or PDF and no larger than 4 MB.
+- MIME type and file signature must agree; filenames are reduced to a safe basename.
+- Any authenticated active staff user may view a document through an authenticated proxy route.
+- Upload, replacement and deletion require `KYC_GATHER` (`OPERATOR` or `ADMIN`).
+- Private Blob URLs and bytes are never returned in DTOs or written to audit JSON.
+- Browser uploads use a ten-minute, customer-and-slot-scoped Vercel Blob token. REST uploads use multipart form data.
+
+## REST API
+
+- `GET /api/v1/customers/{customerNumber}/documents`
+- `GET /api/v1/customers/{customerNumber}/documents/{slot}`
+- `GET /api/v1/customers/{customerNumber}/documents/{slot}/content`
+- `PUT /api/v1/customers/{customerNumber}/documents/{slot}` with multipart field `file`
+- `DELETE /api/v1/customers/{customerNumber}/documents/{slot}`
+
+All endpoints require the normal FutureBank API key. Writes also apply the selected `X-Staff-Username` permissions. The content endpoint is the only route that returns raw bytes instead of a `{data}` JSON envelope.
+
+## Deterministic baseline
+
+Amelia Hart (`C000001`) has both supplied `TestDocs` images. Generated fixture constants make resets independent of the function filesystem. Seed blobs use immutable hash-addressed paths and Neon rows use stable IDs, `system.seed`, deterministic timestamps and `is_seeded=true`.
+
+Uploaded/replaced documents may be deleted during a demonstration. Reset re-establishes the original seed blobs and metadata, then removes unreferenced non-seed blobs within only the current production, preview, development or CI namespace.
