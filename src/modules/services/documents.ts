@@ -110,6 +110,11 @@ export async function getCustomerDocument(customerNumber: string, slot: Document
   return row?.document ?? null;
 }
 
+export async function getCustomerDocumentMetadata(customerNumber: string, slot: DocumentSlot): Promise<DocumentMeta | null> {
+  const document = await getCustomerDocument(customerNumber, slot);
+  return document ? meta(document) : null;
+}
+
 export async function getCustomerDocumentContent(customerNumber: string, slot: DocumentSlot) {
   const document = await getCustomerDocument(customerNumber, slot);
   if (!document) return null;
