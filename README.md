@@ -25,7 +25,7 @@ The production demonstration is available at [future-bank-demo.vercel.app](https
 
 ## Local setup
 
-Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string, authentication secret, four demo credentials (`DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`), and `FUTUREBANK_API_KEY`. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
+Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string, authentication secret, four demo credentials (`DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`), `FUTUREBANK_API_KEY`, and a Vercel Blob read-write token (`BLOB_READ_WRITE_TOKEN`) for the customer-documents feature. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
 
 ```powershell
 npm install
