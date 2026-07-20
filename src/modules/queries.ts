@@ -4,7 +4,7 @@ import { desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   addresses, auditEvents, bankAccounts, beneficiaries, branches, contactPoints, customerRelationships,
-  customers, identityDocuments, ledgerEntries, ledgerTransactions, loanDetails, loanRepayments, overdraftAlerts,
+  customerDocumentFiles, customers, identityDocuments, ledgerEntries, ledgerTransactions, loanDetails, loanRepayments, overdraftAlerts,
   overdraftFacilities, paymentOrders, products, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
@@ -77,13 +77,15 @@ export async function getCustomer(customerNumber: string): Promise<CustomerDetai
   await requireUser();
   const [customer] = await db.select().from(customers).where(eq(customers.customerNumber, customerNumber)).limit(1);
   if (!customer) return null;
-  const [addressRows, contactRows, identityRows, relationshipRows, accountRows] = await Promise.all([
+  const [addressRows, contactRows, identityRows, documentRows, relationshipRows, accountRows] = await Promise.all([
     db.select().from(addresses).where(eq(addresses.customerId, customer.id)).orderBy(addresses.type),
     db.select().from(contactPoints).where(eq(contactPoints.customerId, customer.id)).orderBy(desc(contactPoints.preferred), contactPoints.type),
     db.select().from(identityDocuments).where(eq(identityDocuments.customerId, customer.id)).orderBy(identityDocuments.type),
+    db.select().from(customerDocumentFiles).where(eq(customerDocumentFiles.customerId, customer.id)).orderBy(customerDocumentFiles.slot),
     db.select().from(customerRelationships).where(eq(customerRelationships.customerId, customer.id)),
     queryAccounts(eq(bankAccounts.customerId, customer.id)),
   ]);
+  const documentBySlot = new Map(documentRows.map((item) => [item.slot, item]));
   const relatedIds = relationshipRows.map((item) => item.relatedCustomerId);
   const relatedRows = relatedIds.length ? await db.select().from(customers).where(inArray(customers.id, relatedIds)) : [];
   const relatedMap = new Map(relatedRows.map((item) => [item.id, item]));
@@ -122,6 +124,10 @@ export async function getCustomer(customerNumber: string): Promise<CustomerDetai
     addresses: addressRows.map((item) => ({ id: item.id, type: item.type, line1: item.line1, line2: item.line2, city: item.city, region: item.region, postalCode: item.postalCode, country: item.country })),
     contacts: contactRows.map((item) => ({ id: item.id, type: item.type, value: item.value, preferred: item.preferred })),
     identityDocuments: identityRows.map((item) => ({ id: item.id, type: item.type, documentNumber: item.documentNumber, issuingCountry: item.issuingCountry, issuedAt: item.issuedAt, expiresAt: item.expiresAt, verificationStatus: item.verificationStatus, verificationMethod: item.verificationMethod, expiryAlertAt: item.expiryAlertAt })),
+    documents: (["PASSPORT", "NATIONAL_ID"] as const).map((slot) => {
+      const item = documentBySlot.get(slot);
+      return item ? { slot, filename: item.filename, mimeType: item.mimeType, sizeBytes: item.sizeBytes, uploadedBy: item.uploadedBy, uploadedAt: iso(item.uploadedAt) } : { slot, empty: true as const };
+    }),
     relationships,
     accounts: accountRows.map(mapAccount),
   };

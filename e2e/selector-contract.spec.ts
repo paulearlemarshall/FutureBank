@@ -14,6 +14,7 @@ test("authenticated pages satisfy the Blue Prism selector contract", async ({ pa
     [`/search?query=${demo.customerNumber}`, "search"],
     ["/customers", "customers"],
     [`/customers/${demo.customerNumber}`, "customer-detail"],
+    [`/customers/${demo.customerNumber}?tab=documents`, "customer-detail"],
     [`/accounts/${demo.accountNumber}`, "account-detail"],
     ["/beneficiaries", "beneficiaries"],
     ["/payments", "payments"],

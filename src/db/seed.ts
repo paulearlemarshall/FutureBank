@@ -12,6 +12,8 @@ import {
   validateBaselineSeed,
 } from "./seed-manifest";
 import { minorUnitsToMoney, moneyToMinorUnits } from "@/modules/domain/transfer-policy";
+import { removeUnreferencedNamespaceBlobs } from "@/lib/document-storage";
+import { prepareSeedDocumentBlobs, type PreparedSeedDocument } from "./seed-documents";
 
 type SeedDb = Database;
 
@@ -49,6 +51,7 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.customerDueDiligenceProfiles);
   await tx.delete(tables.kycCases);
   await tx.delete(tables.screeningWatchlistEntries);
+  await tx.delete(tables.customerDocumentFiles);
   await tx.delete(tables.identityDocuments);
   await tx.delete(tables.contactPoints);
   await tx.delete(tables.addresses);
@@ -58,13 +61,23 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.branches);
 }
 
-export async function seedBaseline(tx: SeedDb): Promise<void> {
+export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDocument[] = []): Promise<void> {
   const errors = validateBaselineSeed();
   if (errors.length) throw new Error(`Invalid baseline seed: ${errors.join("; ")}`);
 
   await tx.insert(tables.branches).values(baselineBranches.map((item) => ({ id: branchId(item.code), ...item })));
   await tx.insert(tables.products).values(baselineProducts.map((item) => ({ id: productId(item.code), ...item })));
   await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, language: "English", ...item })));
+
+  if (preparedDocuments.length) {
+    await tx.insert(tables.customerDocumentFiles).values(preparedDocuments.map((document) => ({
+      id: stableUuid(`customer-document-C000001-${document.slot}`), customerId: customerId("C000001"), slot: document.slot,
+      filename: document.filename, mimeType: document.mimeType, sizeBytes: document.sizeBytes, blobUrl: document.blobUrl,
+      blobPathname: document.blobPathname, blobEtag: document.blobEtag, sha256: document.sha256,
+      uploadedBy: "system.seed", uploadedAt: new Date("2026-07-20T08:00:00.000Z"), isSeeded: true,
+      createdAt: new Date("2026-07-20T08:00:00.000Z"), updatedAt: new Date("2026-07-20T08:00:00.000Z"),
+    })));
+  }
 
   const addressRows = baselineCustomers.map((customer, index) => ({
     id: stableUuid(`address-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "PRIMARY",
@@ -351,15 +364,21 @@ export async function seedBaseline(tx: SeedDb): Promise<void> {
     action: "CUSTOMER_BASELINE_CREATED", entityType: "CUSTOMER", entityReference: customer.customerNumber, correlationId: `SEED-${customer.customerNumber}`,
     before: null, after: { status: customer.status, kycStatus: customer.kycStatus },
   })));
+  if (preparedDocuments.length) await tx.insert(tables.auditEvents).values(preparedDocuments.map((document) => ({
+    id: stableUuid(`audit-document-C000001-${document.slot}`), occurredAt: new Date("2026-07-20T08:00:00.000Z"), actorUsername: "system.seed",
+    action: "DOCUMENT_BASELINE_CREATED", entityType: "CUSTOMER", entityReference: "C000001", correlationId: `SEED-C000001-${document.slot}`,
+    before: null, after: { slot: document.slot, filename: document.filename, mimeType: document.mimeType, sizeBytes: document.sizeBytes },
+  })));
 }
 
 export async function resetBaseline(database: Database, actor: { id: string; username: string }): Promise<void> {
+  const preparedDocuments = await prepareSeedDocumentBlobs();
   await database.transaction(async (transaction) => {
     const tx = transaction as unknown as SeedDb;
     await tx.execute(sql`select pg_advisory_xact_lock(738_204_019)`);
     await tx.delete(tables.loginAttempts).where(lt(tables.loginAttempts.attemptedAt, new Date(Date.now() - 24 * 60 * 60_000)));
     await clearBankingData(tx);
-    await seedBaseline(tx);
+    await seedBaseline(tx, preparedDocuments);
     await tx.insert(tables.auditEvents).values({
       actorUserId: actor.id,
       actorUsername: actor.username,
@@ -371,4 +390,6 @@ export async function resetBaseline(database: Database, actor: { id: string; use
       after: { baselineCustomers: 9, baselineAccounts: 19 },
     });
   });
+  const referenced = new Set((await database.select({ pathname: tables.customerDocumentFiles.blobPathname }).from(tables.customerDocumentFiles)).map((row) => row.pathname));
+  await removeUnreferencedNamespaceBlobs(referenced);
 }

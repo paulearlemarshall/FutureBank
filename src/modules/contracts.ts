@@ -74,9 +74,28 @@ export type CustomerDetail = CustomerListItem & {
   addresses: AddressView[];
   contacts: ContactView[];
   identityDocuments: IdentityDocumentView[];
+  documents: CustomerDocumentSlot[];
   relationships: RelationshipView[];
   accounts: AccountListItem[];
 };
+
+export type DocumentSlot = "PASSPORT" | "NATIONAL_ID";
+
+export type DocumentMeta = {
+  slot: DocumentSlot;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedAt: string;
+};
+
+export type EmptyDocumentSlot = {
+  slot: DocumentSlot;
+  empty: true;
+};
+
+export type CustomerDocumentSlot = DocumentMeta | EmptyDocumentSlot;
 
 export type AddressView = {
   id: string;

@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -41,6 +42,7 @@ export const overdraftStatusEnum = pgEnum("overdraft_status", ["DRAFT", "PENDING
 export const overdraftAlertTypeEnum = pgEnum("overdraft_alert_type", ["REPEAT_USE", "HIGH_UTILIZATION", "REVIEW_DUE", "FINANCIAL_DIFFICULTY"]);
 export const overdraftAlertStatusEnum = pgEnum("overdraft_alert_status", ["OPEN", "ASSIGNED", "RESOLVED"]);
 export const holdStatusEnum = pgEnum("hold_status", ["ACTIVE", "RELEASED", "CONSUMED", "EXPIRED"]);
+export const documentSlotEnum = pgEnum("document_slot", ["PASSPORT", "NATIONAL_ID"]);
 
 // Better Auth core tables. Their exports and column names intentionally match
 // Better Auth's Drizzle adapter conventions.
@@ -182,6 +184,27 @@ export const identityDocuments = pgTable("identity_documents", {
   expiryAlertAt: date("expiry_alert_at"),
   ...timestamps,
 }, (table) => [index("identity_customer_idx").on(table.customerId)]);
+
+export const customerDocumentFiles = pgTable("customer_document_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+  slot: documentSlotEnum("slot").notNull(),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  blobUrl: text("blob_url").notNull(),
+  blobPathname: text("blob_pathname").notNull(),
+  blobEtag: text("blob_etag"),
+  sha256: text("sha256"),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  isSeeded: boolean("is_seeded").notNull().default(false),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("customer_document_files_slot_idx").on(table.customerId, table.slot),
+  index("customer_document_files_customer_idx").on(table.customerId),
+  index("customer_document_files_pathname_idx").on(table.blobPathname),
+]);
 
 export const customerRelationships = pgTable("customer_relationships", {
   id: uuid("id").primaryKey().defaultRandom(),

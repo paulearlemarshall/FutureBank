@@ -56,6 +56,15 @@ export function jsonResponse(data: unknown, init: ResponseInit = {}): Response {
   return Response.json({ data }, { ...init, headers });
 }
 
+export function safeContentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replaceAll("\\", "_").replaceAll('"', "'");
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+export function binaryStreamResponse(stream: ReadableStream<Uint8Array>, mimeType: string, filename: string): Response {
+  return new Response(stream, { headers: { "Content-Type": mimeType, "Content-Disposition": safeContentDisposition(filename), "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+}
+
 export function errorResponse(error: unknown): Response {
   const apiError = error instanceof ApiError
     ? error

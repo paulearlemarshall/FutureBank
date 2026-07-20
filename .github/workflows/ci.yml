@@ -34,6 +34,8 @@ jobs:
       DEMO_ADMIN_PASSWORD: ci-only-admin-password
       FUTUREBANK_API_KEY: ci-only-futurebank-api-key
       FUTUREBANK_API_DEFAULT_USERNAME: bp.operator
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      FUTUREBANK_BLOB_NAMESPACE: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,3 +54,6 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium msedge
       - run: npm run test:e2e
+      - name: Clean customer document Blob namespace
+        if: always()
+        run: npx tsx scripts/cleanup-document-blobs.ts

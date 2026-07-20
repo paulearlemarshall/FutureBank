@@ -3,18 +3,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutomationPage } from "@/components/banking/automation-page";
 import { CustomerTabs } from "@/components/banking/customer-tabs";
+import { CustomerDocuments } from "@/components/banking/customer-documents";
 import { formatDate, formatMoney, labelEnum } from "@/components/banking/format";
 import { Badge, Breadcrumbs, Panel } from "@/components/banking/ui";
 import { getCustomer, listAuditEvents } from "@/modules/queries";
 import { getKycCase, listKycCases } from "@/modules/operations-queries";
+import { documentBlobPrefix } from "@/lib/document-storage";
+import { getCurrentUser } from "@/lib/auth/session";
+import { hasPermission } from "@/modules/domain/auth-policy";
 
 export const metadata: Metadata = { title: "Customer details" };
-type Tab = "Overview" | "Accounts" | "KYC" | "Contact & address" | "Relationships" | "Audit";
+type Tab = "Overview" | "Accounts" | "KYC" | "Documents" | "Contact & address" | "Relationships" | "Audit";
 
 function tabFrom(value?: string): Tab {
   const normalized = value?.toLowerCase();
   if (normalized === "accounts") return "Accounts";
   if (normalized === "kyc") return "KYC";
+  if (normalized === "documents") return "Documents";
   if (normalized === "contact & address") return "Contact & address";
   if (normalized === "relationships") return "Relationships";
   if (normalized === "audit") return "Audit";
@@ -29,6 +34,7 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
   const customerAudit = activeTab === "Audit" ? (await listAuditEvents({ query: customerNumber, limit: 100 })) : [];
   const customerKycCases = activeTab === "KYC" ? (await listKycCases()).filter((item) => item.customerNumber === customerNumber) : [];
   const latestKyc = customerKycCases[0] ? await getKycCase(customerKycCases[0].reference) : null;
+  const currentUser = activeTab === "Documents" ? await getCurrentUser() : null;
 
   return (
     <AutomationPage name="customer-detail">
@@ -47,6 +53,8 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
       {activeTab === "Accounts" ? <Panel title={`Accounts (${customer.accounts.length})`}><div style={{ margin: "-16px" }}><table className="data-table" data-bp="customer-accounts-table"><thead><tr><th>Account</th><th>Product</th><th>Currency</th><th>Status</th><th className="numeric">Available balance</th></tr></thead><tbody>{customer.accounts.map((account) => <tr key={account.accountNumber}><td className="mono"><Link href={`/accounts/${account.accountNumber}`} data-bp={`customer-account-${account.accountNumber}`}>{account.accountNumber}</Link></td><td>{account.productName}</td><td>{account.currency}</td><td><Badge tone={account.status === "ACTIVE" ? "positive" : "warning"}>{labelEnum(account.status)}</Badge></td><td className="numeric">{formatMoney(account.availableBalance, account.currency)}</td></tr>)}</tbody></table></div></Panel> : null}
 
       {activeTab === "KYC" ? <div className="page-stack"><div className="equal-columns"><Panel title="KYC profile"><dl className="definition-grid"><div><dt>Status</dt><dd>{labelEnum(customer.kycStatus)}</dd></div><div><dt>Risk rating</dt><dd>{labelEnum(customer.riskRating)}</dd></div><div><dt>Review date</dt><dd>{formatDate(customer.kycReviewDate)}</dd></div><div><dt>CDD purpose</dt><dd>{latestKyc?.profile?.accountPurpose ?? "—"}</dd></div><div><dt>Source of funds</dt><dd>{latestKyc?.profile?.sourceOfFunds ?? "—"}</dd></div><div><dt>Source of wealth</dt><dd>{latestKyc?.profile?.sourceOfWealth ?? "—"}</dd></div></dl></Panel><Panel title={`Identity documents (${customer.identityDocuments.length})`}>{customer.identityDocuments.map((document) => <dl className="definition-grid" key={document.id}><div><dt>Type</dt><dd>{document.type}</dd></div><div><dt>Document number</dt><dd className="mono">{document.documentNumber}</dd></div><div><dt>Verification</dt><dd>{labelEnum(document.verificationStatus)}</dd></div><div><dt>Method</dt><dd>{document.verificationMethod ?? "—"}</dd></div><div><dt>Issued</dt><dd>{formatDate(document.issuedAt)}</dd></div><div><dt>Expires</dt><dd>{formatDate(document.expiresAt)}</dd></div></dl>)}</Panel></div><Panel title={`KYC case history (${customerKycCases.length})`}><table className="data-table" data-bp="customer-kyc-case-table"><thead><tr><th>Case</th><th>Type</th><th>Status</th><th>Risk score</th><th>Risk rating</th><th>Due</th></tr></thead><tbody>{customerKycCases.map((item) => <tr key={item.reference}><td className="mono"><Link href={`/kyc/${item.reference}`} data-bp={`customer-kyc-case-${item.reference}`}>{item.reference}</Link></td><td>{labelEnum(item.type)}</td><td>{labelEnum(item.status)}</td><td>{item.riskScore}</td><td>{labelEnum(item.riskRating)}</td><td>{formatDate(item.dueAt, true)}</td></tr>)}</tbody></table></Panel>{latestKyc ? <><Panel title="Screening history"><table className="data-table" data-bp="customer-screening-table"><thead><tr><th>Reference</th><th>Type</th><th>Outcome</th><th>Score</th><th>Resolution</th></tr></thead><tbody>{latestKyc.screenings.map((item) => <tr key={item.reference}><td className="mono">{item.reference}</td><td>{labelEnum(item.screeningType)}</td><td>{labelEnum(item.outcome)}</td><td>{item.matchScore}</td><td>{item.resolutionComment ?? "—"}</td></tr>)}</tbody></table></Panel><Panel title="Evidence and restrictions"><table className="data-table" data-bp="customer-kyc-evidence-table"><thead><tr><th>Evidence</th><th>Type</th><th>Verification</th><th>Expires</th></tr></thead><tbody>{latestKyc.evidence.map((item) => <tr key={item.reference}><td className="mono">{item.reference}</td><td>{labelEnum(item.evidenceType)}</td><td>{labelEnum(item.verificationStatus)}</td><td>{item.expiresAt ? formatDate(item.expiresAt) : "—"}</td></tr>)}</tbody></table><table className="data-table" data-bp="customer-restrictions-table"><thead><tr><th>Restriction</th><th>Type</th><th>Reason</th><th>Active</th></tr></thead><tbody>{latestKyc.restrictions.map((item) => <tr key={item.reference}><td className="mono">{item.reference}</td><td>{labelEnum(item.type)}</td><td>{item.reason}</td><td>{item.active ? "Yes" : "No"}</td></tr>)}</tbody></table></Panel></> : null}</div> : null}
+
+      {activeTab === "Documents" ? <Panel title="Customer documents" description="Private Passport and National ID files. JPEG, PNG or PDF; maximum 4 MB."><CustomerDocuments customerNumber={customer.customerNumber} documents={customer.documents} uploadPrefix={documentBlobPrefix()} canEdit={Boolean(currentUser && hasPermission(currentUser.role, "KYC_GATHER"))} /></Panel> : null}
 
       {activeTab === "Contact & address" ? <div className="equal-columns"><Panel title="Addresses">{customer.addresses.map((address) => <dl className="definition-grid" key={address.id}><div><dt>Type</dt><dd>{address.type}</dd></div><div className="span-2"><dt>Address</dt><dd>{[address.line1, address.line2, address.city, address.region, address.postalCode, address.country].filter(Boolean).join(", ")}</dd></div></dl>)}</Panel><Panel title="Contact points"><table className="data-table" data-bp="customer-contact-table"><thead><tr><th>Type</th><th>Value</th><th>Preferred</th></tr></thead><tbody>{customer.contacts.map((contact) => <tr key={contact.id}><td>{contact.type}</td><td>{contact.value}</td><td>{contact.preferred ? "Yes" : "No"}</td></tr>)}</tbody></table></Panel></div> : null}
 

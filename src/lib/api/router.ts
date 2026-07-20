@@ -2,6 +2,10 @@ import "server-only";
 
 import type { PaymentApprovalDetail, WorkItemPriority, WorkItemStatus, WorkItemType } from "@/modules/contracts";
 import { initialActionState } from "@/modules/contracts";
+import { requirePermission } from "@/lib/auth/session";
+import { isDocumentSlot } from "@/modules/domain/document-policy";
+import { BankingError } from "@/modules/services/errors";
+import { deleteCustomerDocument, getCustomerDocumentContent, uploadCustomerDocument } from "@/modules/services/documents";
 import {
   createBeneficiaryAction, createCustomerAction, openAccountAction, submitPaymentAction,
   updateAccountStatusAction, updateBeneficiaryAction, updateCustomerAction,
@@ -26,7 +30,7 @@ import {
   listOverdraftFacilities, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
-  ApiError, formDataFromObject, integerQuery, jsonResponse, readJsonObject, responseForAction,
+  ApiError, binaryStreamResponse, formDataFromObject, integerQuery, jsonResponse, readJsonObject, responseForAction,
 } from "./http";
 
 const paymentStatuses = new Set<PaymentApprovalDetail["status"]>(["BOOKED", "PENDING", "REJECTED", "EXPIRED"]);
@@ -36,6 +40,20 @@ const priorities = new Set<WorkItemPriority>(["LOW", "NORMAL", "HIGH", "CRITICAL
 
 function notFound(resource = "API route"): never {
   throw new ApiError(404, "NOT_FOUND", `${resource} was not found.`);
+}
+
+async function documentWriteActor() {
+  try { return await requirePermission("KYC_GATHER"); }
+  catch { throw new ApiError(403, "FORBIDDEN", "The selected staff actor cannot maintain customer documents."); }
+}
+
+function documentFailure(error: unknown): never {
+  if (error instanceof ApiError) throw error;
+  if (error instanceof BankingError) {
+    const status = error.code === "CUSTOMER_NOT_FOUND" ? 404 : error.code === "FORBIDDEN" ? 403 : 400;
+    throw new ApiError(status, error.code, error.message);
+  }
+  throw error;
 }
 
 function enumQuery<T extends string>(url: URL, name: string, values: Set<T>): T | undefined {
@@ -56,7 +74,7 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
       name: "FutureBank API", version: "1.0.0", openapi: "/api/openapi.json",
-      resources: ["customers", "accounts", "beneficiaries", "payments", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -67,6 +85,25 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       const item = await getCustomer(segments[1]);
       if (!item) notFound("Customer");
       return jsonResponse(item);
+    }
+    if (segments[0] === "customers" && segments.length === 3 && segments[2] === "documents") {
+      const item = await getCustomer(segments[1]);
+      if (!item) notFound("Customer");
+      return jsonResponse(item.documents);
+    }
+    if (segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
+      if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
+      const item = await getCustomer(segments[1]);
+      if (!item) notFound("Customer");
+      const document = item.documents.find((candidate) => candidate.slot === segments[3]);
+      if (!document || "empty" in document) notFound("Customer document");
+      return jsonResponse(document);
+    }
+    if (segments[0] === "customers" && segments.length === 5 && segments[2] === "documents" && segments[4] === "content") {
+      if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
+      const content = await getCustomerDocumentContent(segments[1], segments[3]);
+      if (!content) notFound("Customer document");
+      return binaryStreamResponse(content.stream, content.document.mimeType, content.document.filename);
     }
     if (segments[0] === "accounts" && segments.length === 1) return jsonResponse(await listAccounts({
       query: url.searchParams.get("query") ?? undefined,
@@ -177,6 +214,26 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     if (segments[0] === "beneficiaries" && segments.length === 2) return responseForAction(await updateBeneficiaryAction(segments[1], initialActionState, await bodyForm(request)));
     if (segments[0] === "kyc-cases" && segments.length === 3 && segments[2] === "cdd") return responseForAction(await updateCddProfileAction(segments[1], initialActionState, await bodyForm(request)));
     notFound();
+  }
+
+  if (method === "PUT" && segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
+    if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
+    try {
+      const actor = await documentWriteActor();
+      const form = await request.formData();
+      const file = form.get("file");
+      if (!(file instanceof File)) throw new ApiError(400, "VALIDATION_ERROR", "A multipart file field named file is required.", { file: ["Choose a document file"] });
+      const result = await uploadCustomerDocument({ customerNumber: segments[1], slot: segments[3], file }, actor);
+      return jsonResponse(result.document, { status: result.created ? 201 : 200 });
+    } catch (error) { documentFailure(error); }
+  }
+
+  if (method === "DELETE" && segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
+    if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
+    try {
+      const actor = await documentWriteActor();
+      return jsonResponse({ deleted: await deleteCustomerDocument({ customerNumber: segments[1], slot: segments[3] }, actor) });
+    } catch (error) { documentFailure(error); }
   }
 
   throw new ApiError(405, "METHOD_NOT_ALLOWED", "This API method is not supported.");

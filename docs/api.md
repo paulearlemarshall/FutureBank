@@ -1,6 +1,6 @@
 # FutureBank REST API
 
-The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, accounts, beneficiaries, payments, KYC, overdrafts and work items.
+The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, payments, KYC, overdrafts and work items.
 
 ## Authentication and actors
 
@@ -40,6 +40,24 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/payments" \
 ```
 
 Successful responses use `{ "data": ... }`. Errors use `{ "error": { "code", "message", "fieldErrors"? } }` with an appropriate HTTP status. Money values are decimal strings and callers should reuse the same `Idempotency-Key` when retrying a payment.
+
+## Customer document examples
+
+```bash
+# List Passport and National ID slots
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY"
+
+# Upload or replace the Passport slot (maximum 4 MB)
+curl -X PUT "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.operator" \
+  -F "file=@Passport-AmeliaHart.jpg;type=image/jpeg"
+
+# Stream the authenticated file bytes
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT/content" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" --output passport.jpg
+```
 
 ## OpenAPI
 
