@@ -4,6 +4,12 @@ FutureBank Core is a fictional core-banking application for Blue Prism demonstra
 
 All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 
+## Deterministic demonstration baseline
+
+An administrative reset restores nine customers and nineteen accounts. The original identifiers `C000001`–`C000005` and `1000000001`–`1000000014` remain unchanged. Additional scenarios cover KYC not started, in progress, pending approval and expired; active, blocked and closed accounts; every reachable overdraft lifecycle state; booked, pending, rejected and expired payments; all hold and work-item states; and open, assigned and resolved overdraft alerts.
+
+Useful starting records include `KYC-000007` for an unresolved fictional match, `KYC-000008` for Compliance approval, `1000000017` for a blocked account, `1000000018` for a closed account, `ODF-000006` for a pending limit change, and `PAY-000002`–`PAY-000004` for terminal payment and hold outcomes.
+
 ## Live demonstration
 
 The production demonstration is available at [future-bank-demo.vercel.app](https://future-bank-demo.vercel.app). Demo usernames are `bp.operator`, `bp.supervisor`, `bp.compliance`, and `bp.admin`; passwords are managed as Vercel environment variables and are intentionally not stored in this public repository.
@@ -38,7 +44,7 @@ npm test
 npm run build
 ```
 
-The unit suite covers monetary validation, role boundaries, same-currency transfer rules, insufficient funds, read-only accounts, balanced double-entry postings, and deterministic seed identifiers.
+The unit suite covers monetary validation, role boundaries, same-currency transfer rules, insufficient funds, read-only accounts, balanced double-entry postings, deterministic seed identifiers, and baseline state coverage.
 
 Browser tests use the running local application by default and load its ignored `.env.local` through Next.js's environment loader. You can also override the two passwords in the test process, then run:
 

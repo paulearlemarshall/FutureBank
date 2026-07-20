@@ -15,19 +15,30 @@ async function scalar(statement: ReturnType<typeof sql>): Promise<number> {
 }
 
 async function main() {
-  expectEqual("customers", await scalar(sql`select count(*)::int as value from customers`), 5);
-  expectEqual("retail customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'RETAIL'`), 3);
-  expectEqual("SME customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'SME'`), 2);
-  expectEqual("unique RIM identifiers", await scalar(sql`select count(distinct rim_number)::int as value from customers where rim_number like 'RIM%'`), 5);
-  expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 7);
-  expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 14);
+  expectEqual("customers", await scalar(sql`select count(*)::int as value from customers`), 9);
+  expectEqual("retail customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'RETAIL'`), 6);
+  expectEqual("SME customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'SME'`), 3);
+  expectEqual("unique RIM identifiers", await scalar(sql`select count(distinct rim_number)::int as value from customers where rim_number like 'RIM%'`), 9);
+  expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 13);
+  expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 19);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
-  expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 12);
-  expectEqual("KYC cases", await scalar(sql`select count(*)::int as value from kyc_cases`), 5);
-  expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 5);
+  expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
+  expectEqual("KYC cases", await scalar(sql`select count(*)::int as value from kyc_cases`), 8);
+  expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 9);
   expectEqual("active payment holds", await scalar(sql`select count(*)::int as value from account_holds where status = 'ACTIVE'`), 1);
-  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 3);
-  expectEqual("confirmed fictional sanctions restrictions", await scalar(sql`select count(*)::int as value from customer_restrictions where type = 'DEBIT_BLOCK' and active`), 1);
+  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 5);
+  expectEqual("active debit restrictions", await scalar(sql`select count(*)::int as value from customer_restrictions where type = 'DEBIT_BLOCK' and active`), 2);
+  expectEqual("account status coverage", await scalar(sql`select count(distinct status)::int as value from bank_accounts`), 3);
+  expectEqual("payment status coverage", await scalar(sql`select count(distinct status)::int as value from payment_orders`), 4);
+  expectEqual("hold status coverage", await scalar(sql`select count(distinct status)::int as value from account_holds`), 4);
+  expectEqual("work-item status coverage", await scalar(sql`select count(distinct status)::int as value from work_items`), 6);
+  expectEqual("reachable overdraft status coverage", await scalar(sql`select count(distinct status)::int as value from overdraft_facilities where status <> 'DRAFT'`), 7);
+  expectEqual("active KYC case uniqueness violations", await scalar(sql`
+    select count(*)::int as value from (
+      select customer_id from kyc_cases where status in ('OPEN', 'IN_PROGRESS', 'AWAITING_INFORMATION', 'PENDING_APPROVAL')
+      group by customer_id having count(*) > 1
+    ) duplicates
+  `), 0);
   expectEqual("accounts below transaction minimum", await scalar(sql`
     select count(*)::int as value from (
       select a.id from bank_accounts a left join ledger_entries e on e.account_id = a.id
