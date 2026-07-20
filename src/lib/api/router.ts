@@ -103,7 +103,10 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
       const content = await getCustomerDocumentContent(segments[1], segments[3]);
       if (!content) notFound("Customer document");
-      return binaryStreamResponse(content.stream, content.document.mimeType, content.document.filename);
+      return binaryStreamResponse(content.stream, content.document.mimeType, content.document.filename, {
+        sizeBytes: content.document.sizeBytes,
+        etag: content.document.blobEtag ?? undefined,
+      });
     }
     if (segments[0] === "accounts" && segments.length === 1) return jsonResponse(await listAccounts({
       query: url.searchParams.get("query") ?? undefined,
@@ -220,6 +223,9 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
     try {
       const actor = await documentWriteActor();
+      if (!request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) {
+        throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Customer document uploads require multipart/form-data with a file field.");
+      }
       const form = await request.formData();
       const file = form.get("file");
       if (!(file instanceof File)) throw new ApiError(400, "VALIDATION_ERROR", "A multipart file field named file is required.", { file: ["Choose a document file"] });

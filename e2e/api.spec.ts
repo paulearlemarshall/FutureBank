@@ -25,7 +25,22 @@ test("reads Amelia Hart's seeded private document metadata and content", async (
   const content = await request.get("/api/v1/customers/C000001/documents/PASSPORT/content", { headers });
   expect(content.ok()).toBe(true);
   expect(content.headers()["content-type"]).toContain("image/jpeg");
+  expect(content.headers()["content-length"]).toBe("58533");
+  expect(content.headers().etag).toBeTruthy();
+  expect(content.headers()["cache-control"]).toBe("no-store");
   expect((await content.body()).byteLength).toBe(58533);
+});
+
+test("requires multipart form data for customer document uploads", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const response = await request.put("/api/v1/customers/C000006/documents/PASSPORT", {
+    headers: { "X-API-Key": apiKey!, "X-Staff-Username": "bp.operator", "Content-Type": "application/json" },
+    data: { file: "not-binary" },
+  });
+  expect(response.status()).toBe(415);
+  expect(await response.json()).toEqual({
+    error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Customer document uploads require multipart/form-data with a file field." },
+  });
 });
 
 test("enforces document write permissions without mutating data", async ({ request }) => {
