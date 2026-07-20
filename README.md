@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FutureBank Core
 
-## Getting Started
+FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic customer, account, beneficiary, payment, statement, and audit workflows.
 
-First, run the development server:
+All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 
-```bash
+## Live demonstration
+
+The production demonstration is available at [future-bank-demo.vercel.app](https://future-bank-demo.vercel.app). Demo usernames are `bp.operator` and `bp.admin`; passwords are managed as Vercel environment variables and are intentionally not stored in this public repository.
+
+## Stack
+
+- Next.js 16 App Router, React 19, and TypeScript
+- Drizzle ORM with Neon Serverless Postgres
+- Better Auth username/password sessions
+- Vitest domain tests and Playwright browser tests
+- Vercel deployment
+
+## Local setup
+
+Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string and authentication secrets; demo credentials are supplied through `DEMO_OPERATOR_PASSWORD` and `DEMO_ADMIN_PASSWORD` and must not be committed. For a linked Vercel project, `vercel env pull .env.local` retrieves the development values.
+
+```powershell
+npm install
+npm run db:migrate
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The seeded usernames are `bp.operator` and `bp.admin`; their passwords are the corresponding environment-variable values.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quality checks
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```powershell
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-## Learn More
+The unit suite covers monetary validation, role boundaries, same-currency transfer rules, insufficient funds, read-only accounts, balanced double-entry postings, and deterministic seed identifiers.
 
-To learn more about Next.js, take a look at the following resources:
+Browser tests use the running local application by default and load its ignored `.env.local` through Next.js's environment loader. You can also override the two passwords in the test process, then run:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+$env:DEMO_OPERATOR_PASSWORD = "<operator password>"
+$env:DEMO_ADMIN_PASSWORD = "<admin password>"
+npm run test:e2e
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Set `PLAYWRIGHT_BASE_URL` to test a deployed environment. The suite runs serially in Chromium and Microsoft Edge because canonical journeys share deterministic demo data. The suite includes an administrator reset that restores the deterministic baseline, so run it only against a demonstration environment that is safe to reset.
 
-## Deploy on Vercel
+Test evidence (traces, screenshots, and video) is retained on failure. Playwright's HTML report is written to `playwright-report/`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Blue Prism automation contract
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Automation must target `data-bp` attributes and wait for the route's `[data-bp-page][data-bp-ready="true"]` marker. Do not target generated CSS classes or element positions. The full compatibility rules and canonical journeys are documented in [docs/blue-prism-selector-contract.md](docs/blue-prism-selector-contract.md).
+
+The application uses native labelled form controls and semantic tables, stable IDs and names, persistent status/error regions, and deterministic baseline customer/account numbers so processes remain spyable after an administrative reset.
+
+## Database lifecycle
+
+- `npm run db:generate` generates a migration after schema changes.
+- `npm run db:migrate` applies committed migrations.
+- `npm run db:seed` creates the deterministic demonstration dataset.
+- `npm run db:reset` restores banking-domain data in a controlled development environment.
+
+Migrations are applied explicitly and are not run during `next build`. Production and preview/development databases should use separate Neon branches.
