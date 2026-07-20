@@ -57,3 +57,108 @@ jobs:
       - name: Clean customer document Blob namespace
         if: always()
         run: npx tsx scripts/cleanup-document-blobs.ts
+
+  browser-upload-e2e:
+    needs: verify
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: futurebank
+          POSTGRES_PASSWORD: futurebank
+          POSTGRES_DB: futurebank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U futurebank -d futurebank"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://futurebank:futurebank@127.0.0.1:5432/futurebank
+      BETTER_AUTH_SECRET: ci-only-futurebank-secret-with-at-least-32-characters
+      DEMO_OPERATOR_PASSWORD: ci-only-operator-password
+      DEMO_SUPERVISOR_PASSWORD: ci-only-supervisor-password
+      DEMO_COMPLIANCE_PASSWORD: ci-only-compliance-password
+      DEMO_ADMIN_PASSWORD: ci-only-admin-password
+      FUTUREBANK_API_KEY: ci-only-futurebank-api-key
+      FUTUREBANK_API_DEFAULT_USERNAME: bp.operator
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      FUTUREBANK_BLOB_NAMESPACE: ci-tunnel-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx drizzle-kit migrate
+      - run: npx tsx scripts/reset.ts
+      - run: npm run build
+
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o /usr/local/bin/cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /usr/local/bin/cloudflared
+          cloudflared --version
+
+      - name: Start cloudflared quick tunnel
+        run: |
+          cloudflared tunnel --url http://127.0.0.1:3000 > cloudflared.log 2>&1 &
+          echo $! > cloudflared.pid
+          url=""
+          for i in $(seq 1 30); do
+            url=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' cloudflared.log | head -n1 || true)
+            if [ -n "$url" ]; then break; fi
+            sleep 1
+          done
+          if [ -z "$url" ]; then
+            echo "::error::cloudflared did not print a trycloudflare.com URL within 30s"
+            cat cloudflared.log
+            exit 1
+          fi
+          echo "Tunnel URL: $url"
+          echo "TUNNEL_URL=$url" >> "$GITHUB_ENV"
+
+      - name: Start production server
+        run: |
+          BETTER_AUTH_URL="$TUNNEL_URL" VERCEL_BLOB_CALLBACK_URL="$TUNNEL_URL" npm run start > server.log 2>&1 &
+          echo $! > server.pid
+
+      - name: Wait for server readiness
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3000/api/health" || true)
+            if [ "$code" = "200" ]; then echo "Server ready"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::Server did not become healthy within timeout"
+          cat server.log
+          exit 1
+
+      - run: npx playwright install --with-deps chromium
+      - name: Run browser-upload e2e spec against tunnel
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ env.TUNNEL_URL }}
+        run: npx playwright test e2e/customer-documents.spec.ts --project=chromium
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          [ -f server.pid ] && kill "$(cat server.pid)" 2>/dev/null || true
+          [ -f cloudflared.pid ] && kill "$(cat cloudflared.pid)" 2>/dev/null || true
+
+      - name: Clean customer document Blob namespace
+        if: always()
+        run: npx tsx scripts/cleanup-document-blobs.ts
+
+      - name: Upload server and tunnel logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-upload-e2e-logs
+          path: |
+            server.log
+            cloudflared.log
