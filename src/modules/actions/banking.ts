@@ -6,12 +6,12 @@ import { z } from "zod";
 import { db } from "@/db";
 import {
   accountStatusHistory, addresses, auditEvents, bankAccounts, beneficiaries, branches, clearingAccounts,
-  clearingEntries, contactPoints, customers, ledgerEntries, ledgerTransactions, paymentOrders, products,
+  clearingEntries, contactPoints, customerRestrictions, customers, identityDocuments, ledgerEntries, ledgerTransactions, paymentOrders, products,
 } from "@/db/schema";
 import { resetBaseline } from "@/db/seed";
 import { requireActionUser } from "@/lib/auth/session";
 import type { ActionState } from "@/modules/contracts";
-import { moneyToMinorUnits, minorUnitsToMoney } from "@/modules/domain/transfer-policy";
+import { moneyToMinorUnits, minorUnitsToMoney, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 import { BankingError, bookExternalPayment, bookInternalTransfer } from "@/modules/services/payments";
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "").trim();
@@ -48,13 +48,15 @@ const customerSchema = z.object({
   partyType: z.enum(["RETAIL", "SME"]), title: z.string().nullable(), givenName: z.string().nullable(), familyName: z.string().nullable(),
   legalName: z.string().nullable(), shortName: z.string().min(2), dateOfBirth: z.string().nullable(), registrationNumber: z.string().nullable(),
   gender: z.string().nullable(), maritalStatus: z.string().nullable(), nationality: z.string().length(2), residenceCountry: z.string().length(2),
-  language: z.string().min(2), sector: z.string().min(2), industry: z.string().min(2), kycStatus: z.enum(["COMPLETE", "DUE", "REVIEW"]),
+  language: z.string().min(2), sector: z.string().min(2), industry: z.string().min(2), kycStatus: z.enum(["NOT_STARTED", "IN_PROGRESS", "AWAITING_INFORMATION", "PENDING_APPROVAL", "APPROVED", "DUE", "REJECTED", "EXPIRED"]),
   riskRating: z.enum(["LOW", "MEDIUM", "HIGH"]), kycReviewDate: z.string().min(10), taxId: z.string().min(3), branchCode: z.string().min(3), relationshipManager: z.string().min(2),
   addressLine1: z.string().min(3), addressLine2: z.string().nullable(), city: z.string().min(2), region: z.string().nullable(), postalCode: z.string().min(2), country: z.string().length(2),
   email: z.email(), phone: z.string().min(7),
+  identityDocumentType: z.string().nullable(), identityDocumentNumber: z.string().nullable(), identityIssuingCountry: z.string().nullable(), identityIssuedAt: z.string().nullable(), identityExpiresAt: z.string().nullable(),
 }).superRefine((value, context) => {
   if (value.partyType === "RETAIL" && (!value.givenName || !value.familyName || !value.dateOfBirth)) context.addIssue({ code: "custom", path: ["givenName"], message: "Retail customers require given name, family name, and date of birth" });
   if (value.partyType === "SME" && (!value.legalName || !value.registrationNumber)) context.addIssue({ code: "custom", path: ["legalName"], message: "SME customers require legal name and registration number" });
+  if (value.identityDocumentNumber && (!value.identityDocumentType || !value.identityIssuingCountry || !value.identityIssuedAt || !value.identityExpiresAt)) context.addIssue({ code: "custom", path: ["identityDocumentNumber"], message: "Document type, country, issue date and expiry date are required when recording an identity document" });
 });
 
 function customerForm(formData: FormData) {
@@ -67,6 +69,8 @@ function customerForm(formData: FormData) {
     kycReviewDate: text(formData, "kycReviewDate") || new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10), taxId: text(formData, "taxId") || "AUTO", branchCode: text(formData, "branchCode") || (residenceCountry === "AE" ? "DXB001" : "LON001"), relationshipManager: text(formData, "relationshipManager"),
     addressLine1: text(formData, "addressLine1"), addressLine2: optionalText(formData, "addressLine2"), city: text(formData, "city"), region: optionalText(formData, "region"), postalCode: text(formData, "postalCode"), country: (text(formData, "country") || residenceCountry).toUpperCase(),
     email: text(formData, "email").toLowerCase(), phone: text(formData, "phone"),
+    identityDocumentType: optionalText(formData, "identityDocumentType"), identityDocumentNumber: optionalText(formData, "identityDocumentNumber"), identityIssuingCountry: optionalText(formData, "identityIssuingCountry")?.toUpperCase() ?? null,
+    identityIssuedAt: optionalText(formData, "identityIssuedAt"), identityExpiresAt: optionalText(formData, "identityExpiresAt"),
   };
 }
 
@@ -82,7 +86,7 @@ export async function createCustomerAction(_previous: ActionState, formData: For
       const next = `C${(Number(rows[0]?.max_number ?? 0) + 1).toString().padStart(6, "0")}`;
       const value = parsed.data;
       const [created] = await tx.insert(customers).values({
-        customerNumber: next, partyType: value.partyType, title: value.title, givenName: value.givenName, familyName: value.familyName,
+        customerNumber: next, rimNumber: `RIM${next.slice(1)}`, partyType: value.partyType, title: value.title, givenName: value.givenName, familyName: value.familyName,
         legalName: value.legalName, shortName: value.shortName, dateOfBirth: value.dateOfBirth, registrationNumber: value.registrationNumber,
         gender: value.gender, maritalStatus: value.maritalStatus, nationality: value.nationality, residenceCountry: value.residenceCountry,
         language: value.language, sector: value.sector, industry: value.industry, kycStatus: value.kycStatus, riskRating: value.riskRating,
@@ -93,6 +97,13 @@ export async function createCustomerAction(_previous: ActionState, formData: For
         { customerId: created.id, type: "EMAIL", value: value.email, preferred: true },
         { customerId: created.id, type: "MOBILE", value: value.phone, preferred: false },
       ]);
+      if (value.identityDocumentNumber && value.identityDocumentType && value.identityIssuingCountry && value.identityIssuedAt && value.identityExpiresAt) {
+        await tx.insert(identityDocuments).values({
+          customerId: created.id, type: value.identityDocumentType, documentNumber: value.identityDocumentNumber,
+          issuingCountry: value.identityIssuingCountry, issuedAt: value.identityIssuedAt, expiresAt: value.identityExpiresAt,
+          verificationStatus: "NOT_VERIFIED", verificationMethod: "Awaiting KYC verification",
+        });
+      }
       await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "CUSTOMER_CREATED", entityType: "CUSTOMER", entityReference: next, correlationId: crypto.randomUUID(), before: null, after: { shortName: value.shortName, partyType: value.partyType } });
       return next;
     });
@@ -104,7 +115,7 @@ export async function createCustomerAction(_previous: ActionState, formData: For
 const customerUpdateSchema = z.object({
   partyType: z.enum(["RETAIL", "SME"]), title: z.string().nullable(), givenName: z.string().nullable(), familyName: z.string().nullable(), legalName: z.string().nullable(),
   shortName: z.string().min(2), dateOfBirth: z.string().nullable(), registrationNumber: z.string().nullable(), nationality: z.string().length(2), residenceCountry: z.string().length(2),
-  status: z.enum(["ACTIVE", "INACTIVE", "RESTRICTED"]), kycStatus: z.enum(["COMPLETE", "DUE", "REVIEW"]), riskRating: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  status: z.enum(["ACTIVE", "INACTIVE", "RESTRICTED"]), kycStatus: z.enum(["NOT_STARTED", "IN_PROGRESS", "AWAITING_INFORMATION", "PENDING_APPROVAL", "APPROVED", "DUE", "REJECTED", "EXPIRED"]), riskRating: z.enum(["LOW", "MEDIUM", "HIGH"]),
   kycReviewDate: z.string().min(10), language: z.string().min(2), taxId: z.string().min(3), branchCode: z.string().min(3), relationshipManager: z.string().min(2), sector: z.string().min(2), industry: z.string().min(2),
   addressLine1: z.string().min(3), city: z.string().min(2), postalCode: z.string().min(2), country: z.string().length(2), email: z.email(), phone: z.string().min(7),
 });
@@ -144,6 +155,7 @@ export async function openAccountAction(_previous: ActionState, formData: FormDa
         tx.select().from(branches).where(eq(branches.code, parsed.data.branchCode)).limit(1),
       ]);
       if (!customer) throw new BankingError("CUSTOMER_NOT_FOUND", "Customer not found.");
+      if (["REJECTED", "EXPIRED"].includes(customer.kycStatus) || customer.status === "RESTRICTED") throw new BankingError("CUSTOMER_RESTRICTED", "KYC controls prevent opening another account for this customer.");
       if (!product) throw new BankingError("PRODUCT_NOT_FOUND", "Product not found or inactive.");
       const selectedBranch = branch;
       if (!selectedBranch) throw new BankingError("BRANCH_NOT_FOUND", "Branch not found.");
@@ -158,7 +170,7 @@ export async function openAccountAction(_previous: ActionState, formData: FormDa
         const clearingResult = await tx.execute(sql`select id, balance from clearing_accounts where currency = ${product.currency} order by code limit 1 for update`);
         const clearing = (clearingResult.rows as unknown as Array<{ id: string; balance: string }>)[0];
         if (!clearing) throw new BankingError("CLEARING_UNAVAILABLE", "Opening deposit clearing is unavailable.");
-        const clearingAfter = minorUnitsToMoney(moneyToMinorUnits(clearing.balance) - deposit);
+        const clearingAfter = minorUnitsToMoney(signedMoneyToMinorUnits(clearing.balance) - deposit);
         const [transaction] = await tx.insert(ledgerTransactions).values({ reference: `OPEN-${next}`, bookedAt: new Date(), valueDate: new Date().toISOString().slice(0, 10), description: "Opening deposit", type: "OPENING_DEPOSIT", status: "BOOKED", currency: product.currency, amount: parsed.data.initialDeposit, counterparty: "Opening Deposit Clearing" }).returning();
         await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: created.id, direction: "CREDIT", amount: parsed.data.initialDeposit, balanceAfter: parsed.data.initialDeposit });
         await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "DEBIT", amount: parsed.data.initialDeposit, balanceAfter: clearingAfter });
@@ -184,7 +196,7 @@ export async function updateAccountStatusAction(accountNumber: string, _previous
       if (!existing) throw new BankingError("ACCOUNT_NOT_FOUND", "Account not found.");
       if (existing.read_only) throw new BankingError("READ_ONLY_ACCOUNT", "Loan accounts are read-only.");
       if (parsed.data.status === "CLOSED") {
-        if (moneyToMinorUnits(existing.balance) !== 0n) throw new BankingError("NON_ZERO_BALANCE", "An account must have a zero balance before it can be closed.");
+        if (signedMoneyToMinorUnits(existing.balance) !== 0n) throw new BankingError("NON_ZERO_BALANCE", "An account must have a zero balance before it can be closed.");
         const [pending] = await tx.select({ value: sql<number>`count(*)::int` }).from(paymentOrders).where(and(eq(paymentOrders.sourceAccountId, existing.id), eq(paymentOrders.status, "PENDING")));
         if (pending.value > 0) throw new BankingError("PENDING_PAYMENTS", "Pending payments must be resolved before closing the account.");
       }
@@ -205,6 +217,8 @@ export async function createBeneficiaryAction(_previous: ActionState, formData: 
     const actor = await requireActionUser();
     const [customer] = await db.select().from(customers).where(eq(customers.customerNumber, parsed.data.customerNumber)).limit(1);
     if (!customer) return { ok: false, code: "CUSTOMER_NOT_FOUND", message: "Customer not found." };
+    const debitRestrictions = await db.select().from(customerRestrictions).where(and(eq(customerRestrictions.customerId, customer.id), eq(customerRestrictions.active, true), eq(customerRestrictions.type, "DEBIT_BLOCK")));
+    if (["REJECTED", "EXPIRED"].includes(customer.kycStatus) || debitRestrictions.length) return { ok: false, code: "CUSTOMER_RESTRICTED", message: "KYC controls prevent beneficiary creation." };
     const [created] = await db.insert(beneficiaries).values({ customerId: customer.id, name: parsed.data.name, bankName: parsed.data.bankName, accountNumber: parsed.data.accountNumber, iban: parsed.data.iban, swiftBic: parsed.data.swiftBic, currency: parsed.data.currency, status: "ACTIVE" }).returning();
     await audit(actor, "BENEFICIARY_CREATED", "BENEFICIARY", created.id, null, parsed.data);
     revalidatePath("/beneficiaries");
@@ -236,8 +250,9 @@ export async function submitPaymentAction(_previous: ActionState, formData: Form
     const result = parsed.data.paymentType === "INTERNAL"
       ? await bookInternalTransfer({ ...base, destinationAccountNumber: parsed.data.destinationAccountNumber ?? "" }, actor)
       : await bookExternalPayment({ ...base, beneficiaryId: parsed.data.beneficiaryId ?? "" }, actor);
+    const pending = "pending" in result && result.pending;
     revalidatePath("/payments"); revalidatePath("/accounts");
-    return { ok: true, code: result.duplicate ? "PAYMENT_ALREADY_BOOKED" : "PAYMENT_BOOKED", message: result.duplicate ? `Payment ${result.reference} was already booked; no duplicate was created.` : `Payment ${result.reference} was booked.` };
+    return { ok: true, code: result.duplicate ? "PAYMENT_ALREADY_BOOKED" : pending ? "PAYMENT_PENDING_APPROVAL" : "PAYMENT_BOOKED", message: result.duplicate ? `Payment ${result.reference} already exists; no duplicate was created.` : pending ? `Payment ${result.reference} is pending approval and its funds are on hold.` : `Payment ${result.reference} was booked.` };
   } catch (error) { return failure(error); }
 }
 

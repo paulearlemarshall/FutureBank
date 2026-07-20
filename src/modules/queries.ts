@@ -4,19 +4,24 @@ import { desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   addresses, auditEvents, bankAccounts, beneficiaries, branches, contactPoints, customerRelationships,
-  customers, identityDocuments, ledgerEntries, ledgerTransactions, loanDetails, loanRepayments, products,
+  customers, identityDocuments, ledgerEntries, ledgerTransactions, loanDetails, loanRepayments, overdraftAlerts,
+  overdraftFacilities, paymentOrders, products, workItems,
 } from "@/db/schema";
+import { requireUser } from "@/lib/auth/session";
 import type {
   AccountDetail, AccountListItem, AuditListItem, BeneficiaryView, CustomerDetail, CustomerListItem,
   DashboardSummary, ListOptions, ProductView, RelationshipView, TransactionView,
 } from "./contracts";
+import { getOverdraftFacility } from "./operations-queries";
 
 const iso = (value: Date | string) => value instanceof Date ? value.toISOString() : value;
 const boundedLimit = (value?: number) => Math.min(Math.max(value ?? 50, 1), 200);
+export const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
 function mapCustomer(row: typeof customers.$inferSelect): CustomerListItem {
   return {
     customerNumber: row.customerNumber,
+    rimNumber: row.rimNumber,
     partyType: row.partyType,
     displayName: row.legalName ?? ([row.givenName, row.familyName].filter(Boolean).join(" ") || row.shortName),
     status: row.status,
@@ -52,16 +57,24 @@ function mapAccount(row: AccountJoined): AccountListItem {
 }
 
 export async function listCustomers(options: ListOptions = {}): Promise<CustomerListItem[]> {
+  await requireUser();
   const query = options.query?.trim();
+  const pattern = query ? `%${escapeLikePattern(query)}%` : "";
   const condition = query ? or(
-    ilike(customers.customerNumber, `%${query}%`), ilike(customers.shortName, `%${query}%`),
-    ilike(customers.givenName, `%${query}%`), ilike(customers.familyName, `%${query}%`), ilike(customers.legalName, `%${query}%`),
+    ilike(customers.customerNumber, pattern), ilike(customers.rimNumber, pattern), ilike(customers.shortName, pattern),
+    ilike(customers.givenName, pattern), ilike(customers.familyName, pattern), ilike(customers.legalName, pattern),
+    sql`exists (
+      select 1 from identity_documents identity_search
+      where identity_search.customer_id = ${customers.id}
+        and identity_search.document_number ilike ${pattern} escape '\\'
+    )`,
   ) : undefined;
   const rows = await db.select().from(customers).where(condition).orderBy(customers.customerNumber).limit(boundedLimit(options.limit)).offset(Math.max(options.offset ?? 0, 0));
   return rows.map(mapCustomer);
 }
 
 export async function getCustomer(customerNumber: string): Promise<CustomerDetail | null> {
+  await requireUser();
   const [customer] = await db.select().from(customers).where(eq(customers.customerNumber, customerNumber)).limit(1);
   if (!customer) return null;
   const [addressRows, contactRows, identityRows, relationshipRows, accountRows] = await Promise.all([
@@ -82,6 +95,9 @@ export async function getCustomer(customerNumber: string): Promise<CustomerDetai
       relatedDisplayName: related.legalName ?? ([related.givenName, related.familyName].filter(Boolean).join(" ") || related.shortName),
       relationshipType: item.relationshipType,
       ownershipPercent: item.ownershipPercent,
+      controlType: item.controlType,
+      beneficialOwner: item.beneficialOwner,
+      verificationStatus: item.verificationStatus,
     };
   });
   return {
@@ -105,7 +121,7 @@ export async function getCustomer(customerNumber: string): Promise<CustomerDetai
     kycReviewDate: customer.kycReviewDate,
     addresses: addressRows.map((item) => ({ id: item.id, type: item.type, line1: item.line1, line2: item.line2, city: item.city, region: item.region, postalCode: item.postalCode, country: item.country })),
     contacts: contactRows.map((item) => ({ id: item.id, type: item.type, value: item.value, preferred: item.preferred })),
-    identityDocuments: identityRows.map((item) => ({ id: item.id, type: item.type, documentNumber: item.documentNumber, issuingCountry: item.issuingCountry, issuedAt: item.issuedAt, expiresAt: item.expiresAt })),
+    identityDocuments: identityRows.map((item) => ({ id: item.id, type: item.type, documentNumber: item.documentNumber, issuingCountry: item.issuingCountry, issuedAt: item.issuedAt, expiresAt: item.expiresAt, verificationStatus: item.verificationStatus, verificationMethod: item.verificationMethod, expiryAlertAt: item.expiryAlertAt })),
     relationships,
     accounts: accountRows.map(mapAccount),
   };
@@ -122,10 +138,12 @@ async function queryAccounts(condition?: ReturnType<typeof eq>): Promise<Account
 }
 
 export async function listAccounts(options: ListOptions = {}): Promise<AccountListItem[]> {
+  await requireUser();
   const query = options.query?.trim();
+  const pattern = query ? `%${escapeLikePattern(query)}%` : "";
   const condition = query ? or(
-    ilike(bankAccounts.accountNumber, `%${query}%`), ilike(customers.customerNumber, `%${query}%`),
-    ilike(customers.shortName, `%${query}%`), ilike(customers.legalName, `%${query}%`),
+    ilike(bankAccounts.accountNumber, pattern), ilike(customers.customerNumber, pattern),
+    ilike(customers.shortName, pattern), ilike(customers.legalName, pattern),
   ) : undefined;
   const rows = await db.select({ account: bankAccounts, customer: customers, product: products, branch: branches })
     .from(bankAccounts)
@@ -140,6 +158,7 @@ export async function listAccounts(options: ListOptions = {}): Promise<AccountLi
 }
 
 export async function getAccount(accountNumber: string): Promise<AccountDetail | null> {
+  await requireUser();
   const rows = await queryAccounts(eq(bankAccounts.accountNumber, accountNumber));
   const row = rows[0];
   if (!row) return null;
@@ -161,11 +180,14 @@ export async function getAccount(accountNumber: string): Promise<AccountDetail |
   }));
   const [loan] = await db.select().from(loanDetails).where(eq(loanDetails.accountId, row.account.id)).limit(1);
   const repayments = loan ? await db.select().from(loanRepayments).where(eq(loanRepayments.accountId, row.account.id)).orderBy(desc(loanRepayments.dueDate)) : [];
+  const [facility] = await db.select({ reference: overdraftFacilities.reference }).from(overdraftFacilities)
+    .where(sql`${overdraftFacilities.accountId} = ${row.account.id} and ${overdraftFacilities.status} in ('ACTIVE', 'PENDING_APPROVAL', 'PENDING_CHANGE', 'SUSPENDED')`)
+    .orderBy(desc(overdraftFacilities.updatedAt)).limit(1);
   return {
     ...mapAccount(row),
     branchCode: row.branch.code,
     nickname: row.account.nickname,
-    overdraftLimit: row.account.overdraftLimit,
+    overdraft: facility ? await getOverdraftFacility(facility.reference) : null,
     maturityDate: row.account.maturityDate,
     transactions,
     loan: loan ? {
@@ -180,6 +202,7 @@ export async function getAccount(accountNumber: string): Promise<AccountDetail |
 }
 
 export async function listBeneficiaries(options: { customerNumber?: string; limit?: number } = {}): Promise<BeneficiaryView[]> {
+  await requireUser();
   const condition = options.customerNumber ? eq(customers.customerNumber, options.customerNumber) : undefined;
   const rows = await db.select({ beneficiary: beneficiaries, customerNumber: customers.customerNumber })
     .from(beneficiaries).innerJoin(customers, eq(beneficiaries.customerId, customers.id))
@@ -192,27 +215,35 @@ export async function listBeneficiaries(options: { customerNumber?: string; limi
 }
 
 export async function listProducts(): Promise<ProductView[]> {
+  await requireUser();
   const rows = await db.select().from(products).orderBy(products.code);
   return rows.map((item) => ({ code: item.code, name: item.name, kind: item.kind, currency: item.currency, interestRate: item.interestRate, minimumOpeningBalance: item.minimumOpeningBalance, active: item.active }));
 }
 
 export async function listAuditEvents(options: ListOptions = {}): Promise<AuditListItem[]> {
+  await requireUser();
   const query = options.query?.trim();
+  const pattern = query ? `%${escapeLikePattern(query)}%` : "";
   const condition = query ? or(
-    ilike(auditEvents.actorUsername, `%${query}%`), ilike(auditEvents.action, `%${query}%`),
-    ilike(auditEvents.entityReference, `%${query}%`), ilike(auditEvents.correlationId, `%${query}%`),
+    ilike(auditEvents.actorUsername, pattern), ilike(auditEvents.action, pattern),
+    ilike(auditEvents.entityReference, pattern), ilike(auditEvents.correlationId, pattern),
   ) : undefined;
   const rows = await db.select().from(auditEvents).where(condition).orderBy(desc(auditEvents.occurredAt)).limit(boundedLimit(options.limit)).offset(Math.max(options.offset ?? 0, 0));
   return rows.map((item) => ({ id: item.id, occurredAt: iso(item.occurredAt), actorUsername: item.actorUsername, action: item.action, entityType: item.entityType, entityReference: item.entityReference, correlationId: item.correlationId }));
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [[customerCount], [accountStats], [kycCount], [paymentCount], recentActivity] = await Promise.all([
+  await requireUser();
+  const [[customerCount], [accountStats], [kycCount], [paymentCount], [workCount], [pendingPaymentCount], [overdraftStats], [repeatUseCount], recentActivity] = await Promise.all([
     db.select({ value: sql<number>`count(*)::int` }).from(customers),
     db.select({ active: sql<number>`count(*) filter (where ${bankAccounts.status} = 'ACTIVE')::int`, deposits: sql<string>`coalesce(sum(${bankAccounts.balance}) filter (where ${products.kind} <> 'LOAN' and ${bankAccounts.status} <> 'CLOSED'), 0)::text` }).from(bankAccounts).innerJoin(products, eq(bankAccounts.productId, products.id)),
-    db.select({ value: sql<number>`count(*)::int` }).from(customers).where(ne(customers.kycStatus, "COMPLETE")),
+    db.select({ value: sql<number>`count(*)::int` }).from(customers).where(ne(customers.kycStatus, "APPROVED")),
     db.select({ value: sql<number>`count(*)::int` }).from(ledgerTransactions).where(sql`${ledgerTransactions.bookedAt}::date = current_date`),
+    db.select({ value: sql<number>`count(*)::int` }).from(workItems).where(sql`${workItems.status} in ('OPEN', 'ASSIGNED')`),
+    db.select({ value: sql<number>`count(*)::int` }).from(paymentOrders).where(eq(paymentOrders.status, "PENDING")),
+    db.select({ value: sql<string>`coalesce(sum(${overdraftFacilities.approvedLimit}), 0)::text` }).from(overdraftFacilities).where(sql`${overdraftFacilities.status} in ('ACTIVE', 'SUSPENDED', 'PENDING_CHANGE')`),
+    db.select({ value: sql<number>`count(*)::int` }).from(overdraftAlerts).where(sql`${overdraftAlerts.type} = 'REPEAT_USE' and ${overdraftAlerts.status} <> 'RESOLVED'`),
     listAuditEvents({ limit: 8 }),
   ]);
-  return { customers: customerCount.value, activeAccounts: accountStats.active, totalDeposits: accountStats.deposits, pendingKycReviews: kycCount.value, paymentsToday: paymentCount.value, recentActivity };
+  return { customers: customerCount.value, activeAccounts: accountStats.active, totalDeposits: accountStats.deposits, pendingKycReviews: kycCount.value, paymentsToday: paymentCount.value, openWorkItems: workCount.value, pendingPayments: pendingPaymentCount.value, overdraftExposure: overdraftStats.value, repeatUseAlerts: repeatUseCount.value, recentActivity };
 }

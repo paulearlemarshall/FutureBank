@@ -3,6 +3,10 @@ import { expect, type Locator, type Page } from "@playwright/test";
 export const demo = {
   operatorUsername: process.env.DEMO_OPERATOR_USERNAME ?? "bp.operator",
   operatorPassword: process.env.DEMO_OPERATOR_PASSWORD,
+  supervisorUsername: process.env.DEMO_SUPERVISOR_USERNAME ?? "bp.supervisor",
+  supervisorPassword: process.env.DEMO_SUPERVISOR_PASSWORD,
+  complianceUsername: process.env.DEMO_COMPLIANCE_USERNAME ?? "bp.compliance",
+  compliancePassword: process.env.DEMO_COMPLIANCE_PASSWORD,
   adminUsername: process.env.DEMO_ADMIN_USERNAME ?? "bp.admin",
   adminPassword: process.env.DEMO_ADMIN_PASSWORD,
   customerNumber: process.env.DEMO_CUSTOMER_NUMBER ?? "C000001",
@@ -22,18 +26,17 @@ export async function expectReady(page: Page, pageName: string) {
 
 export async function login(
   page: Page,
-  role: "operator" | "admin" = "operator",
+  role: "operator" | "supervisor" | "compliance" | "admin" = "operator",
 ) {
-  const password = role === "admin" ? demo.adminPassword : demo.operatorPassword;
+  const credentials: [string, string | undefined, string] = role === "admin" ? [demo.adminUsername, demo.adminPassword, "DEMO_ADMIN_PASSWORD"] : role === "supervisor" ? [demo.supervisorUsername, demo.supervisorPassword, "DEMO_SUPERVISOR_PASSWORD"] : role === "compliance" ? [demo.complianceUsername, demo.compliancePassword, "DEMO_COMPLIANCE_PASSWORD"] : [demo.operatorUsername, demo.operatorPassword, "DEMO_OPERATOR_PASSWORD"];
+  const [username, password, variable] = credentials;
   if (!password) {
-    throw new Error(
-      `${role === "admin" ? "DEMO_ADMIN_PASSWORD" : "DEMO_OPERATOR_PASSWORD"} is required for Playwright authentication`,
-    );
+    throw new Error(`${variable} is required for Playwright authentication`);
   }
   await page.goto("/login");
   await expectReady(page, "login");
   await bp(page, "login-username").fill(
-    role === "admin" ? demo.adminUsername : demo.operatorUsername,
+    username,
   );
   await bp(page, "login-password").fill(password);
   await bp(page, "login-submit").click();

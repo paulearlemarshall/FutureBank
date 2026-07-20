@@ -55,7 +55,7 @@ test("onboards a fully populated fictional retail customer", async ({ page }) =>
   await bp(page, "customer-party-type").selectOption("RETAIL");
   await bp(page, "customer-title").selectOption("Ms");
   await bp(page, "customer-risk-rating").selectOption("LOW");
-  await bp(page, "customer-kyc-status").selectOption("COMPLETE");
+  await bp(page, "customer-kyc-status").selectOption("APPROVED");
   await bp(page, "customer-branch-code").selectOption("LON001");
   for (const [selector, value] of Object.entries(values)) {
     await bp(page, selector).fill(value);

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import type { Database } from "./index";
 import * as tables from "./schema";
 import {
@@ -19,12 +19,22 @@ function customerId(customerNumber: string) { return stableUuid(`customer-${cust
 function bankAccountId(accountNumber: string) { return stableUuid(`account-${accountNumber}`); }
 function productId(code: string) { return stableUuid(`product-${code}`); }
 function branchId(code: string) { return stableUuid(`branch-${code}`); }
+function staffId(key: "operator" | "supervisor" | "compliance" | "admin") { return stableUuid(`auth-user-${key}`); }
+function kycCaseId(customerNumber: string) { return stableUuid(`kyc-case-${customerNumber}`); }
+function facilityId(reference: string) { return stableUuid(`overdraft-${reference}`); }
 
 export async function clearBankingData(tx: SeedDb): Promise<void> {
+  await tx.delete(tables.workItemEvents);
+  await tx.delete(tables.workItems);
+  await tx.delete(tables.accountHolds);
   await tx.delete(tables.clearingEntries);
   await tx.delete(tables.ledgerEntries);
   await tx.delete(tables.ledgerTransactions);
   await tx.delete(tables.paymentOrders);
+  await tx.delete(tables.overdraftAlerts);
+  await tx.delete(tables.overdraftUsageSnapshots);
+  await tx.delete(tables.overdraftLimitHistory);
+  await tx.delete(tables.overdraftFacilities);
   await tx.delete(tables.loanRepayments);
   await tx.delete(tables.loanDetails);
   await tx.delete(tables.accountStatusHistory);
@@ -32,6 +42,13 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.bankAccounts);
   await tx.delete(tables.clearingAccounts);
   await tx.delete(tables.customerRelationships);
+  await tx.delete(tables.customerRestrictions);
+  await tx.delete(tables.screeningChecks);
+  await tx.delete(tables.kycEvidence);
+  await tx.delete(tables.kycRiskFactors);
+  await tx.delete(tables.customerDueDiligenceProfiles);
+  await tx.delete(tables.kycCases);
+  await tx.delete(tables.screeningWatchlistEntries);
   await tx.delete(tables.identityDocuments);
   await tx.delete(tables.contactPoints);
   await tx.delete(tables.addresses);
@@ -47,7 +64,7 @@ export async function seedBaseline(tx: SeedDb): Promise<void> {
 
   await tx.insert(tables.branches).values(baselineBranches.map((item) => ({ id: branchId(item.code), ...item })));
   await tx.insert(tables.products).values(baselineProducts.map((item) => ({ id: productId(item.code), ...item })));
-  await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), language: "English", ...item })));
+  await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, language: "English", ...item })));
 
   const addressRows = baselineCustomers.map((customer, index) => ({
     id: stableUuid(`address-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "PRIMARY",
@@ -60,34 +77,172 @@ export async function seedBaseline(tx: SeedDb): Promise<void> {
     { id: stableUuid(`contact-email-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "EMAIL", value: `demo.${index + 1}@futurebank.example`, preferred: true },
     { id: stableUuid(`contact-phone-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "MOBILE", value: customer.residenceCountry === "AE" ? `+9715000000${index}` : `+4477009000${index}`, preferred: false },
   ]));
-  await tx.insert(tables.identityDocuments).values(baselineCustomers.map((customer, index) => ({
-    id: stableUuid(`identity-${customer.customerNumber}`), customerId: customerId(customer.customerNumber),
-    type: customer.partyType === "SME" ? "COMPANY_REGISTRATION" : "PASSPORT", documentNumber: customer.registrationNumber ?? `FICTP000${index + 1}`,
-    issuingCountry: customer.nationality, issuedAt: `2021-0${index + 1}-15`, expiresAt: `2031-0${index + 1}-14`,
-  })));
+  await tx.insert(tables.identityDocuments).values(baselineCustomers.flatMap((customer, index) => {
+    const documents = customer.partyType === "SME"
+      ? [{ type: customer.residenceCountry === "AE" ? "TRADE_LICENSE" : "COMPANY_REGISTRATION", number: customer.registrationNumber!, country: customer.residenceCountry }]
+      : [
+          { type: "PASSPORT", number: `FICT-P-${customer.customerNumber.slice(1)}`, country: customer.nationality },
+          ...(customer.residenceCountry === "AE" ? [{ type: "EMIRATES_ID", number: `784-FICT-${customer.customerNumber.slice(-4)}`, country: "AE" }] : []),
+        ];
+    return documents.map((document, documentIndex) => ({
+      id: stableUuid(`identity-${customer.customerNumber}-${document.type}`), customerId: customerId(customer.customerNumber),
+      type: document.type, documentNumber: document.number, issuingCountry: document.country, issuedAt: `2021-0${index + 1}-15`,
+      expiresAt: customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? "2026-08-10" : `2031-0${index + 1}-14`,
+      verificationStatus: "VERIFIED" as const, verificationMethod: "Fictional document inspection", verifiedBy: staffId("operator"),
+      verifiedAt: new Date("2026-07-10T09:00:00.000Z"),
+      expiryAlertAt: customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? "2026-07-20" : `2030-10-${(10 + index + documentIndex).toString().padStart(2, "0")}`,
+    }));
+  }));
   await tx.insert(tables.customerRelationships).values([
-    { id: stableUuid("rel-c4-c1"), customerId: customerId("C000004"), relatedCustomerId: customerId("C000001"), relationshipType: "BENEFICIAL_OWNER", ownershipPercent: "65.00" },
-    { id: stableUuid("rel-c4-c3"), customerId: customerId("C000004"), relatedCustomerId: customerId("C000003"), relationshipType: "DIRECTOR", ownershipPercent: "35.00" },
-    { id: stableUuid("rel-c5-c2"), customerId: customerId("C000005"), relatedCustomerId: customerId("C000002"), relationshipType: "BENEFICIAL_OWNER", ownershipPercent: "70.00" },
-    { id: stableUuid("rel-c5-c3"), customerId: customerId("C000005"), relatedCustomerId: customerId("C000003"), relationshipType: "DIRECTOR", ownershipPercent: "30.00" },
+    { id: stableUuid("rel-c4-c1"), customerId: customerId("C000004"), relatedCustomerId: customerId("C000001"), relationshipType: "BENEFICIAL_OWNER", ownershipPercent: "65.00", controlType: "OWNERSHIP", beneficialOwner: true, verificationStatus: "VERIFIED" as const },
+    { id: stableUuid("rel-c4-c3"), customerId: customerId("C000004"), relatedCustomerId: customerId("C000003"), relationshipType: "DIRECTOR", ownershipPercent: "35.00", controlType: "BOARD_CONTROL", beneficialOwner: true, verificationStatus: "VERIFIED" as const },
+    { id: stableUuid("rel-c5-c2"), customerId: customerId("C000005"), relatedCustomerId: customerId("C000002"), relationshipType: "BENEFICIAL_OWNER", ownershipPercent: "70.00", controlType: "OWNERSHIP", beneficialOwner: true, verificationStatus: "VERIFIED" as const },
+    { id: stableUuid("rel-c5-c3"), customerId: customerId("C000005"), relatedCustomerId: customerId("C000003"), relationshipType: "DIRECTOR", ownershipPercent: "30.00", controlType: "BOARD_CONTROL", beneficialOwner: false, verificationStatus: "VERIFIED" as const },
   ]);
+
+  const caseRows = [
+    { customerNumber: "C000001", reference: "KYC-000001", type: "PERIODIC_REVIEW" as const, jurisdiction: "GB", status: "APPROVED" as const, score: 0, calculated: "LOW" as const, final: "LOW" as const, edd: false, dueAt: "2026-07-15T17:00:00.000Z", submittedAt: "2026-07-11T10:00:00.000Z", decidedAt: "2026-07-12T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "Standard due diligence complete." },
+    { customerNumber: "C000002", reference: "KYC-000002", type: "TRIGGER_EVENT" as const, jurisdiction: "AE", status: "APPROVED" as const, score: 40, calculated: "MEDIUM" as const, final: "MEDIUM" as const, edd: true, dueAt: "2026-07-16T17:00:00.000Z", submittedAt: "2026-07-12T10:00:00.000Z", decidedAt: "2026-07-13T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "PEP relationship approved after EDD and source-of-wealth review." },
+    { customerNumber: "C000003", reference: "KYC-000003", type: "PERIODIC_REVIEW" as const, jurisdiction: "AE", status: "AWAITING_INFORMATION" as const, score: 0, calculated: "LOW" as const, final: null, edd: false, dueAt: "2026-08-15T17:00:00.000Z", submittedAt: null, decidedAt: null, decidedBy: null, comment: null },
+    { customerNumber: "C000004", reference: "KYC-000004", type: "PERIODIC_REVIEW" as const, jurisdiction: "GB", status: "APPROVED" as const, score: 15, calculated: "LOW" as const, final: "MEDIUM" as const, edd: false, dueAt: "2026-07-17T17:00:00.000Z", submittedAt: "2026-07-13T10:00:00.000Z", decidedAt: "2026-07-14T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "Ownership verified; sanctions candidate resolved as a false positive." },
+    { customerNumber: "C000005", reference: "KYC-000005", type: "TRIGGER_EVENT" as const, jurisdiction: "AE", status: "REJECTED" as const, score: 85, calculated: "HIGH" as const, final: "HIGH" as const, edd: true, dueAt: "2026-07-18T17:00:00.000Z", submittedAt: "2026-07-14T10:00:00.000Z", decidedAt: "2026-07-15T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "Rejected following a confirmed fictional sanctions result." },
+  ];
+  await tx.insert(tables.kycCases).values(caseRows.map((item) => ({
+    id: kycCaseId(item.customerNumber), reference: item.reference, customerId: customerId(item.customerNumber), type: item.type,
+    jurisdiction: item.jurisdiction, status: item.status, calculatedRiskScore: item.score, calculatedRiskRating: item.calculated,
+    finalRiskRating: item.final, enhancedDueDiligence: item.edd,
+    requirements: item.customerNumber === "C000003"
+      ? [{ code: "EMIRATES_ID", label: "Emirates ID", mandatory: true }, { code: "PASSPORT", label: "Passport", mandatory: true }, { code: "RESIDENCY", label: "Residency evidence", mandatory: true }]
+      : Number(item.customerNumber.slice(-1)) >= 4
+        ? [{ code: "INCORPORATION", label: "Trade licence or incorporation evidence", mandatory: true }, { code: "OWNERSHIP", label: "Ownership and control structure", mandatory: true }, { code: "CONTROLLERS", label: "Directors and authorised signatories", mandatory: true }, { code: "BENEFICIAL_OWNERS", label: "Verified beneficial owners", mandatory: true }]
+        : [{ code: "IDENTITY", label: "Identity evidence", mandatory: true }, { code: "ADDRESS", label: "Address evidence", mandatory: true }],
+    dueAt: new Date(item.dueAt), submittedAt: item.submittedAt ? new Date(item.submittedAt) : null,
+    decidedAt: item.decidedAt ? new Date(item.decidedAt) : null, createdBy: staffId("operator"), decidedBy: item.decidedBy, decisionComment: item.comment,
+  })));
+  await tx.insert(tables.customerDueDiligenceProfiles).values(caseRows.map((item, index) => ({
+    id: stableUuid(`cdd-${item.customerNumber}`), kycCaseId: kycCaseId(item.customerNumber),
+    accountPurpose: index >= 3 ? "Business operations and supplier payments" : "Daily banking, savings and household payments",
+    occupationOrBusiness: baselineCustomers[index].industry, expectedMonthlyCredits: index >= 3 ? "250000.00" : "25000.00",
+    expectedMonthlyDebits: index >= 3 ? "220000.00" : "18000.00", expectedCountries: item.jurisdiction === "AE" ? ["AE", "GB", "IN"] : ["GB", "IE", "FR"],
+    cashUsage: index === 4 ? "HIGH" : "LOW", sourceOfFunds: index >= 3 ? "Trading receipts" : "Salary and investments",
+    sourceOfWealth: index === 1 ? "Family business interests and investments (fictional)" : index >= 3 ? "Retained business earnings" : "Employment income and savings",
+    incomeOrTurnoverBand: index >= 3 ? "1M-5M" : "100K-250K", netWorthBand: index >= 3 ? "1M-5M" : "250K-1M",
+  })));
+  await tx.insert(tables.kycRiskFactors).values([
+    { id: stableUuid("risk-c2-pep"), kycCaseId: kycCaseId("C000002"), category: "CUSTOMER", rule: "PEP", score: 40, explanation: "Fictional domestic PEP relationship." },
+    { id: stableUuid("risk-c4-ownership"), kycCaseId: kycCaseId("C000004"), category: "OWNERSHIP", rule: "COMPLEX_OWNERSHIP", score: 15, explanation: "Multiple controllers require enhanced ownership verification." },
+    { id: stableUuid("risk-c5-sanctions"), kycCaseId: kycCaseId("C000005"), category: "SCREENING", rule: "HIGH_RISK_GEOGRAPHY", score: 20, explanation: "Fictional high-risk geography exposure." },
+    { id: stableUuid("risk-c5-pep"), kycCaseId: kycCaseId("C000005"), category: "SCREENING", rule: "PEP", score: 40, explanation: "Fictional connected PEP factor." },
+    { id: stableUuid("risk-c5-media"), kycCaseId: kycCaseId("C000005"), category: "SCREENING", rule: "CONFIRMED_ADVERSE_MEDIA", score: 25, explanation: "Confirmed fictional adverse-media result." },
+  ]);
+  const evidenceRows = caseRows.flatMap((item) => {
+    const types = item.customerNumber === "C000003" ? ["EMIRATES_ID", "PASSPORT", "RESIDENCY"] : Number(item.customerNumber.slice(-1)) >= 4 ? ["INCORPORATION", "OWNERSHIP", "CONTROLLERS", "BENEFICIAL_OWNERS"] : ["IDENTITY", "ADDRESS"];
+    return types.map((evidenceType, index) => ({
+      id: stableUuid(`evidence-${item.customerNumber}-${evidenceType}`), reference: `EVD-${item.customerNumber.slice(-3)}-${index + 1}`,
+      kycCaseId: kycCaseId(item.customerNumber), evidenceType, documentReference: `FICT-${item.customerNumber}-${evidenceType}`,
+      source: "Customer supplied fictional metadata", receivedAt: "2026-07-10", verificationStatus: item.customerNumber === "C000003" && evidenceType === "RESIDENCY" ? "PENDING" as const : "VERIFIED" as const,
+      verifiedBy: item.customerNumber === "C000003" && evidenceType === "RESIDENCY" ? null : staffId("operator"),
+      verifiedAt: item.customerNumber === "C000003" && evidenceType === "RESIDENCY" ? null : new Date("2026-07-11T10:00:00.000Z"),
+      expiresAt: item.customerNumber === "C000003" && evidenceType === "EMIRATES_ID" ? "2026-08-10" : "2028-07-10",
+      reviewerNotes: item.customerNumber === "C000003" && evidenceType === "RESIDENCY" ? "Updated residency evidence requested." : "Fictional evidence verified for demonstration.",
+    }));
+  });
+  await tx.insert(tables.kycEvidence).values(evidenceRows);
+  await tx.insert(tables.screeningWatchlistEntries).values([
+    { id: stableUuid("watch-pep-omar"), reference: "FWL-PEP-001", screeningType: "PEP", subjectName: "Omar Al Mansoori", aliases: ["Omar Mansoori"], country: "AE", dateOfBirth: "1979-11-03", details: "Fictional PEP entry for demonstration." },
+    { id: stableUuid("watch-false-northstar"), reference: "FWL-SAN-002", screeningType: "SANCTIONS", subjectName: "North Star Logistic Holdings", aliases: ["Northstar Logistics"], country: "US", details: "Fictional near-name entry used for false-positive resolution." },
+    { id: stableUuid("watch-crescent-sanctions"), reference: "FWL-SAN-003", screeningType: "SANCTIONS", subjectName: "Crescent Digital Trading FZ-LLC", aliases: ["Crescent Digital"], country: "AE", details: "Fictional sanctions entry for a blocked demo scenario." },
+    { id: stableUuid("watch-crescent-media"), reference: "FWL-MEDIA-004", screeningType: "ADVERSE_MEDIA", subjectName: "Crescent Digital Trading FZ-LLC", aliases: [], country: "AE", details: "Fictional adverse-media entry for demonstration." },
+  ]);
+  await tx.insert(tables.screeningChecks).values([
+    { id: stableUuid("screen-c1-clear"), reference: "SCR-000001", kycCaseId: kycCaseId("C000001"), customerId: customerId("C000001"), subjectType: "CUSTOMER", subjectReference: "C000001", subjectName: "Amelia Hart", screeningType: "SANCTIONS", matchScore: 0, outcome: "CLEAR" },
+    { id: stableUuid("screen-c2-pep"), reference: "SCR-000002", kycCaseId: kycCaseId("C000002"), customerId: customerId("C000002"), subjectType: "CUSTOMER", subjectReference: "C000002", subjectName: "Omar Al Mansoori", screeningType: "PEP", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-13T11:00:00.000Z"), resolutionComment: "PEP confirmed; EDD completed. PEP status is not a sanctions rejection." },
+    { id: stableUuid("screen-c4-false"), reference: "SCR-000004", kycCaseId: kycCaseId("C000004"), customerId: customerId("C000004"), subjectType: "CUSTOMER", subjectReference: "C000004", subjectName: "Northstar Sustainable Logistics Ltd", screeningType: "SANCTIONS", matchScore: 82, outcome: "FALSE_POSITIVE", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-14T11:00:00.000Z"), resolutionComment: "Different legal entity, country and registration number." },
+    { id: stableUuid("screen-c5-sanctions"), reference: "SCR-000005", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "Crescent Digital Trading FZ-LLC", screeningType: "SANCTIONS", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:00:00.000Z"), resolutionComment: "Confirmed fictional match; relationship rejected and debit block applied." },
+    { id: stableUuid("screen-c5-media"), reference: "SCR-000006", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "Crescent Digital Trading FZ-LLC", screeningType: "ADVERSE_MEDIA", matchScore: 96, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:05:00.000Z"), resolutionComment: "Confirmed fictional adverse-media subject." },
+  ]);
+  await tx.insert(tables.customerRestrictions).values({
+    id: stableUuid("restriction-c5-debit"), reference: "RST-000001", customerId: customerId("C000005"), type: "DEBIT_BLOCK",
+    reason: "Confirmed fictional sanctions result", sourceKycCaseId: kycCaseId("C000005"), effectiveFrom: new Date("2026-07-15T12:00:00.000Z"), appliedBy: staffId("compliance"), active: true,
+  });
 
   await tx.insert(tables.bankAccounts).values(baselineAccounts.map((item) => {
     const product = baselineProducts.find((candidate) => candidate.code === item.productCode)!;
     return {
       id: bankAccountId(item.accountNumber), accountNumber: item.accountNumber, customerId: customerId(item.customerNumber),
       productId: productId(item.productCode), branchId: branchId(item.branchCode), nickname: item.nickname, currency: product.currency,
-      balance: item.balance, availableBalance: item.balance, overdraftLimit: item.overdraftLimit, status: "ACTIVE" as const,
+      balance: item.balance, availableBalance: item.balance, status: "ACTIVE" as const,
       readOnly: "readOnly" in item ? item.readOnly : false, openedAt: item.openedAt, maturityDate: "maturityDate" in item ? item.maturityDate : null,
     };
   }));
+  const projectedAvailableBalances: Record<string, string> = {
+    "1000000001": "759.50",
+    "1000000004": "69650.25",
+    "1000000009": "392190.44",
+  };
+  for (const [accountNumber, availableBalance] of Object.entries(projectedAvailableBalances)) {
+    await tx.update(tables.bankAccounts).set({ availableBalance }).where(eq(tables.bankAccounts.id, bankAccountId(accountNumber)));
+  }
   await tx.insert(tables.accountStatusHistory).values(baselineAccounts.map((item) => ({
     id: stableUuid(`status-${item.accountNumber}`), accountId: bankAccountId(item.accountNumber), previousStatus: null,
     newStatus: "ACTIVE" as const, reason: "Baseline account opened", changedBy: "system.seed", changedAt: new Date(`${item.openedAt}T09:00:00.000Z`),
   })));
 
+  const facilities = [
+    { reference: "ODF-000001", accountNumber: "1000000001", requestedLimit: "1000.00", approvedLimit: "1000.00", currency: "GBP", rate: "19.9000", purpose: "Household cash-flow buffer", riskGrade: "A", status: "ACTIVE" as const, startDate: "2025-08-01", reviewDate: "2026-08-01", expiryDate: "2027-08-01", approvedBy: staffId("supervisor") },
+    { reference: "ODF-000002", accountNumber: "1000000004", requestedLimit: "10000.00", approvedLimit: "10000.00", currency: "AED", rate: "12.5000", purpose: "Personal liquidity buffer", riskGrade: "B", status: "ACTIVE" as const, startDate: "2025-10-01", reviewDate: "2026-10-01", expiryDate: "2027-10-01", approvedBy: staffId("supervisor") },
+    { reference: "ODF-000003", accountNumber: "1000000007", requestedLimit: "7500.00", approvedLimit: "0.00", currency: "AED", rate: "13.2500", purpose: "Short-term household expenses", riskGrade: "B", status: "PENDING_APPROVAL" as const, startDate: null, reviewDate: null, expiryDate: null, approvedBy: null },
+    { reference: "ODF-000004", accountNumber: "1000000009", requestedLimit: "50000.00", approvedLimit: "50000.00", currency: "GBP", rate: "11.7500", purpose: "Working capital", riskGrade: "B", status: "ACTIVE" as const, startDate: "2025-09-01", reviewDate: "2026-09-01", expiryDate: "2027-09-01", approvedBy: staffId("supervisor") },
+    { reference: "ODF-000005", accountNumber: "1000000012", requestedLimit: "100000.00", approvedLimit: "100000.00", currency: "AED", rate: "14.5000", purpose: "Supplier settlement buffer", riskGrade: "D", status: "SUSPENDED" as const, startDate: "2025-05-01", reviewDate: "2026-07-15", expiryDate: "2027-05-01", approvedBy: staffId("supervisor") },
+  ];
+  await tx.insert(tables.overdraftFacilities).values(facilities.map((item) => ({
+    id: facilityId(item.reference), reference: item.reference, accountId: bankAccountId(item.accountNumber), requestedLimit: item.requestedLimit,
+    approvedLimit: item.approvedLimit, currency: item.currency, annualInterestRate: item.rate, purpose: item.purpose,
+    affordabilityInformation: { monthlyIncomeOrTurnover: item.currency === "AED" ? "75000.00" : "25000.00", monthlyCommittedOutgoings: item.currency === "AED" ? "42000.00" : "14000.00", fictional: true },
+    riskGrade: item.riskGrade, status: item.status, startDate: item.startDate, reviewDate: item.reviewDate, expiryDate: item.expiryDate,
+    createdBy: staffId("operator"), approvedBy: item.approvedBy, submittedAt: new Date("2026-07-18T09:00:00.000Z"),
+    decidedAt: item.approvedBy ? new Date("2026-07-18T12:00:00.000Z") : null, decisionComment: item.approvedBy ? "Approved under FutureBank demo policy." : null,
+  })));
+  await tx.insert(tables.overdraftLimitHistory).values(facilities.filter((item) => item.approvedBy).map((item) => ({
+    id: stableUuid(`od-history-${item.reference}`), facilityId: facilityId(item.reference), previousLimit: "0.00", newLimit: item.approvedLimit,
+    reason: "Initial arranged overdraft approval", effectiveDate: item.startDate!, approvedBy: item.approvedBy!,
+  })));
+  await tx.insert(tables.overdraftUsageSnapshots).values([
+    { id: stableUuid("od-snapshot-1"), facilityId: facilityId("ODF-000001"), snapshotDate: "2026-07-18", ledgerBalance: "-180.00", utilization: "180.00", approvedLimit: "1000.00", regularCredits30Days: "4200.00" },
+    { id: stableUuid("od-snapshot-2"), facilityId: facilityId("ODF-000001"), snapshotDate: "2026-07-19", ledgerBalance: "-220.00", utilization: "220.00", approvedLimit: "1000.00", regularCredits30Days: "4200.00" },
+    { id: stableUuid("od-snapshot-3"), facilityId: facilityId("ODF-000001"), snapshotDate: "2026-07-20", ledgerBalance: "-240.50", utilization: "240.50", approvedLimit: "1000.00", regularCredits30Days: "3150.00" },
+    { id: stableUuid("od-snapshot-c5"), facilityId: facilityId("ODF-000005"), snapshotDate: "2026-07-20", ledgerBalance: "895420.32", utilization: "0.00", approvedLimit: "100000.00", regularCredits30Days: "185000.00" },
+  ]);
+  await tx.insert(tables.overdraftAlerts).values([
+    { id: stableUuid("od-alert-repeat"), reference: "ODA-000001", facilityId: facilityId("ODF-000001"), type: "REPEAT_USE", status: "OPEN", severity: "HIGH", detectedAt: new Date("2026-07-20T06:00:00.000Z"), dueAt: new Date("2026-07-23T17:00:00.000Z"), details: "FutureBank demo policy: regular credits fell by 25% while utilization increased." },
+    { id: stableUuid("od-alert-c5"), reference: "ODA-000002", facilityId: facilityId("ODF-000005"), type: "FINANCIAL_DIFFICULTY", status: "ASSIGNED", severity: "CRITICAL", detectedAt: new Date("2026-07-15T13:00:00.000Z"), dueAt: new Date("2026-07-21T17:00:00.000Z"), details: "Facility suspended after rejected KYC and debit restriction.", assignedTo: staffId("supervisor") },
+  ]);
+
   await tx.insert(tables.beneficiaries).values(baselineBeneficiaries.map((item) => ({
     ...item, customerId: customerId(item.customerNumber), status: "ACTIVE" as const,
+  })));
+
+  const pendingPaymentId = stableUuid("payment-pending-pep");
+  await tx.insert(tables.paymentOrders).values({
+    id: pendingPaymentId, reference: "PAY-000001", type: "EXTERNAL", status: "PENDING", sourceAccountId: bankAccountId("1000000004"),
+    beneficiaryId: stableUuid("beneficiary-2"), amount: "2500.00", currency: "AED", description: "Fictional service payment",
+    idempotencyKey: "SEED-PAY-PENDING-0001", initiatedBy: "bp.operator", approvalReason: "Approved PEP relationship requires external-payment approval",
+    expiresAt: new Date("2026-07-21T09:00:00.000Z"), createdAt: new Date("2026-07-20T09:00:00.000Z"),
+  });
+  await tx.insert(tables.accountHolds).values({
+    id: stableUuid("hold-pending-pep"), reference: "HLD-000001", accountId: bankAccountId("1000000004"), paymentOrderId: pendingPaymentId,
+    amount: "2500.00", currency: "AED", status: "ACTIVE", expiresAt: new Date("2026-07-21T09:00:00.000Z"),
+  });
+  const seededWorkItems = [
+    { id: stableUuid("work-payment-1"), reference: "WRK-000001", type: "PAYMENT_APPROVAL" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "PAYMENT", entityReference: "PAY-000001", title: "Approve external PEP payment", description: "Review customer KYC, beneficiary screening, hold and available headroom.", requiredRole: "SUPERVISOR" as const, dueAt: new Date("2026-07-21T09:00:00.000Z") },
+    { id: stableUuid("work-overdraft-3"), reference: "WRK-000002", type: "OVERDRAFT_APPROVAL" as const, status: "OPEN" as const, priority: "NORMAL" as const, entityType: "OVERDRAFT", entityReference: "ODF-000003", title: "Approve arranged overdraft application", description: "Review affordability and current KYC due status before decision.", requiredRole: "SUPERVISOR" as const, dueAt: new Date("2026-07-22T17:00:00.000Z") },
+    { id: stableUuid("work-alert-c5"), reference: "WRK-000003", type: "OVERDRAFT_ALERT" as const, status: "ASSIGNED" as const, priority: "CRITICAL" as const, entityType: "OVERDRAFT_ALERT", entityReference: "ODA-000002", title: "Resolve financial-difficulty alert", description: "Record the intervention outcome for the suspended facility.", requiredRole: "SUPERVISOR" as const, assignedTo: staffId("supervisor"), dueAt: new Date("2026-07-21T17:00:00.000Z") },
+  ];
+  await tx.insert(tables.workItems).values(seededWorkItems.map((item) => ({ ...item, createdBy: staffId("operator") })));
+  await tx.insert(tables.workItemEvents).values(seededWorkItems.map((item) => ({
+    id: stableUuid(`event-${item.reference}`), workItemId: item.id, eventType: item.status === "ASSIGNED" ? "ASSIGNED" : "CREATED",
+    fromStatus: null, toStatus: item.status, actorUserId: staffId("operator"), actorUsername: "bp.operator", comment: "Seeded demonstration work item.",
+    occurredAt: new Date("2026-07-20T09:00:00.000Z"),
   })));
 
   const currencies = ["GBP", "AED", "USD", "EUR"];
@@ -146,6 +301,7 @@ export async function resetBaseline(database: Database, actor: { id: string; use
   await database.transaction(async (transaction) => {
     const tx = transaction as unknown as SeedDb;
     await tx.execute(sql`select pg_advisory_xact_lock(738_204_019)`);
+    await tx.delete(tables.loginAttempts).where(lt(tables.loginAttempts.attemptedAt, new Date(Date.now() - 24 * 60 * 60_000)));
     await clearBankingData(tx);
     await seedBaseline(tx);
     await tx.insert(tables.auditEvents).values({

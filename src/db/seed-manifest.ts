@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { BASELINE_CUSTOMER_NUMBERS } from "@/modules/contracts";
-import { assertBalancedEntries, minorUnitsToMoney, moneyToMinorUnits } from "@/modules/domain/transfer-policy";
+import { assertBalancedEntries, minorUnitsToMoney, moneyToMinorUnits, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 
 export function stableUuid(key: string): string {
   const hex = createHash("sha256").update(`futurebank:${key}`).digest("hex").slice(0, 32).split("");
@@ -10,11 +10,11 @@ export function stableUuid(key: string): string {
 }
 
 export const baselineCustomers = [
-  { customerNumber: "C000001", partyType: "RETAIL", title: "Ms", givenName: "Amelia", familyName: "Hart", legalName: null, shortName: "Amelia Hart", dateOfBirth: "1987-04-16", registrationNumber: null, gender: "Female", maritalStatus: "Married", nationality: "GB", residenceCountry: "GB", sector: "Personal Banking", industry: "Healthcare", status: "ACTIVE", kycStatus: "COMPLETE", riskRating: "LOW", kycReviewDate: "2027-04-16", taxId: "GB-FIC-000001", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
-  { customerNumber: "C000002", partyType: "RETAIL", title: "Mr", givenName: "Omar", familyName: "Al Mansoori", legalName: null, shortName: "Omar Al Mansoori", dateOfBirth: "1979-11-03", registrationNumber: null, gender: "Male", maritalStatus: "Married", nationality: "AE", residenceCountry: "AE", sector: "Personal Banking", industry: "Aviation", status: "ACTIVE", kycStatus: "COMPLETE", riskRating: "MEDIUM", kycReviewDate: "2027-01-20", taxId: "AE-FIC-000002", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
+  { customerNumber: "C000001", partyType: "RETAIL", title: "Ms", givenName: "Amelia", familyName: "Hart", legalName: null, shortName: "Amelia Hart", dateOfBirth: "1987-04-16", registrationNumber: null, gender: "Female", maritalStatus: "Married", nationality: "GB", residenceCountry: "GB", sector: "Personal Banking", industry: "Healthcare", status: "ACTIVE", kycStatus: "APPROVED", riskRating: "LOW", kycReviewDate: "2029-04-16", taxId: "GB-FIC-000001", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
+  { customerNumber: "C000002", partyType: "RETAIL", title: "Mr", givenName: "Omar", familyName: "Al Mansoori", legalName: null, shortName: "Omar Al Mansoori", dateOfBirth: "1979-11-03", registrationNumber: null, gender: "Male", maritalStatus: "Married", nationality: "AE", residenceCountry: "AE", sector: "Personal Banking", industry: "Aviation", status: "ACTIVE", kycStatus: "APPROVED", riskRating: "MEDIUM", kycReviewDate: "2027-01-20", taxId: "AE-FIC-000002", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
   { customerNumber: "C000003", partyType: "RETAIL", title: "Dr", givenName: "Priya", familyName: "Nair", legalName: null, shortName: "Priya Nair", dateOfBirth: "1991-08-22", registrationNumber: null, gender: "Female", maritalStatus: "Single", nationality: "IN", residenceCountry: "AE", sector: "Personal Banking", industry: "Technology", status: "ACTIVE", kycStatus: "DUE", riskRating: "LOW", kycReviewDate: "2026-08-15", taxId: "AE-FIC-000003", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
-  { customerNumber: "C000004", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Northstar Sustainable Logistics Ltd", shortName: "Northstar Logistics", dateOfBirth: null, registrationNumber: "09990041", gender: null, maritalStatus: null, nationality: "GB", residenceCountry: "GB", sector: "Corporate Banking", industry: "Logistics", status: "ACTIVE", kycStatus: "COMPLETE", riskRating: "MEDIUM", kycReviewDate: "2027-02-10", taxId: "GB-FIC-SME004", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
-  { customerNumber: "C000005", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Crescent Digital Trading FZ-LLC", shortName: "Crescent Digital", dateOfBirth: null, registrationNumber: "FIC-DDA-88210", gender: null, maritalStatus: null, nationality: "AE", residenceCountry: "AE", sector: "Business Banking", industry: "E-commerce", status: "ACTIVE", kycStatus: "REVIEW", riskRating: "HIGH", kycReviewDate: "2026-07-31", taxId: "AE-FIC-SME005", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
+  { customerNumber: "C000004", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Northstar Sustainable Logistics Ltd", shortName: "Northstar Logistics", dateOfBirth: null, registrationNumber: "09990041", gender: null, maritalStatus: null, nationality: "GB", residenceCountry: "GB", sector: "Corporate Banking", industry: "Logistics", status: "ACTIVE", kycStatus: "APPROVED", riskRating: "MEDIUM", kycReviewDate: "2027-02-10", taxId: "GB-FIC-SME004", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
+  { customerNumber: "C000005", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Crescent Digital Trading FZ-LLC", shortName: "Crescent Digital", dateOfBirth: null, registrationNumber: "FIC-DDA-88210", gender: null, maritalStatus: null, nationality: "AE", residenceCountry: "AE", sector: "Business Banking", industry: "E-commerce", status: "RESTRICTED", kycStatus: "REJECTED", riskRating: "HIGH", kycReviewDate: "2026-07-20", taxId: "AE-FIC-SME005", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
 ] as const;
 
 export const baselineBranches = [
@@ -35,7 +35,7 @@ export const baselineProducts = [
 ] as const;
 
 export const baselineAccounts = [
-  { accountNumber: "1000000001", customerNumber: "C000001", productCode: "CUR-GBP", branchCode: "LON001", nickname: "Everyday", balance: "8432.17", overdraftLimit: "1000.00", openedAt: "2019-06-14" },
+  { accountNumber: "1000000001", customerNumber: "C000001", productCode: "CUR-GBP", branchCode: "LON001", nickname: "Everyday", balance: "-240.50", overdraftLimit: "1000.00", openedAt: "2019-06-14" },
   { accountNumber: "1000000002", customerNumber: "C000001", productCode: "SAV-GBP", branchCode: "LON001", nickname: "Rainy Day", balance: "24780.55", overdraftLimit: "0.00", openedAt: "2020-02-11" },
   { accountNumber: "1000000003", customerNumber: "C000001", productCode: "FCY-EUR", branchCode: "LON001", nickname: "Travel EUR", balance: "3260.80", overdraftLimit: "0.00", openedAt: "2022-05-04" },
   { accountNumber: "1000000004", customerNumber: "C000002", productCode: "CUR-AED", branchCode: "DXB001", nickname: "Daily Banking", balance: "62150.25", overdraftLimit: "10000.00", openedAt: "2017-09-19" },
@@ -87,7 +87,7 @@ export const baselineTransactions: BaselineTransaction[] = baselineAccounts.flat
     const amount = `${40 + ((accountIndex + 3) * (index + 7) * 17) % 950}.${((accountIndex + index) * 13 % 100).toString().padStart(2, "0")}`;
     return { direction, amount };
   });
-  const target = moneyToMinorUnits(account.balance);
+  const target = signedMoneyToMinorUnits(account.balance);
   const net = movements.reduce((sum, item) => sum + (item.direction === "CREDIT" ? moneyToMinorUnits(item.amount) : -moneyToMinorUnits(item.amount)), 0n);
   let running = target - net;
   return movements.map((movement, index) => {

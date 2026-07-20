@@ -15,6 +15,7 @@ import {
   ledgerTransactions,
   loanDetails,
   loanRepayments,
+  overdraftFacilities,
   paymentOrders,
   products,
   session,
@@ -67,7 +68,7 @@ describe("database model contract", () => {
     const moneyColumns = [
       bankAccounts.balance,
       bankAccounts.availableBalance,
-      bankAccounts.overdraftLimit,
+      overdraftFacilities.approvedLimit,
       paymentOrders.amount,
       ledgerTransactions.amount,
       ledgerEntries.amount,

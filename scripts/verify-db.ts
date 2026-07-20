@@ -18,9 +18,16 @@ async function main() {
   expectEqual("customers", await scalar(sql`select count(*)::int as value from customers`), 5);
   expectEqual("retail customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'RETAIL'`), 3);
   expectEqual("SME customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'SME'`), 2);
+  expectEqual("unique RIM identifiers", await scalar(sql`select count(distinct rim_number)::int as value from customers where rim_number like 'RIM%'`), 5);
+  expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 7);
   expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 14);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 12);
+  expectEqual("KYC cases", await scalar(sql`select count(*)::int as value from kyc_cases`), 5);
+  expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 5);
+  expectEqual("active payment holds", await scalar(sql`select count(*)::int as value from account_holds where status = 'ACTIVE'`), 1);
+  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 3);
+  expectEqual("confirmed fictional sanctions restrictions", await scalar(sql`select count(*)::int as value from customer_restrictions where type = 'DEBIT_BLOCK' and active`), 1);
   expectEqual("accounts below transaction minimum", await scalar(sql`
     select count(*)::int as value from (
       select a.id from bank_accounts a left join ledger_entries e on e.account_id = a.id
@@ -35,22 +42,24 @@ async function main() {
     )
     select count(*)::int as value from (select transaction_id from legs group by transaction_id having sum(signed) <> 0) unbalanced
   `), 0);
-  expectEqual("staff users", await scalar(sql`select count(*)::int as value from staff_profiles where active`), 2);
+  expectEqual("staff users", await scalar(sql`select count(*)::int as value from staff_profiles where active`), 4);
 
   const credentials = await db.execute(sql`
     select u.username, a.password from "user" u join account a on a.user_id = u.id and a.provider_id = 'credential'
-    where u.username in ('bp.operator', 'bp.admin') order by u.username
+    where u.username in ('bp.operator', 'bp.supervisor', 'bp.compliance', 'bp.admin') order by u.username
   `);
   const rows = credentials.rows as unknown as PasswordRow[];
   const passwordByUsername: Record<string, string | undefined> = {
     "bp.operator": process.env.DEMO_OPERATOR_PASSWORD,
+    "bp.supervisor": process.env.DEMO_SUPERVISOR_PASSWORD,
+    "bp.compliance": process.env.DEMO_COMPLIANCE_PASSWORD,
     "bp.admin": process.env.DEMO_ADMIN_PASSWORD,
   };
   for (const credential of rows) {
     const password = passwordByUsername[credential.username];
     if (!password || !(await verifyPassword({ hash: credential.password, password }))) throw new Error(`Credential verification failed for ${credential.username}`);
   }
-  expectEqual("verified staff credentials", rows.length, 2);
+  expectEqual("verified staff credentials", rows.length, 4);
   console.info("Live Neon verification passed: schema, baseline counts, transaction coverage, balanced ledger, and staff credentials.");
 }
 

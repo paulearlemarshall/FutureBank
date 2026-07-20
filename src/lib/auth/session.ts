@@ -1,15 +1,17 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { staffProfiles } from "@/db/schema";
 import type { SessionUser, StaffRole } from "@/modules/contracts";
 import { hasRequiredRole } from "@/modules/domain/auth-policy";
+import { hasPermission, type StaffPermission } from "@/modules/domain/auth-policy";
 import { auth } from "./index";
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const current = await auth.api.getSession({ headers: await headers() });
   if (!current?.user) return null;
   const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, current.user.id)).limit(1);
@@ -20,7 +22,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     name: current.user.name,
     role: profile.role,
   };
-}
+});
 
 export async function requireUser(): Promise<SessionUser> {
   const current = await getCurrentUser();
@@ -38,5 +40,18 @@ export async function requireActionUser(required: StaffRole = "OPERATOR"): Promi
   const current = await getCurrentUser();
   if (!current) throw new Error("UNAUTHENTICATED");
   if (!hasRequiredRole(current.role, required)) throw new Error("FORBIDDEN");
+  return current;
+}
+
+export async function requireAuthenticatedActionUser(): Promise<SessionUser> {
+  const current = await getCurrentUser();
+  if (!current) throw new Error("UNAUTHENTICATED");
+  return current;
+}
+
+export async function requirePermission(permission: StaffPermission): Promise<SessionUser> {
+  const current = await getCurrentUser();
+  if (!current) throw new Error("UNAUTHENTICATED");
+  if (!hasPermission(current.role, permission)) throw new Error("FORBIDDEN");
   return current;
 }
