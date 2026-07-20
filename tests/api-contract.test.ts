@@ -31,4 +31,46 @@ describe("FutureBank API contract", () => {
       expect(paths.some((path) => path === prefix || path.startsWith(`${prefix}/`)), prefix).toBe(true);
     }
   });
+
+  it("documents customer party variants and every accepted address and identity field", () => {
+    const schemas = specification.components.schemas;
+    const customerWrite = schemas.CustomerWrite as {
+      oneOf: Array<{ $ref: string }>;
+      discriminator: { propertyName: string; mapping: Record<string, string> };
+    };
+    const base = schemas.CustomerWriteBase as {
+      required: string[];
+      properties: Record<string, unknown>;
+      anyOf: Array<{ required?: string[]; properties?: Record<string, unknown> }>;
+    };
+    const retail = schemas.RetailCustomerWrite.allOf[1] as {
+      required: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+    const sme = schemas.SmeCustomerWrite.allOf[1] as {
+      required: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+
+    expect(customerWrite.oneOf.map((item) => item.$ref)).toEqual([
+      "#/components/schemas/RetailCustomerWrite",
+      "#/components/schemas/SmeCustomerWrite",
+    ]);
+    expect(customerWrite.discriminator).toEqual(expect.objectContaining({ propertyName: "partyType" }));
+    expect(retail.required).toEqual(expect.arrayContaining(["partyType", "givenName", "familyName", "dateOfBirth"]));
+    expect(retail.properties.partyType.enum).toEqual(["RETAIL"]);
+    expect(sme.required).toEqual(expect.arrayContaining(["partyType", "legalName", "registrationNumber"]));
+    expect(sme.properties.partyType.enum).toEqual(["SME"]);
+
+    expect(base.required).not.toContain("country");
+    expect(base.properties).toEqual(expect.objectContaining({
+      country: expect.any(Object),
+      identityDocumentType: expect.any(Object),
+      identityDocumentNumber: expect.any(Object),
+      identityIssuingCountry: expect.any(Object),
+      identityIssuedAt: expect.any(Object),
+      identityExpiresAt: expect.any(Object),
+    }));
+    expect(base.anyOf.some((variant) => variant.required?.includes("identityExpiresAt"))).toBe(true);
+  });
 });
