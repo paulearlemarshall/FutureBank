@@ -156,8 +156,14 @@ export async function getPaymentApproval(reference: string): Promise<PaymentAppr
 }
 
 export async function listPendingPayments(): Promise<PaymentApprovalDetail[]> {
+  return listPayments({ status: "PENDING" });
+}
+
+export async function listPayments(options: { status?: PaymentApprovalDetail["status"] } = {}): Promise<PaymentApprovalDetail[]> {
   await requireUser();
-  const rows = await db.select({ reference: paymentOrders.reference }).from(paymentOrders).where(eq(paymentOrders.status, "PENDING")).orderBy(paymentOrders.createdAt);
+  const rows = await db.select({ reference: paymentOrders.reference }).from(paymentOrders)
+    .where(options.status ? eq(paymentOrders.status, options.status) : undefined)
+    .orderBy(desc(paymentOrders.createdAt));
   const details = await Promise.all(rows.map((row) => getPaymentApproval(row.reference)));
   return details.filter((item): item is PaymentApprovalDetail => item !== null);
 }

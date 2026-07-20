@@ -32,6 +32,8 @@ jobs:
       DEMO_SUPERVISOR_PASSWORD: ci-only-supervisor-password
       DEMO_COMPLIANCE_PASSWORD: ci-only-compliance-password
       DEMO_ADMIN_PASSWORD: ci-only-admin-password
+      FUTUREBANK_API_KEY: ci-only-futurebank-api-key
+      FUTUREBANK_API_DEFAULT_USERNAME: bp.operator
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

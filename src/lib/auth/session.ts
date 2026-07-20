@@ -9,9 +9,10 @@ import { staffProfiles } from "@/db/schema";
 import type { SessionUser, StaffRole } from "@/modules/contracts";
 import { hasRequiredRole } from "@/modules/domain/auth-policy";
 import { hasPermission, type StaffPermission } from "@/modules/domain/auth-policy";
+import { getApiUser } from "./api-context";
 import { auth } from "./index";
 
-export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
+const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const current = await auth.api.getSession({ headers: await headers() });
   if (!current?.user) return null;
   const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, current.user.id)).limit(1);
@@ -23,6 +24,10 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     role: profile.role,
   };
 });
+
+export async function getCurrentUser(): Promise<SessionUser | null> {
+  return getApiUser() ?? getSessionUser();
+}
 
 export async function requireUser(): Promise<SessionUser> {
   const current = await getCurrentUser();
