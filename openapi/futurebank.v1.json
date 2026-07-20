@@ -1,0 +1,148 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FutureBank Demo API",
+    "version": "1.0.0",
+    "description": "Authenticated read/write API for the fictional FutureBank core-banking demonstration. All data and screening results are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "license": { "name": "Demonstration use only" }
+  },
+  "servers": [
+    { "url": "https://future-bank-demo.vercel.app/api/v1", "description": "Production demo" },
+    { "url": "http://localhost:3000/api/v1", "description": "Local development" }
+  ],
+  "security": [{ "ApiKeyAuth": [] }],
+  "tags": [
+    { "name": "System", "description": "Discovery and operational summary resources." },
+    { "name": "Customers", "description": "Customer and CRM maintenance." },
+    { "name": "Accounts", "description": "Products, accounts and transaction histories." },
+    { "name": "Beneficiaries", "description": "External beneficiary maintenance." },
+    { "name": "Payments", "description": "Internal and external payment processing." },
+    { "name": "KYC", "description": "CDD, evidence, screening, decisions and restrictions." },
+    { "name": "Overdrafts", "description": "Arranged-overdraft facilities and monitoring." },
+    { "name": "Work items", "description": "Maker-checker work queues and assignments." },
+    { "name": "Audit", "description": "Append-only operational audit events." }
+  ],
+  "paths": {
+    "/": {
+      "get": { "tags": ["System"], "summary": "Discover API resources", "responses": { "200": { "$ref": "#/components/responses/Success" } } }
+    },
+    "/dashboard": {
+      "get": { "tags": ["System"], "summary": "Get operational dashboard summary", "responses": { "200": { "$ref": "#/components/responses/Success" } } }
+    },
+    "/products": {
+      "get": { "tags": ["Accounts"], "summary": "List active and inactive banking products", "responses": { "200": { "$ref": "#/components/responses/Success" } } }
+    },
+    "/customers": {
+      "get": { "tags": ["Customers"], "summary": "List or search customers", "parameters": [{ "$ref": "#/components/parameters/Query" }, { "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Offset" }], "responses": { "200": { "$ref": "#/components/responses/Success" } } },
+      "post": { "tags": ["Customers"], "summary": "Create a fully populated customer", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerWrite" } } } }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/customers/{customerNumber}": {
+      "parameters": [{ "$ref": "#/components/parameters/CustomerNumber" }],
+      "get": { "tags": ["Customers"], "summary": "Get a customer with identity, address, relationships and accounts", "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "patch": { "tags": ["Customers"], "summary": "Update a customer", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/customers/{customerNumber}/restrictions": {
+      "post": { "tags": ["KYC"], "summary": "Apply a customer restriction", "parameters": [{ "$ref": "#/components/parameters/CustomerNumber" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["type", "reason"], "properties": { "type": { "type": "string", "enum": ["DEBIT_BLOCK", "PAYMENT_REVIEW", "ONBOARDING_HOLD"] }, "reason": { "type": "string" } } } } } }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/customers/{customerNumber}/restrictions/{restrictionReference}/lift": {
+      "post": { "tags": ["KYC"], "summary": "Lift a customer restriction", "parameters": [{ "$ref": "#/components/parameters/CustomerNumber" }, { "$ref": "#/components/parameters/RestrictionReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string" } } } } } }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/accounts": {
+      "get": { "tags": ["Accounts"], "summary": "List or search accounts", "parameters": [{ "$ref": "#/components/parameters/Query" }, { "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Offset" }], "responses": { "200": { "$ref": "#/components/responses/Success" } } },
+      "post": { "tags": ["Accounts"], "summary": "Open an account", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["customerNumber", "productCode", "branchCode", "initialDeposit"], "properties": { "customerNumber": { "type": "string" }, "productCode": { "type": "string" }, "branchCode": { "type": "string" }, "nickname": { "type": "string", "nullable": true }, "initialDeposit": { "$ref": "#/components/schemas/Money" } } } } } }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/accounts/{accountNumber}": {
+      "get": { "tags": ["Accounts"], "summary": "Get account, facility and statement detail", "parameters": [{ "$ref": "#/components/parameters/AccountNumber" }], "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/accounts/{accountNumber}/transactions": {
+      "get": { "tags": ["Accounts"], "summary": "Get account transaction history", "parameters": [{ "$ref": "#/components/parameters/AccountNumber" }], "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/accounts/{accountNumber}/status": {
+      "patch": { "tags": ["Accounts"], "summary": "Block, activate or close an account", "parameters": [{ "$ref": "#/components/parameters/AccountNumber" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "type": "string", "enum": ["ACTIVE", "BLOCKED", "CLOSED"] }, "reason": { "type": "string" } } } } } }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/beneficiaries": {
+      "get": { "tags": ["Beneficiaries"], "summary": "List beneficiaries", "parameters": [{ "name": "customerNumber", "in": "query", "schema": { "type": "string" } }, { "$ref": "#/components/parameters/Limit" }], "responses": { "200": { "$ref": "#/components/responses/Success" } } },
+      "post": { "tags": ["Beneficiaries"], "summary": "Create a beneficiary", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/beneficiaries/{beneficiaryId}": {
+      "patch": { "tags": ["Beneficiaries"], "summary": "Activate or deactivate a beneficiary", "parameters": [{ "name": "beneficiaryId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] } } } } } }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payments": {
+      "get": { "tags": ["Payments"], "summary": "List payments in every lifecycle state", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string", "enum": ["BOOKED", "PENDING", "REJECTED", "EXPIRED"] } }], "responses": { "200": { "$ref": "#/components/responses/Success" } } },
+      "post": { "tags": ["Payments"], "summary": "Submit an internal or external payment", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }, { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8, "maxLength": 100 } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentWrite" } } } }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payments/{paymentReference}": {
+      "get": { "tags": ["Payments"], "summary": "Get payment, hold and approval detail", "parameters": [{ "$ref": "#/components/parameters/PaymentReference" }], "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payments/{paymentReference}/decision": {
+      "post": { "tags": ["Payments"], "summary": "Approve or reject a pending payment", "parameters": [{ "$ref": "#/components/parameters/PaymentReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Decision" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payments/expiry-run": {
+      "post": { "tags": ["Payments"], "summary": "Expire stale pending payments and release holds", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "403": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/kyc-cases": {
+      "get": { "tags": ["KYC"], "summary": "List KYC cases", "responses": { "200": { "$ref": "#/components/responses/Success" } } },
+      "post": { "tags": ["KYC"], "summary": "Open a KYC case", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["customerNumber", "type"], "properties": { "customerNumber": { "type": "string" }, "type": { "type": "string", "enum": ["ONBOARDING", "PERIODIC_REVIEW", "TRIGGER_EVENT", "REMEDIATION"] } } } } } }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/kyc-cases/{caseReference}": {
+      "get": { "tags": ["KYC"], "summary": "Get the complete KYC workspace", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }], "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/kyc-cases/{caseReference}/cdd": { "patch": { "tags": ["KYC"], "summary": "Create or update the CDD profile", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" } } } },
+    "/kyc-cases/{caseReference}/evidence": { "post": { "tags": ["KYC"], "summary": "Record fictional evidence metadata", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" } } } },
+    "/kyc-cases/{caseReference}/evidence-verification": { "post": { "tags": ["KYC"], "summary": "Verify or reject evidence", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" } } } },
+    "/kyc-cases/{caseReference}/screening": { "post": { "tags": ["KYC"], "summary": "Run fictional screening", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" } } } },
+    "/kyc-cases/{caseReference}/screening-resolution": { "post": { "tags": ["KYC"], "summary": "Resolve a possible fictional match", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" } } } },
+    "/kyc-cases/{caseReference}/submission": { "post": { "tags": ["KYC"], "summary": "Submit a complete KYC case for approval", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/kyc-cases/{caseReference}/decision": { "post": { "tags": ["KYC"], "summary": "Approve or reject a KYC case", "parameters": [{ "$ref": "#/components/parameters/CaseReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Decision" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/overdrafts": {
+      "get": { "tags": ["Overdrafts"], "summary": "List overdraft facilities", "responses": { "200": { "$ref": "#/components/responses/Success" } } },
+      "post": { "tags": ["Overdrafts"], "summary": "Submit an arranged-overdraft application", "parameters": [{ "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "201": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/overdrafts/{facilityReference}": { "get": { "tags": ["Overdrafts"], "summary": "Get facility, utilization, limits and alerts", "parameters": [{ "$ref": "#/components/parameters/FacilityReference" }], "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } } },
+    "/overdrafts/{facilityReference}/limit-changes": { "post": { "tags": ["Overdrafts"], "summary": "Request a limit change", "parameters": [{ "$ref": "#/components/parameters/FacilityReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "202": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/overdrafts/{facilityReference}/decision": { "post": { "tags": ["Overdrafts"], "summary": "Approve or decline an overdraft application or change", "parameters": [{ "$ref": "#/components/parameters/FacilityReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Decision" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/overdrafts/{facilityReference}/status": { "post": { "tags": ["Overdrafts"], "summary": "Suspend or close a facility", "parameters": [{ "$ref": "#/components/parameters/FacilityReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/overdraft-alerts/{alertReference}/resolution": { "post": { "tags": ["Overdrafts"], "summary": "Resolve an overdraft monitoring alert", "parameters": [{ "name": "alertReference", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Mutation" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" } } } },
+    "/work-items": { "get": { "tags": ["Work items"], "summary": "List and filter the approval queue", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }, { "name": "type", "in": "query", "schema": { "type": "string" } }, { "name": "priority", "in": "query", "schema": { "type": "string" } }, { "name": "assignedTo", "in": "query", "schema": { "type": "string" } }, { "name": "overdueOnly", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "$ref": "#/components/responses/Success" } } } },
+    "/work-items/{workItemReference}": { "get": { "tags": ["Work items"], "summary": "Get a work item and transition history", "parameters": [{ "$ref": "#/components/parameters/WorkItemReference" }], "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } } } },
+    "/work-items/{workItemReference}/claim": { "post": { "tags": ["Work items"], "summary": "Claim a work item", "parameters": [{ "$ref": "#/components/parameters/WorkItemReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Version" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/work-items/{workItemReference}/release": { "post": { "tags": ["Work items"], "summary": "Release a claimed work item", "parameters": [{ "$ref": "#/components/parameters/WorkItemReference" }, { "$ref": "#/components/parameters/StaffActor" }], "requestBody": { "$ref": "#/components/requestBodies/Version" }, "responses": { "200": { "$ref": "#/components/responses/ActionSuccess" }, "409": { "$ref": "#/components/responses/Error" } } } },
+    "/audit-events": { "get": { "tags": ["Audit"], "summary": "List or search audit events", "parameters": [{ "$ref": "#/components/parameters/Query" }, { "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Offset" }], "responses": { "200": { "$ref": "#/components/responses/Success" } } } }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "X-API-Key", "description": "The same key may also be sent as Authorization: Bearer <key>." }
+    },
+    "parameters": {
+      "StaffActor": { "name": "X-Staff-Username", "in": "header", "required": false, "description": "Active seeded staff actor. Defaults to bp.operator. Role permissions and maker-checker controls still apply.", "schema": { "type": "string", "example": "bp.operator" } },
+      "Query": { "name": "query", "in": "query", "schema": { "type": "string" } },
+      "Limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 } },
+      "Offset": { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } },
+      "CustomerNumber": { "name": "customerNumber", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^C[0-9]{6}$" } },
+      "AccountNumber": { "name": "accountNumber", "in": "path", "required": true, "schema": { "type": "string" } },
+      "PaymentReference": { "name": "paymentReference", "in": "path", "required": true, "schema": { "type": "string" } },
+      "CaseReference": { "name": "caseReference", "in": "path", "required": true, "schema": { "type": "string" } },
+      "FacilityReference": { "name": "facilityReference", "in": "path", "required": true, "schema": { "type": "string" } },
+      "WorkItemReference": { "name": "workItemReference", "in": "path", "required": true, "schema": { "type": "string" } },
+      "RestrictionReference": { "name": "restrictionReference", "in": "path", "required": true, "schema": { "type": "string" } }
+    },
+    "schemas": {
+      "Money": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$", "example": "1250.00" },
+      "ActionState": { "type": "object", "required": ["ok", "code", "message"], "properties": { "ok": { "type": "boolean" }, "code": { "type": "string" }, "message": { "type": "string" }, "fieldErrors": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } } } },
+      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "object", "required": ["code", "message"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "fieldErrors": { "type": "object", "additionalProperties": true } } } } },
+      "CustomerWrite": { "type": "object", "required": ["partyType", "shortName", "nationality", "residenceCountry", "sector", "industry", "kycStatus", "riskRating", "relationshipManager", "addressLine1", "city", "postalCode", "email", "phone"], "additionalProperties": true, "properties": { "partyType": { "type": "string", "enum": ["RETAIL", "SME"] }, "shortName": { "type": "string" }, "nationality": { "type": "string", "minLength": 2, "maxLength": 2 }, "residenceCountry": { "type": "string", "minLength": 2, "maxLength": 2 }, "sector": { "type": "string" }, "industry": { "type": "string" }, "kycStatus": { "type": "string" }, "riskRating": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] }, "relationshipManager": { "type": "string" }, "addressLine1": { "type": "string" }, "city": { "type": "string" }, "postalCode": { "type": "string" }, "email": { "type": "string", "format": "email" }, "phone": { "type": "string" }, "identityDocumentNumber": { "type": "string", "nullable": true } } },
+      "PaymentWrite": { "type": "object", "required": ["paymentType", "sourceAccountNumber", "amount", "description"], "properties": { "paymentType": { "type": "string", "enum": ["INTERNAL", "EXTERNAL"] }, "sourceAccountNumber": { "type": "string" }, "destinationAccountNumber": { "type": "string", "nullable": true }, "beneficiaryId": { "type": "string", "nullable": true }, "amount": { "$ref": "#/components/schemas/Money" }, "description": { "type": "string", "minLength": 3, "maxLength": 140 } } },
+      "MutationRequest": { "type": "object", "additionalProperties": true }
+    },
+    "requestBodies": {
+      "Mutation": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MutationRequest" } } } },
+      "Decision": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["workItemReference", "expectedVersion", "decision", "comment"], "properties": { "workItemReference": { "type": "string" }, "expectedVersion": { "type": "integer", "minimum": 1 }, "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "DECLINE"] }, "comment": { "type": "string", "minLength": 5 }, "finalRiskRating": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] }, "overrideReason": { "type": "string", "nullable": true } } } } } },
+      "Version": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["expectedVersion"], "properties": { "expectedVersion": { "type": "integer", "minimum": 1 } } } } } }
+    },
+    "responses": {
+      "Success": { "description": "Successful response", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": {} } } } } },
+      "ActionSuccess": { "description": "Successful mutation", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ActionState" } } } } } },
+      "Error": { "description": "API error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    }
+  }
+}

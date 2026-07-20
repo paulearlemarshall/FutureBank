@@ -15,6 +15,7 @@
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
+    "db:seed-staff": "dotenv -e .env.local -- tsx scripts/seed-staff.ts",
     "db:reset": "dotenv -e .env.local -- tsx scripts/reset.ts",
     "db:verify": "dotenv -e .env.local -- tsx scripts/verify-db.ts",
     "db:verify-workflows": "dotenv -e .env.local -- node --conditions=react-server --import tsx scripts/verify-workflows.ts"

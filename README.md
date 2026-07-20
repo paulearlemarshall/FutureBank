@@ -20,11 +20,12 @@ The production demonstration is available at [future-bank-demo.vercel.app](https
 - Drizzle ORM with Neon Serverless Postgres
 - Better Auth username/password sessions
 - Vitest domain tests and Playwright browser tests
+- Versioned authenticated REST API with an OpenAPI 3.0 artifact
 - Vercel deployment
 
 ## Local setup
 
-Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string, authentication secret, and four demo credentials: `DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
+Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string, authentication secret, four demo credentials (`DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`), and `FUTUREBANK_API_KEY`. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
 
 ```powershell
 npm install
@@ -34,6 +35,20 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The four seeded usernames are listed above; their passwords are the corresponding environment-variable values.
+
+## REST API
+
+The read/write API is rooted at `/api/v1`. Send the configured key in `X-API-Key` or as a bearer token. Mutations may also send `X-Staff-Username` to select an active seeded staff actor; normal role permissions and maker-checker separation remain enforced. The default actor is `bp.operator`.
+
+```powershell
+$headers = @{
+  "X-API-Key" = "<api key>"
+  "X-Staff-Username" = "bp.operator"
+}
+Invoke-RestMethod "http://localhost:3000/api/v1/customers?limit=9" -Headers $headers
+```
+
+The committed OpenAPI 3.0 artifact is [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) and the running app serves the same document publicly at `/api/openapi.json`. See [`docs/api.md`](docs/api.md) for authentication, write examples and response conventions.
 
 ## Quality checks
 
