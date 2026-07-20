@@ -16,7 +16,8 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
     "db:reset": "dotenv -e .env.local -- tsx scripts/reset.ts",
-    "db:verify": "dotenv -e .env.local -- tsx scripts/verify-db.ts"
+    "db:verify": "dotenv -e .env.local -- tsx scripts/verify-db.ts",
+    "db:verify-workflows": "dotenv -e .env.local -- node --conditions=react-server --import tsx scripts/verify-workflows.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",

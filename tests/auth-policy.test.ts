@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasRequiredRole } from "@/modules/domain/auth-policy";
+import { hasPermission, hasRequiredRole } from "@/modules/domain/auth-policy";
 
 describe("role boundaries", () => {
   it("allows operators to perform operator work", () => {
@@ -14,4 +14,14 @@ describe("role boundaries", () => {
     "allows administrators to satisfy the %s requirement",
     (required) => expect(hasRequiredRole("ADMIN", required)).toBe(true),
   );
+
+  it("separates operator, supervisor and compliance duties", () => {
+    expect(hasPermission("OPERATOR", "PAYMENT_INITIATE")).toBe(true);
+    expect(hasPermission("OPERATOR", "PAYMENT_DECIDE")).toBe(false);
+    expect(hasPermission("SUPERVISOR", "OVERDRAFT_DECIDE")).toBe(true);
+    expect(hasPermission("SUPERVISOR", "KYC_DECIDE")).toBe(false);
+    expect(hasPermission("COMPLIANCE", "KYC_DECIDE")).toBe(true);
+    expect(hasPermission("COMPLIANCE", "PAYMENT_DECIDE")).toBe(false);
+    expect(hasPermission("ADMIN", "DEMO_RESET")).toBe(true);
+  });
 });

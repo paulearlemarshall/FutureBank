@@ -48,5 +48,9 @@ The Playwright suite treats these workflows as the compatibility baseline:
 4. Open and maintain an account, inspect its statement, and verify loan records are read-only.
 5. Create a beneficiary and a payment with idempotent retry and insufficient-funds validation.
 6. Reset the demonstration data as an administrator and restore exactly five baseline customers.
+7. Claim and decide payment, KYC, and overdraft work items with separate maker and checker users.
+8. Record/verify KYC evidence, run and resolve fictional screening, and approve or reject a KYC case.
+9. Submit and decide an arranged-overdraft application, verify headroom, and resolve a repeat-use alert.
+10. Create a risk-triggered pending payment, verify its hold, then approve, reject, or expire it.
 
-The reset journey is destructive and only runs when `PLAYWRIGHT_ALLOW_RESET=true`.
+The reset journey is destructive and is part of the canonical suite; it is not opt-in. Run the suite only against a disposable demonstration environment that is safe to restore to the deterministic baseline.

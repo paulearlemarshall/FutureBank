@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, gt } from "drizzle-orm";
+import { and, count, eq, gt, lt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -17,6 +17,7 @@ export async function loginAction(_previous: ActionState, formData: FormData): P
 
   const requestHeaders = await headers();
   const ipAddress = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  await db.delete(loginAttempts).where(lt(loginAttempts.attemptedAt, new Date(Date.now() - 24 * 60 * 60_000)));
   const since = new Date(Date.now() - 15 * 60_000);
   const [failures] = await db.select({ value: count() }).from(loginAttempts).where(and(
     eq(loginAttempts.username, username), eq(loginAttempts.ipAddress, ipAddress), eq(loginAttempts.succeeded, false), gt(loginAttempts.attemptedAt, since),

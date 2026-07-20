@@ -18,6 +18,10 @@ export default async function DashboardPage() {
         <Metric label="Total deposits" value={formatMoney(summary.totalDeposits)} detail="GBP equivalent demo value" bp="metric-deposits" />
         <Metric label="KYC reviews" value={String(summary.pendingKycReviews)} detail="Due or in review" bp="metric-kyc" />
         <Metric label="Payments today" value={String(summary.paymentsToday)} detail="Booked transactions" bp="metric-payments" />
+        <Metric label="Open work" value={String(summary.openWorkItems)} detail="Approval and intervention queue" bp="metric-open-work" />
+        <Metric label="Pending payments" value={String(summary.pendingPayments)} detail="Funds reserved on hold" bp="metric-pending-payments" />
+        <Metric label="Overdraft exposure" value={formatMoney(summary.overdraftExposure)} detail="Approved active and suspended limits" bp="metric-overdraft-exposure" />
+        <Metric label="Repeat-use alerts" value={String(summary.repeatUseAlerts)} detail="FutureBank demo policy" bp="metric-repeat-use" />
       </div>
       <div className="two-column">
         <Panel title="Recent activity" description="Latest controlled actions across the core system">
@@ -34,6 +38,9 @@ export default async function DashboardPage() {
             <Link href="/customers/new" data-bp="quick-new-customer"><strong>New customer</strong><small>Create a retail or SME record</small></Link>
             <Link href="/accounts/new" data-bp="quick-open-account"><strong>Open account</strong><small>Select an eligible product</small></Link>
             <Link href="/payments" data-bp="quick-new-payment"><strong>New payment</strong><small>Internal or simulated external</small></Link>
+            <Link href="/work-queue" data-bp="quick-work-queue"><strong>Work queue</strong><small>Claim and decide controlled work</small></Link>
+            <Link href="/kyc" data-bp="quick-kyc"><strong>KYC operations</strong><small>CDD, evidence and fictional screening</small></Link>
+            <Link href="/overdrafts" data-bp="quick-overdrafts"><strong>Arranged overdrafts</strong><small>Facilities, utilization and alerts</small></Link>
           </div>
         </Panel>
       </div>

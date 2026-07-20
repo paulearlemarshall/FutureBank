@@ -6,6 +6,8 @@ import { stableUuid } from "./seed-manifest";
 
 const demoStaff = [
   { key: "operator", username: "bp.operator", name: "Blue Prism Operator", email: "bp.operator@futurebank.example", employeeNumber: "FB-OP-001", role: "OPERATOR" as const, env: "DEMO_OPERATOR_PASSWORD" },
+  { key: "supervisor", username: "bp.supervisor", name: "Blue Prism Supervisor", email: "bp.supervisor@futurebank.example", employeeNumber: "FB-SU-001", role: "SUPERVISOR" as const, env: "DEMO_SUPERVISOR_PASSWORD" },
+  { key: "compliance", username: "bp.compliance", name: "Blue Prism Compliance", email: "bp.compliance@futurebank.example", employeeNumber: "FB-CO-001", role: "COMPLIANCE" as const, env: "DEMO_COMPLIANCE_PASSWORD" },
   { key: "admin", username: "bp.admin", name: "Blue Prism Administrator", email: "bp.admin@futurebank.example", employeeNumber: "FB-AD-001", role: "ADMIN" as const, env: "DEMO_ADMIN_PASSWORD" },
 ];
 

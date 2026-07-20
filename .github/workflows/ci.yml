@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "agent/**"]
+    branches: [main, "agent/**", "feature/**"]
   pull_request:
 
 permissions:
@@ -11,10 +11,26 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: futurebank
+          POSTGRES_PASSWORD: futurebank
+          POSTGRES_DB: futurebank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U futurebank -d futurebank"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://futurebank:futurebank@127.0.0.1:5432/futurebank
       BETTER_AUTH_SECRET: ci-only-futurebank-secret-with-at-least-32-characters
       DEMO_OPERATOR_PASSWORD: ci-only-operator-password
+      DEMO_SUPERVISOR_PASSWORD: ci-only-supervisor-password
+      DEMO_COMPLIANCE_PASSWORD: ci-only-compliance-password
       DEMO_ADMIN_PASSWORD: ci-only-admin-password
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +39,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx drizzle-kit migrate
+      - run: npx tsx scripts/reset.ts
+      - run: npx tsx scripts/verify-db.ts
+      - run: node --conditions=react-server --import tsx scripts/verify-workflows.ts
+      - run: npx tsx scripts/verify-db.ts
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium msedge
+      - run: npm run test:e2e

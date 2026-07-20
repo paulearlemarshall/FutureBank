@@ -8,6 +8,7 @@ const navGroups = [
     label: "Workspace",
     items: [
       ["Dashboard", "/dashboard", "nav-dashboard"],
+      ["Work queue", "/work-queue", "nav-work-queue"],
       ["Customer search", "/customers", "nav-customers"],
     ],
   },
@@ -17,12 +18,14 @@ const navGroups = [
       ["Accounts", "/accounts", "nav-accounts"],
       ["Beneficiaries", "/beneficiaries", "nav-beneficiaries"],
       ["Payments & transfers", "/payments", "nav-payments"],
+      ["Arranged overdrafts", "/overdrafts", "nav-overdrafts"],
       ["Product catalogue", "/products", "nav-products"],
     ],
   },
   {
     label: "Controls",
     items: [
+      ["KYC operations", "/kyc", "nav-kyc"],
       ["Audit trail", "/audit", "nav-audit"],
       ["Demo reset", "/admin/reset", "nav-reset"],
     ],
@@ -77,7 +80,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Sessio
         <div className="sidebar-footer">
           <strong>System status</strong>
           <span><i /> Operational</span>
-          <small>FutureBank Core · v1.0</small>
+          <small>FutureBank Core · v2.0</small>
         </div>
       </aside>
 

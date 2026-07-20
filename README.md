@@ -1,12 +1,12 @@
 # FutureBank Core
 
-FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic customer, account, beneficiary, payment, statement, and audit workflows.
+FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, customer, account, statement, and audit workflows.
 
 All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 
 ## Live demonstration
 
-The production demonstration is available at [future-bank-demo.vercel.app](https://future-bank-demo.vercel.app). Demo usernames are `bp.operator` and `bp.admin`; passwords are managed as Vercel environment variables and are intentionally not stored in this public repository.
+The production demonstration is available at [future-bank-demo.vercel.app](https://future-bank-demo.vercel.app). Demo usernames are `bp.operator`, `bp.supervisor`, `bp.compliance`, and `bp.admin`; passwords are managed as Vercel environment variables and are intentionally not stored in this public repository.
 
 ## Stack
 
@@ -18,7 +18,7 @@ The production demonstration is available at [future-bank-demo.vercel.app](https
 
 ## Local setup
 
-Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string and authentication secrets; demo credentials are supplied through `DEMO_OPERATOR_PASSWORD` and `DEMO_ADMIN_PASSWORD` and must not be committed. For a linked Vercel project, `vercel env pull .env.local` retrieves the development values.
+Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string, authentication secret, and four demo credentials: `DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
 
 ```powershell
 npm install
@@ -27,7 +27,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The seeded usernames are `bp.operator` and `bp.admin`; their passwords are the corresponding environment-variable values.
+Open [http://localhost:3000](http://localhost:3000). The four seeded usernames are listed above; their passwords are the corresponding environment-variable values.
 
 ## Quality checks
 
@@ -44,6 +44,8 @@ Browser tests use the running local application by default and load its ignored 
 
 ```powershell
 $env:DEMO_OPERATOR_PASSWORD = "<operator password>"
+$env:DEMO_SUPERVISOR_PASSWORD = "<supervisor password>"
+$env:DEMO_COMPLIANCE_PASSWORD = "<compliance password>"
 $env:DEMO_ADMIN_PASSWORD = "<admin password>"
 npm run test:e2e
 ```
@@ -65,4 +67,4 @@ The application uses native labelled form controls and semantic tables, stable I
 - `npm run db:seed` creates the deterministic demonstration dataset.
 - `npm run db:reset` restores banking-domain data in a controlled development environment.
 
-Migrations are applied explicitly and are not run during `next build`. Production and preview/development databases should use separate Neon branches.
+Migrations are applied explicitly and are not run during `next build`. Production and preview/development databases use separate Neon branches. The representative future module sequence is documented in [docs/core-banking-roadmap.md](docs/core-banking-roadmap.md); roadmap modules are intentionally absent from navigation until they work.

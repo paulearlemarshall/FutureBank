@@ -1,7 +1,7 @@
-export type StaffRole = "OPERATOR" | "ADMIN";
+export type StaffRole = "OPERATOR" | "SUPERVISOR" | "COMPLIANCE" | "ADMIN";
 export type PartyType = "RETAIL" | "SME";
 export type CustomerStatus = "ACTIVE" | "INACTIVE" | "RESTRICTED";
-export type KycStatus = "COMPLETE" | "DUE" | "REVIEW";
+export type KycStatus = "NOT_STARTED" | "IN_PROGRESS" | "AWAITING_INFORMATION" | "PENDING_APPROVAL" | "APPROVED" | "DUE" | "REJECTED" | "EXPIRED";
 export type RiskRating = "LOW" | "MEDIUM" | "HIGH";
 export type AccountStatus = "ACTIVE" | "BLOCKED" | "CLOSED";
 export type AccountKind = "CURRENT" | "SAVINGS" | "TERM_DEPOSIT" | "FOREIGN_CURRENCY" | "LOAN";
@@ -34,11 +34,16 @@ export type DashboardSummary = {
   totalDeposits: string;
   pendingKycReviews: number;
   paymentsToday: number;
+  openWorkItems: number;
+  pendingPayments: number;
+  overdraftExposure: string;
+  repeatUseAlerts: number;
   recentActivity: AuditListItem[];
 };
 
 export type CustomerListItem = {
   customerNumber: string;
+  rimNumber: string;
   partyType: PartyType;
   displayName: string;
   status: CustomerStatus;
@@ -98,6 +103,9 @@ export type IdentityDocumentView = {
   issuingCountry: string;
   issuedAt: string;
   expiresAt: string;
+  verificationStatus: "NOT_VERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
+  verificationMethod: string | null;
+  expiryAlertAt: string | null;
 };
 
 export type RelationshipView = {
@@ -106,6 +114,9 @@ export type RelationshipView = {
   relatedDisplayName: string;
   relationshipType: string;
   ownershipPercent: string | null;
+  controlType: string | null;
+  beneficialOwner: boolean;
+  verificationStatus: "NOT_VERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
 };
 
 export type ProductView = {
@@ -144,16 +155,186 @@ export type TransactionView = {
   currency: string;
   balanceAfter: string;
   counterparty: string | null;
-  status: "BOOKED" | "PENDING" | "REJECTED";
+  status: "BOOKED" | "PENDING" | "REJECTED" | "EXPIRED";
 };
 
 export type AccountDetail = AccountListItem & {
   branchCode: string;
   nickname: string | null;
-  overdraftLimit: string;
+  overdraft: OverdraftFacilityDetail | null;
   maturityDate: string | null;
   transactions: TransactionView[];
   loan: LoanView | null;
+};
+
+export type WorkItemStatus = "OPEN" | "ASSIGNED" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
+export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT";
+export type WorkItemPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+
+export type WorkQueueItem = {
+  reference: string;
+  type: WorkItemType;
+  status: WorkItemStatus;
+  priority: WorkItemPriority;
+  entityType: string;
+  entityReference: string;
+  title: string;
+  requiredRole: StaffRole;
+  createdBy: string;
+  assignedTo: string | null;
+  dueAt: string;
+  version: number;
+};
+
+export type WorkItemDetail = WorkQueueItem & {
+  description: string;
+  decisionComment: string | null;
+  events: Array<{
+    eventType: string;
+    fromStatus: WorkItemStatus | null;
+    toStatus: WorkItemStatus | null;
+    actorUsername: string;
+    comment: string | null;
+    occurredAt: string;
+  }>;
+};
+
+export type KycCaseSummary = {
+  reference: string;
+  customerNumber: string;
+  customerName: string;
+  type: "ONBOARDING" | "PERIODIC_REVIEW" | "TRIGGER_EVENT" | "REMEDIATION";
+  jurisdiction: string;
+  status: "OPEN" | "IN_PROGRESS" | "AWAITING_INFORMATION" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  riskScore: number;
+  riskRating: RiskRating;
+  enhancedDueDiligence: boolean;
+  dueAt: string;
+};
+
+export type CddProfile = {
+  accountPurpose: string;
+  occupationOrBusiness: string;
+  expectedMonthlyCredits: string;
+  expectedMonthlyDebits: string;
+  expectedCountries: string[];
+  cashUsage: string;
+  sourceOfFunds: string;
+  sourceOfWealth: string;
+  incomeOrTurnoverBand: string;
+  netWorthBand: string;
+};
+
+export type ScreeningCheck = {
+  reference: string;
+  subjectType: string;
+  subjectReference: string;
+  subjectName: string;
+  screeningType: "SANCTIONS" | "PEP" | "ADVERSE_MEDIA";
+  matchScore: number;
+  outcome: "CLEAR" | "POSSIBLE_MATCH" | "FALSE_POSITIVE" | "CONFIRMED_MATCH";
+  resolutionComment: string | null;
+  createdAt: string;
+};
+
+export type KycEvidence = {
+  reference: string;
+  evidenceType: string;
+  documentReference: string;
+  source: string;
+  receivedAt: string;
+  verificationStatus: "NOT_VERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
+  expiresAt: string | null;
+  reviewerNotes: string | null;
+};
+
+export type CustomerRestriction = {
+  reference: string;
+  type: "DEBIT_BLOCK" | "PAYMENT_REVIEW" | "ONBOARDING_HOLD";
+  reason: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  active: boolean;
+};
+
+export type KycCaseDetail = KycCaseSummary & {
+  finalRiskRating: RiskRating | null;
+  overrideReason: string | null;
+  requirements: Array<{ code: string; label: string; mandatory: boolean }>;
+  profile: CddProfile | null;
+  riskFactors: Array<{ category: string; rule: string; score: number; explanation: string }>;
+  screenings: ScreeningCheck[];
+  evidence: KycEvidence[];
+  restrictions: CustomerRestriction[];
+};
+
+export type OverdraftFacilitySummary = {
+  reference: string;
+  accountNumber: string;
+  customerNumber: string;
+  customerName: string;
+  requestedLimit: string;
+  approvedLimit: string;
+  utilization: string;
+  headroom: string;
+  currency: string;
+  status: "DRAFT" | "PENDING_APPROVAL" | "ACTIVE" | "DECLINED" | "PENDING_CHANGE" | "SUSPENDED" | "EXPIRED" | "CLOSED";
+  reviewDate: string | null;
+};
+
+export type OverdraftAlert = {
+  reference: string;
+  type: "REPEAT_USE" | "HIGH_UTILIZATION" | "REVIEW_DUE" | "FINANCIAL_DIFFICULTY";
+  status: "OPEN" | "ASSIGNED" | "RESOLVED";
+  severity: WorkItemPriority;
+  detectedAt: string;
+  dueAt: string;
+  details: string;
+  intervention: string | null;
+  resolutionComment: string | null;
+};
+
+export type OverdraftFacilityDetail = OverdraftFacilitySummary & {
+  annualInterestRate: string;
+  estimatedDailyInterest: string;
+  purpose: string;
+  affordabilityInformation: Record<string, unknown>;
+  riskGrade: string;
+  startDate: string | null;
+  expiryDate: string | null;
+  activeHolds: string;
+  version: number;
+  alerts: OverdraftAlert[];
+  limitHistory: Array<{ previousLimit: string; newLimit: string; reason: string; effectiveDate: string; approvedBy: string }>;
+};
+
+export type AccountHold = {
+  reference: string;
+  accountNumber: string;
+  paymentReference: string;
+  amount: string;
+  currency: string;
+  status: "ACTIVE" | "RELEASED" | "CONSUMED" | "EXPIRED";
+  expiresAt: string;
+};
+
+export type PaymentApprovalDetail = {
+  reference: string;
+  type: "INTERNAL" | "EXTERNAL";
+  status: "BOOKED" | "PENDING" | "REJECTED" | "EXPIRED";
+  sourceAccountNumber: string;
+  customerNumber: string;
+  customerName: string;
+  destinationReference: string;
+  amount: string;
+  currency: string;
+  description: string;
+  approvalReason: string | null;
+  initiatedBy: string;
+  createdAt: string;
+  expiresAt: string | null;
+  hold: AccountHold | null;
+  workItem: WorkQueueItem | null;
 };
 
 export type LoanView = {
