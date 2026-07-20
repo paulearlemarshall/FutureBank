@@ -13,6 +13,7 @@ export async function POST(request: Request): Promise<Response> {
       request,
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
+        console.error("[document-upload-debug] onBeforeGenerateToken called", { pathname, clientPayload });
         const actor = await requirePermission("KYC_GATHER");
         let payload: { customerNumber?: string; slot?: string; filename?: string } = {};
         try { payload = JSON.parse(clientPayload ?? "{}"); } catch { throw new Error("INVALID_UPLOAD_PAYLOAD"); }
@@ -23,13 +24,16 @@ export async function POST(request: Request): Promise<Response> {
         const expectedPrefix = `${documentBlobPrefix()}/uploads/${payload.customerNumber}/${payload.slot}/`;
         if (!pathname.startsWith(expectedPrefix) || !pathname.endsWith(`-${filename}`)) throw new Error("INVALID_UPLOAD_PATH");
         const signedPayload: UploadPayload = { actorId: actor.id, actorUsername: actor.username, customerNumber: payload.customerNumber, slot: payload.slot, filename };
+        console.error("[document-upload-debug] onBeforeGenerateToken succeeded", { signedPayload });
         return { allowedContentTypes: ["image/jpeg", "image/png", "application/pdf"], maximumSizeInBytes: MAX_DOCUMENT_BYTES, validUntil: Date.now() + 10 * 60_000, addRandomSuffix: false, allowOverwrite: false, tokenPayload: JSON.stringify(signedPayload) };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
+        console.error("[document-upload-debug] onUploadCompleted called", { blobUrl: blob.url, tokenPayload });
         const payload = JSON.parse(tokenPayload ?? "{}") as UploadPayload;
         if (!payload.actorId || !payload.actorUsername || !payload.customerNumber || !isDocumentSlot(payload.slot)) throw new Error("INVALID_UPLOAD_CALLBACK");
         const actor = await activeDocumentActor(payload.actorId, payload.actorUsername);
         await completeClientDocumentUpload({ customerNumber: payload.customerNumber, slot: payload.slot, filename: payload.filename, blob }, actor);
+        console.error("[document-upload-debug] onUploadCompleted finished successfully");
       },
     });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
