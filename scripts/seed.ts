@@ -9,7 +9,7 @@ async function main() {
     await clearBankingData(tx);
     await seedBaseline(tx);
   });
-  console.info("FutureBank baseline seeded: 5 customers, 14 accounts, 350 transactions, 12 beneficiaries, 2 staff users.");
+  console.info("FutureBank baseline seeded: 9 customers, 19 accounts, 475 transactions, 16 beneficiaries, 4 staff users.");
 }
 
 main().catch((error) => {

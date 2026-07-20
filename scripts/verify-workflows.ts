@@ -8,7 +8,7 @@ import { approvePendingPayment } from "../src/modules/services/payments";
 async function main() {
   const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin" };
   const supervisor = { id: stableUuid("auth-user-supervisor"), username: "bp.supervisor", name: "Blue Prism Supervisor", role: "SUPERVISOR" as const };
-  await seedDemoStaff(db);
+  if (process.env.SKIP_DEMO_STAFF_SEED !== "true") await seedDemoStaff(db);
   await resetBaseline(db, admin);
   try {
     const attempts = await Promise.allSettled([

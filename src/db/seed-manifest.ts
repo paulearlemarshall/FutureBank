@@ -15,6 +15,10 @@ export const baselineCustomers = [
   { customerNumber: "C000003", partyType: "RETAIL", title: "Dr", givenName: "Priya", familyName: "Nair", legalName: null, shortName: "Priya Nair", dateOfBirth: "1991-08-22", registrationNumber: null, gender: "Female", maritalStatus: "Single", nationality: "IN", residenceCountry: "AE", sector: "Personal Banking", industry: "Technology", status: "ACTIVE", kycStatus: "DUE", riskRating: "LOW", kycReviewDate: "2026-08-15", taxId: "AE-FIC-000003", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
   { customerNumber: "C000004", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Northstar Sustainable Logistics Ltd", shortName: "Northstar Logistics", dateOfBirth: null, registrationNumber: "09990041", gender: null, maritalStatus: null, nationality: "GB", residenceCountry: "GB", sector: "Corporate Banking", industry: "Logistics", status: "ACTIVE", kycStatus: "APPROVED", riskRating: "MEDIUM", kycReviewDate: "2027-02-10", taxId: "GB-FIC-SME004", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
   { customerNumber: "C000005", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Crescent Digital Trading FZ-LLC", shortName: "Crescent Digital", dateOfBirth: null, registrationNumber: "FIC-DDA-88210", gender: null, maritalStatus: null, nationality: "AE", residenceCountry: "AE", sector: "Business Banking", industry: "E-commerce", status: "RESTRICTED", kycStatus: "REJECTED", riskRating: "HIGH", kycReviewDate: "2026-07-20", taxId: "AE-FIC-SME005", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
+  { customerNumber: "C000006", partyType: "RETAIL", title: "Ms", givenName: "Sophie", familyName: "Turner", legalName: null, shortName: "Sophie Turner", dateOfBirth: "1994-02-18", registrationNumber: null, gender: "Female", maritalStatus: "Single", nationality: "GB", residenceCountry: "GB", sector: "Personal Banking", industry: "Education", status: "INACTIVE", kycStatus: "NOT_STARTED", riskRating: "LOW", kycReviewDate: "2026-08-19", taxId: "GB-FIC-000006", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
+  { customerNumber: "C000007", partyType: "RETAIL", title: "Mr", givenName: "Yousef", familyName: "Haddad", legalName: null, shortName: "Yousef Haddad", dateOfBirth: "1988-06-09", registrationNumber: null, gender: "Male", maritalStatus: "Married", nationality: "JO", residenceCountry: "AE", sector: "Personal Banking", industry: "Construction", status: "ACTIVE", kycStatus: "IN_PROGRESS", riskRating: "MEDIUM", kycReviewDate: "2026-08-20", taxId: "AE-FIC-000007", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
+  { customerNumber: "C000008", partyType: "SME", title: null, givenName: null, familyName: null, legalName: "Harbour Green Energy Ltd", shortName: "Harbour Green", dateOfBirth: null, registrationNumber: "12188008", gender: null, maritalStatus: null, nationality: "GB", residenceCountry: "GB", sector: "Corporate Banking", industry: "Renewable Energy", status: "ACTIVE", kycStatus: "PENDING_APPROVAL", riskRating: "MEDIUM", kycReviewDate: "2026-08-21", taxId: "GB-FIC-SME008", branchCode: "LON001", relationshipManager: "Sofia Bennett" },
+  { customerNumber: "C000009", partyType: "RETAIL", title: "Mrs", givenName: "Layla", familyName: "Rahman", legalName: null, shortName: "Layla Rahman", dateOfBirth: "1983-12-27", registrationNumber: null, gender: "Female", maritalStatus: "Married", nationality: "LB", residenceCountry: "AE", sector: "Personal Banking", industry: "Hospitality", status: "INACTIVE", kycStatus: "EXPIRED", riskRating: "HIGH", kycReviewDate: "2026-06-30", taxId: "AE-FIC-000009", branchCode: "DXB001", relationshipManager: "Daniel Okafor" },
 ] as const;
 
 export const baselineBranches = [
@@ -49,18 +53,24 @@ export const baselineAccounts = [
   { accountNumber: "1000000012", customerNumber: "C000005", productCode: "CUR-AED", branchCode: "DXB001", nickname: "Trading", balance: "895420.32", overdraftLimit: "100000.00", openedAt: "2021-07-05" },
   { accountNumber: "1000000013", customerNumber: "C000005", productCode: "FCY-USD", branchCode: "DXB001", nickname: "Supplier USD", balance: "125300.00", overdraftLimit: "25000.00", openedAt: "2022-02-14" },
   { accountNumber: "1000000014", customerNumber: "C000005", productCode: "LOAN-AED", branchCode: "DXB001", nickname: "Warehouse Finance", balance: "115000.00", overdraftLimit: "0.00", openedAt: "2024-06-10", readOnly: true },
+  { accountNumber: "1000000015", customerNumber: "C000007", productCode: "CUR-AED", branchCode: "DXB001", nickname: "Review Controlled", balance: "18500.00", overdraftLimit: "0.00", openedAt: "2022-09-12" },
+  { accountNumber: "1000000016", customerNumber: "C000008", productCode: "CUR-GBP", branchCode: "LON001", nickname: "Approval Pending", balance: "86500.00", overdraftLimit: "0.00", openedAt: "2021-04-06" },
+  { accountNumber: "1000000017", customerNumber: "C000009", productCode: "CUR-AED", branchCode: "DXB001", nickname: "Expired KYC Block", balance: "4200.00", overdraftLimit: "0.00", openedAt: "2018-11-20", status: "BLOCKED" },
+  { accountNumber: "1000000018", customerNumber: "C000004", productCode: "SAV-GBP", branchCode: "LON001", nickname: "Closed Reserve", balance: "0.00", overdraftLimit: "0.00", openedAt: "2019-03-01", status: "CLOSED", closedAt: "2026-05-31T16:00:00.000Z" },
+  { accountNumber: "1000000019", customerNumber: "C000004", productCode: "CUR-GBP", branchCode: "LON001", nickname: "Facility Lifecycle", balance: "-12000.00", overdraftLimit: "25000.00", openedAt: "2022-01-10" },
 ] as const;
 
-const beneficiaryNames = ["Alex Morgan", "Greenfield Utilities", "Harbour Property Services", "Emirates Telecom Demo", "Nadia Rahman", "Atlas Office Supplies", "Westbridge Insurance", "Fictional Revenue Authority", "Metro Fleet Services", "Cloud Nine Software", "Beacon Freight Partners", "Orchid Media Studio"];
+const beneficiaryNames = ["Alex Morgan", "Greenfield Utilities", "Harbour Property Services", "Emirates Telecom Demo", "Nadia Rahman", "Atlas Office Supplies", "Westbridge Insurance", "Fictional Revenue Authority", "Metro Fleet Services", "Cloud Nine Software", "Beacon Freight Partners", "Orchid Media Studio", "Prospect Utility Demo", "Desert Build Supplies", "Green Turbine Services", "Legacy Hotel Services"];
 export const baselineBeneficiaries = beneficiaryNames.map((name, index) => ({
   id: stableUuid(`beneficiary-${index + 1}`),
-  customerNumber: BASELINE_CUSTOMER_NUMBERS[index % 5],
+  customerNumber: index < 12 ? BASELINE_CUSTOMER_NUMBERS[index % 5] : BASELINE_CUSTOMER_NUMBERS[index - 7],
   name,
   bankName: index % 2 ? "Demo International Bank" : "Example Clearing Bank",
   accountNumber: `900000${(index + 1).toString().padStart(4, "0")}`,
   iban: index % 3 === 0 ? `GB00FICT${(index + 1).toString().padStart(14, "0")}` : null,
   swiftBic: index % 2 ? "DEMOAEAD" : "FICTGB2L",
   currency: (["GBP", "AED", "USD", "EUR"] as const)[index % 4],
+  status: index === 12 ? "INACTIVE" as const : "ACTIVE" as const,
 }));
 
 const transactionDescriptions = ["Salary credit", "Card purchase", "Utility payment", "Online transfer", "Account fee", "Interest payment", "Standing order", "Cash withdrawal", "Supplier payment", "Insurance premium"];
@@ -92,7 +102,8 @@ export const baselineTransactions: BaselineTransaction[] = baselineAccounts.flat
   let running = target - net;
   return movements.map((movement, index) => {
     running += movement.direction === "CREDIT" ? moneyToMinorUnits(movement.amount) : -moneyToMinorUnits(movement.amount);
-    const day = new Date(Date.UTC(2026, 6, 18 - index * 5, 9 + (index % 8), accountIndex % 60));
+    const endDate = new Date("closedAt" in account ? account.closedAt : Date.UTC(2026, 6, 18, 17, accountIndex % 60));
+    const day = new Date(endDate.getTime() - (movements.length - 1 - index) * 5 * 86_400_000);
     return {
       id: stableUuid(`transaction-${account.accountNumber}-${index + 1}`),
       reference: `TX-${account.accountNumber}-${(index + 1).toString().padStart(3, "0")}`,
@@ -112,10 +123,10 @@ export const baselineTransactions: BaselineTransaction[] = baselineAccounts.flat
 
 export function validateBaselineSeed(): string[] {
   const errors: string[] = [];
-  if (baselineCustomers.length !== 5) errors.push("Expected exactly five customers");
-  if (baselineCustomers.filter((item) => item.partyType === "RETAIL").length !== 3) errors.push("Expected three retail customers");
-  if (baselineCustomers.filter((item) => item.partyType === "SME").length !== 2) errors.push("Expected two SME customers");
-  if (baselineAccounts.length !== 14) errors.push("Expected exactly fourteen accounts");
+  if (baselineCustomers.length !== 9) errors.push("Expected exactly nine customers");
+  if (baselineCustomers.filter((item) => item.partyType === "RETAIL").length !== 6) errors.push("Expected six retail customers");
+  if (baselineCustomers.filter((item) => item.partyType === "SME").length !== 3) errors.push("Expected three SME customers");
+  if (baselineAccounts.length !== 19) errors.push("Expected exactly nineteen accounts");
   for (const account of baselineAccounts) {
     const transactions = baselineTransactions.filter((item) => item.accountNumber === account.accountNumber);
     if (transactions.length < 25) errors.push(`${account.accountNumber} has fewer than 25 transactions`);

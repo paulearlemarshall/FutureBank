@@ -33,3 +33,23 @@ test("compliance can inspect PEP EDD and fictional screening resolution", async 
   await expect(page.locator('[data-bp="kyc-screening-table"]')).toContainText("Confirmed match");
   await expect(page.locator('[data-bp="kyc-screening-table"]')).toContainText("EDD completed");
 });
+
+test("expanded baseline exposes blocked, closed, pending-change and terminal payment states", async ({ page }) => {
+  await login(page, "operator");
+  await page.goto("/accounts/1000000017");
+  await expectReady(page, "account-detail");
+  await expect(page.locator('[data-bp="account-record-header"]')).toContainText("Blocked");
+  await page.goto("/accounts/1000000018");
+  await expectReady(page, "account-detail");
+  await expect(page.locator('[data-bp="account-record-header"]')).toContainText("Closed");
+  await page.goto("/kyc/KYC-000007");
+  await expectReady(page, "kyc-case-workspace");
+  await expect(page.locator('[data-bp="kyc-screening-table"]')).toContainText("Possible match");
+  await page.goto("/overdrafts/ODF-000006");
+  await expectReady(page, "overdraft-facility-detail");
+  await expect(page.locator('[data-bp="overdraft-record-header"]')).toContainText("Pending change");
+  await page.goto("/payments/PAY-000004");
+  await expectReady(page, "payment-approval-detail");
+  await expect(page.locator('[data-bp="payment-record-header"]')).toContainText("Expired");
+  await expect(bp(page, "status-payment-decision-complete")).toContainText("Expired");
+});

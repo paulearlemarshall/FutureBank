@@ -13,10 +13,10 @@ describe("baseline seed manifest", () => {
     expect(validateBaselineSeed()).toEqual([]);
   });
 
-  it("contains exactly three retail and two SME customers", () => {
-    expect(baselineCustomers).toHaveLength(5);
-    expect(baselineCustomers.filter(({ partyType }) => partyType === "RETAIL")).toHaveLength(3);
-    expect(baselineCustomers.filter(({ partyType }) => partyType === "SME")).toHaveLength(2);
+  it("contains exactly six retail and three SME customers", () => {
+    expect(baselineCustomers).toHaveLength(9);
+    expect(baselineCustomers.filter(({ partyType }) => partyType === "RETAIL")).toHaveLength(6);
+    expect(baselineCustomers.filter(({ partyType }) => partyType === "SME")).toHaveLength(3);
     expect(baselineCustomers.every(({ customerNumber }) => /^C\d{6}$/.test(customerNumber))).toBe(true);
   });
 
@@ -42,8 +42,8 @@ describe("baseline seed manifest", () => {
     }
   });
 
-  it("contains fourteen accounts across the four demo currencies and two read-only loans", () => {
-    expect(baselineAccounts).toHaveLength(14);
+  it("contains nineteen accounts across the four demo currencies and two read-only loans", () => {
+    expect(baselineAccounts).toHaveLength(19);
     const productCurrency = new Map([
       ["CUR-GBP", "GBP"], ["SAV-GBP", "GBP"], ["TD-GBP", "GBP"], ["LOAN-GBP", "GBP"],
       ["CUR-AED", "AED"], ["SAV-AED", "AED"], ["LOAN-AED", "AED"],
@@ -58,6 +58,14 @@ describe("baseline seed manifest", () => {
         .filter(({ productCode }) => productCode.startsWith("LOAN-"))
         .every((account) => "readOnly" in account && account.readOnly === true),
     ).toBe(true);
+    expect(baselineAccounts.some((account) => "status" in account && account.status === "BLOCKED")).toBe(true);
+    expect(baselineAccounts.some((account) => "status" in account && account.status === "CLOSED")).toBe(true);
+  });
+
+  it("preserves the original identifiers and adds the KYC coverage customers", () => {
+    expect(baselineCustomers.slice(0, 5).map(({ customerNumber }) => customerNumber)).toEqual(["C000001", "C000002", "C000003", "C000004", "C000005"]);
+    expect(baselineAccounts.slice(0, 14).map(({ accountNumber }) => accountNumber)).toEqual(Array.from({ length: 14 }, (_, index) => `10000000${(index + 1).toString().padStart(2, "0")}`));
+    expect(new Set(baselineCustomers.map(({ kycStatus }) => kycStatus))).toEqual(new Set(["NOT_STARTED", "IN_PROGRESS", "PENDING_APPROVAL", "APPROVED", "DUE", "REJECTED", "EXPIRED"]));
   });
 
   it("provides at least 25 chronologically valid transactions per account ending at its balance", () => {
@@ -67,10 +75,11 @@ describe("baseline seed manifest", () => {
       );
       expect(entries.length).toBeGreaterThanOrEqual(25);
       expect(entries.at(-1)?.balanceAfter).toBe(account.balance);
-      for (const entry of entries) {
+      for (const [index, entry] of entries.entries()) {
         expect(entry.currency).toMatch(/^(GBP|AED|USD|EUR)$/);
         expect(Number.isNaN(Date.parse(entry.bookedAt))).toBe(false);
         expect(entry.reference).toContain(account.accountNumber);
+        if (index > 0) expect(Date.parse(entry.bookedAt)).toBeGreaterThan(Date.parse(entries[index - 1].bookedAt));
       }
     }
   });
