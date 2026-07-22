@@ -20,6 +20,7 @@ Every `input`, `select`, `textarea`, and `button` must have:
 - Stable `id` and `name` attributes.
 - An associated `<label for="...">`, `aria-label`, or `aria-labelledby`. Text buttons may use their stable visible name.
 - A native HTML control where the platform provides one.
+- `dir="auto"` for human-readable customer names and addresses, or `dir="ltr"` for structured identifiers, dates, contact details and monetary values. Direction attributes do not replace stable selectors.
 
 Examples:
 
@@ -44,7 +45,7 @@ The Playwright suite treats these workflows as the compatibility baseline:
 
 1. Sign in and sign out.
 2. Use universal search for a deterministic customer and account.
-3. Search for a deterministic seeded customer, edit a contact field, and onboard a fictional customer.
+3. Search for deterministic Latin and Arabic-script seeded customers, verify native bidirectional controls, edit customer data, and onboard a fictional customer.
 4. Open and maintain an account, inspect its statement, and verify loan records are read-only.
 5. Create a beneficiary and a payment with idempotent retry and insufficient-funds validation.
 6. Reset the demonstration data as an administrator and restore exactly nine baseline customers while preserving customer identifiers `C000001`–`C000005`.

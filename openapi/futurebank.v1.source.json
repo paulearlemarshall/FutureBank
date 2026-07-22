@@ -2899,6 +2899,7 @@
       "Query": {
         "name": "query",
         "in": "query",
+        "description": "Unicode search text. Customer searches accept Arabic-script names as well as Latin transliterations and identifiers.",
         "schema": {
           "type": "string"
         }
@@ -3101,7 +3102,9 @@
           },
           "shortName": {
             "type": "string",
-            "minLength": 2
+            "minLength": 2,
+            "description": "Unicode short name. May contain both a Latin transliteration and native Arabic-script name.",
+            "example": "Omar Al Mansoori / عمر المنصوري"
           },
           "nationality": {
             "type": "string",
@@ -3165,7 +3168,9 @@
           },
           "addressLine1": {
             "type": "string",
-            "minLength": 3
+            "minLength": 3,
+            "description": "Unicode address line; Arabic-script text is accepted.",
+            "example": "١١ شارع المثال"
           },
           "addressLine2": {
             "type": "string",
@@ -3173,7 +3178,9 @@
           },
           "city": {
             "type": "string",
-            "minLength": 2
+            "minLength": 2,
+            "description": "Unicode city name.",
+            "example": "دبي"
           },
           "region": {
             "type": "string",
@@ -3304,11 +3311,15 @@
               },
               "givenName": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "description": "Unicode given name; Arabic script is accepted.",
+                "example": "عمر"
               },
               "familyName": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "description": "Unicode family name; Arabic script is accepted.",
+                "example": "المنصوري"
               },
               "dateOfBirth": {
                 "type": "string",
@@ -3340,7 +3351,9 @@
               },
               "legalName": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "description": "Unicode SME legal name; Arabic script is accepted.",
+                "example": "شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م"
               },
               "registrationNumber": {
                 "type": "string",
@@ -3758,7 +3771,8 @@
           },
           "displayName": {
             "type": "string",
-            "description": "Retail full name or SME legal name."
+            "description": "Unicode retail full name or SME legal name.",
+            "example": "عمر المنصوري"
           },
           "status": {
             "type": "string",

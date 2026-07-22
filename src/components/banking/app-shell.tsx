@@ -49,6 +49,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Sessio
             id="global-search-query"
             name="query"
             data-bp="global-search-query"
+            dir="auto"
             placeholder="Customer, account or reference"
             autoComplete="off"
           />

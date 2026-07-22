@@ -19,6 +19,24 @@ async function main() {
   expectEqual("retail customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'RETAIL'`), 6);
   expectEqual("SME customers", await scalar(sql`select count(*)::int as value from customers where party_type = 'SME'`), 3);
   expectEqual("unique RIM identifiers", await scalar(sql`select count(distinct rim_number)::int as value from customers where rim_number like 'RIM%'`), 9);
+  expectEqual("UTF-8 database encoding", await scalar(sql`select case when current_setting('server_encoding') = 'UTF8' then 1 else 0 end::int as value`), 1);
+  expectEqual("Arabic-language customers", await scalar(sql`select count(*)::int as value from customers where language = 'Arabic'`), 2);
+  expectEqual("Arabic seeded names", await scalar(sql`
+    select count(*)::int as value from customers where
+      (customer_number = 'C000002' and given_name = 'عمر' and family_name = 'المنصوري' and short_name like '%Omar Al Mansoori%') or
+      (customer_number = 'C000005' and legal_name = 'شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م' and short_name like '%Crescent Digital%')
+  `), 2);
+  expectEqual("Arabic seeded addresses", await scalar(sql`
+    select count(*)::int as value from addresses a join customers c on c.id = a.customer_id where
+      (c.customer_number = 'C000002' and a.line1 = '١١ شارع المثال' and a.city = 'دبي') or
+      (c.customer_number = 'C000005' and a.line1 = '٤٧ مجمع الأعمال الافتراضي' and a.city = 'دبي')
+  `), 2);
+  expectEqual("Arabic-script customer search", await scalar(sql`
+    select count(*)::int as value from customers where family_name ilike '%المنصوري%' or legal_name ilike '%الهلال%'
+  `), 2);
+  expectEqual("Latin transliteration customer search", await scalar(sql`
+    select count(*)::int as value from customers where short_name ilike '%Omar Al Mansoori%' or short_name ilike '%Crescent Digital%'
+  `), 2);
   expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 13);
   expectEqual("customer document files", await scalar(sql`select count(*)::int as value from customer_document_files`), 2);
   expectEqual("seeded Amelia document slots", await scalar(sql`

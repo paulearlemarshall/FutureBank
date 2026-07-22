@@ -10,6 +10,8 @@ The system boundaries, authoritative owners, and non-negotiable invariants are m
 
 An administrative reset restores nine customers and nineteen accounts. The original identifiers `C000001`–`C000005` and `1000000001`–`1000000014` remain unchanged. Additional scenarios cover KYC not started, in progress, pending approval and expired; active, blocked and closed accounts; every reachable overdraft lifecycle state; booked, pending, rejected and expired payments; all hold and work-item states; and open, assigned and resolved overdraft alerts.
 
+The baseline includes two Arabic-language UAE records without changing identifier counts: retail customer `C000002` and SME customer `C000005`. Arabic-script names and addresses, Latin short-name transliterations, authenticated API search/write, and RTL-aware native form controls are covered by reset, database and browser verification.
+
 Useful starting records include `KYC-000007` for an unresolved fictional match, `KYC-000008` for Compliance approval, `1000000017` for a blocked account, `1000000018` for a closed account, `ODF-000006` for a pending limit change, and `PAY-000002`–`PAY-000004` for terminal payment and hold outcomes.
 
 ## Live demonstration

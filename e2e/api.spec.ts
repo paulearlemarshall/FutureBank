@@ -97,6 +97,57 @@ test("reads deterministic customer and account data with an API key", async ({ r
   expect(accountBody.data.transactions.length).toBeGreaterThanOrEqual(25);
 });
 
+test("round-trips Arabic customer text through authenticated API reads and writes", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.operator" };
+  const search = await request.get(`/api/v1/customers?query=${encodeURIComponent("المنصوري")}`, { headers });
+  expect(search.ok()).toBe(true);
+  expect((await search.json()).data).toEqual([
+    expect.objectContaining({ customerNumber: "C000002", displayName: "عمر المنصوري" }),
+  ]);
+
+  const detailResponse = await request.get("/api/v1/customers/C000002", { headers });
+  expect(detailResponse.ok()).toBe(true);
+  const detail = (await detailResponse.json()).data;
+  expect(detail).toMatchObject({
+    givenName: "عمر",
+    familyName: "المنصوري",
+    language: "Arabic",
+    addresses: [expect.objectContaining({ line1: "١١ شارع المثال", city: "دبي" })],
+  });
+
+  const primaryAddress = detail.addresses[0];
+  const email = detail.contacts.find((item: { type: string }) => item.type === "EMAIL").value;
+  const phone = detail.contacts.find((item: { type: string }) => item.type === "MOBILE").value;
+  const originalAddress = primaryAddress.line1;
+  const updatedAddress = "١١ شارع المثال، اختبار API";
+  const payload = {
+    partyType: detail.partyType, title: detail.title, givenName: detail.givenName, familyName: detail.familyName,
+    legalName: detail.legalName, shortName: detail.shortName, dateOfBirth: detail.dateOfBirth, registrationNumber: detail.registrationNumber,
+    nationality: detail.nationality, residenceCountry: detail.residenceCountry, status: detail.status, kycStatus: detail.kycStatus,
+    riskRating: detail.riskRating, kycReviewDate: detail.kycReviewDate, language: detail.language, taxId: detail.taxId,
+    branchCode: detail.branchCode, relationshipManager: detail.relationshipManager, sector: detail.sector, industry: detail.industry,
+    addressLine1: updatedAddress, city: primaryAddress.city, postalCode: primaryAddress.postalCode, country: primaryAddress.country,
+    email, phone,
+  };
+  let changed = false;
+  try {
+    const update = await request.patch("/api/v1/customers/C000002", { headers, data: payload });
+    changed = update.ok();
+    expect(update.ok(), await update.text()).toBe(true);
+    const reread = await request.get("/api/v1/customers/C000002", { headers });
+    expect((await reread.json()).data.addresses[0].line1).toBe(updatedAddress);
+  } finally {
+    if (changed) {
+      const restore = await request.patch("/api/v1/customers/C000002", {
+        headers,
+        data: { ...payload, addressLine1: originalAddress },
+      });
+      expect(restore.ok(), await restore.text()).toBe(true);
+    }
+  }
+});
+
 test("uses the selected staff actor for controlled work-item writes", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
   const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.supervisor" };

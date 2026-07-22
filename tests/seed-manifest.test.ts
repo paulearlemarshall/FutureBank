@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   baselineAccounts,
   baselineBeneficiaries,
+  baselineCustomerAddressOverrides,
   baselineCustomers,
   baselineTransactions,
   stableUuid,
@@ -66,6 +67,26 @@ describe("baseline seed manifest", () => {
     expect(baselineCustomers.slice(0, 5).map(({ customerNumber }) => customerNumber)).toEqual(["C000001", "C000002", "C000003", "C000004", "C000005"]);
     expect(baselineAccounts.slice(0, 14).map(({ accountNumber }) => accountNumber)).toEqual(Array.from({ length: 14 }, (_, index) => `10000000${(index + 1).toString().padStart(2, "0")}`));
     expect(new Set(baselineCustomers.map(({ kycStatus }) => kycStatus))).toEqual(new Set(["NOT_STARTED", "IN_PROGRESS", "PENDING_APPROVAL", "APPROVED", "DUE", "REJECTED", "EXPIRED"]));
+  });
+
+  it("includes searchable Arabic retail and SME scenarios with Arabic addresses", () => {
+    const arabicScript = /\p{Script=Arabic}/u;
+    const arabicCustomers = baselineCustomers.filter(({ language }) => language === "Arabic");
+    expect(arabicCustomers.map(({ customerNumber }) => customerNumber)).toEqual(["C000002", "C000005"]);
+
+    const retail = baselineCustomers.find(({ customerNumber }) => customerNumber === "C000002")!;
+    expect(retail.givenName).toBe("عمر");
+    expect(retail.familyName).toBe("المنصوري");
+    expect(retail.shortName).toMatch(/Omar Al Mansoori/);
+    expect(retail.shortName).toMatch(arabicScript);
+
+    const sme = baselineCustomers.find(({ customerNumber }) => customerNumber === "C000005")!;
+    expect(sme.legalName).toBe("شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م");
+    expect(sme.shortName).toMatch(/Crescent Digital/);
+    expect(sme.shortName).toMatch(arabicScript);
+
+    expect(baselineCustomerAddressOverrides.C000002.line1).toMatch(arabicScript);
+    expect(baselineCustomerAddressOverrides.C000005.city).toBe("دبي");
   });
 
   it("provides at least 25 chronologically valid transactions per account ending at its balance", () => {

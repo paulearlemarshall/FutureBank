@@ -5,6 +5,7 @@ import {
   baselineAccounts,
   baselineBeneficiaries,
   baselineBranches,
+  baselineCustomerAddressOverrides,
   baselineCustomers,
   baselineProducts,
   baselineTransactions,
@@ -70,7 +71,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
 
   await tx.insert(tables.branches).values(baselineBranches.map((item) => ({ id: branchId(item.code), ...item })));
   await tx.insert(tables.products).values(baselineProducts.map((item) => ({ id: productId(item.code), ...item })));
-  await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, language: "English", ...item, kycReviewDate: timeline.date(reviewOffsets[item.customerNumber]) })));
+  await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, ...item, kycReviewDate: timeline.date(reviewOffsets[item.customerNumber]) })));
 
   if (preparedDocuments.length) {
     await tx.insert(tables.customerDocumentFiles).values(preparedDocuments.map((document) => ({
@@ -82,12 +83,17 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     })));
   }
 
-  const addressRows = baselineCustomers.map((customer, index) => ({
-    id: stableUuid(`address-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "PRIMARY",
-    line1: index < 3 ? `${18 + index * 11} Example Avenue` : `${42 + index} Fictional Business Park`, line2: index % 2 ? "Suite 410" : null,
-    city: customer.residenceCountry === "AE" ? "Dubai" : "London", region: customer.residenceCountry === "AE" ? "Dubai" : "Greater London",
-    postalCode: customer.residenceCountry === "AE" ? `0000${index + 1}` : `EC${index + 1}A 1AA`, country: customer.residenceCountry,
-  }));
+  const addressRows = baselineCustomers.map((customer, index) => {
+    const override = baselineCustomerAddressOverrides[customer.customerNumber as keyof typeof baselineCustomerAddressOverrides];
+    return {
+      id: stableUuid(`address-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "PRIMARY",
+      line1: override?.line1 ?? (index < 3 ? `${18 + index * 11} Example Avenue` : `${42 + index} Fictional Business Park`),
+      line2: override?.line2 ?? (index % 2 ? "Suite 410" : null),
+      city: override?.city ?? (customer.residenceCountry === "AE" ? "Dubai" : "London"),
+      region: override?.region ?? (customer.residenceCountry === "AE" ? "Dubai" : "Greater London"),
+      postalCode: customer.residenceCountry === "AE" ? `0000${index + 1}` : `EC${index + 1}A 1AA`, country: customer.residenceCountry,
+    };
+  });
   await tx.insert(tables.addresses).values(addressRows);
   await tx.insert(tables.contactPoints).values(baselineCustomers.flatMap((customer, index) => [
     { id: stableUuid(`contact-email-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "EMAIL", value: `demo.${index + 1}@futurebank.example`, preferred: true },
@@ -178,18 +184,18 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   });
   await tx.insert(tables.kycEvidence).values(evidenceRows);
   await tx.insert(tables.screeningWatchlistEntries).values([
-    { id: stableUuid("watch-pep-omar"), reference: "FWL-PEP-001", screeningType: "PEP", subjectName: "Omar Al Mansoori", aliases: ["Omar Mansoori"], country: "AE", dateOfBirth: "1979-11-03", details: "Fictional PEP entry for demonstration." },
+    { id: stableUuid("watch-pep-omar"), reference: "FWL-PEP-001", screeningType: "PEP", subjectName: "عمر المنصوري", aliases: ["Omar Al Mansoori", "Omar Mansoori"], country: "AE", dateOfBirth: "1979-11-03", details: "Fictional PEP entry for demonstration." },
     { id: stableUuid("watch-false-northstar"), reference: "FWL-SAN-002", screeningType: "SANCTIONS", subjectName: "North Star Logistic Holdings", aliases: ["Northstar Logistics"], country: "US", details: "Fictional near-name entry used for false-positive resolution." },
-    { id: stableUuid("watch-crescent-sanctions"), reference: "FWL-SAN-003", screeningType: "SANCTIONS", subjectName: "Crescent Digital Trading FZ-LLC", aliases: ["Crescent Digital"], country: "AE", details: "Fictional sanctions entry for a blocked demo scenario." },
-    { id: stableUuid("watch-crescent-media"), reference: "FWL-MEDIA-004", screeningType: "ADVERSE_MEDIA", subjectName: "Crescent Digital Trading FZ-LLC", aliases: [], country: "AE", details: "Fictional adverse-media entry for demonstration." },
+    { id: stableUuid("watch-crescent-sanctions"), reference: "FWL-SAN-003", screeningType: "SANCTIONS", subjectName: "شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م", aliases: ["Crescent Digital Trading FZ-LLC", "Crescent Digital"], country: "AE", details: "Fictional sanctions entry for a blocked demo scenario." },
+    { id: stableUuid("watch-crescent-media"), reference: "FWL-MEDIA-004", screeningType: "ADVERSE_MEDIA", subjectName: "شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م", aliases: ["Crescent Digital Trading FZ-LLC"], country: "AE", details: "Fictional adverse-media entry for demonstration." },
     { id: stableUuid("watch-yousef-possible"), reference: "FWL-SAN-005", screeningType: "SANCTIONS", subjectName: "Yusuf Al Haddad", aliases: ["Yousef Haddad"], country: "JO", details: "Fictional near-name entry requiring Compliance resolution." },
   ]);
   await tx.insert(tables.screeningChecks).values([
     { id: stableUuid("screen-c1-clear"), reference: "SCR-000001", kycCaseId: kycCaseId("C000001"), customerId: customerId("C000001"), subjectType: "CUSTOMER", subjectReference: "C000001", subjectName: "Amelia Hart", screeningType: "SANCTIONS", matchScore: 0, outcome: "CLEAR" },
-    { id: stableUuid("screen-c2-pep"), reference: "SCR-000002", kycCaseId: kycCaseId("C000002"), customerId: customerId("C000002"), subjectType: "CUSTOMER", subjectReference: "C000002", subjectName: "Omar Al Mansoori", screeningType: "PEP", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-13T11:00:00.000Z"), resolutionComment: "PEP confirmed; EDD completed. PEP status is not a sanctions rejection." },
+    { id: stableUuid("screen-c2-pep"), reference: "SCR-000002", kycCaseId: kycCaseId("C000002"), customerId: customerId("C000002"), subjectType: "CUSTOMER", subjectReference: "C000002", subjectName: "عمر المنصوري", screeningType: "PEP", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-13T11:00:00.000Z"), resolutionComment: "PEP confirmed; EDD completed. PEP status is not a sanctions rejection." },
     { id: stableUuid("screen-c4-false"), reference: "SCR-000004", kycCaseId: kycCaseId("C000004"), customerId: customerId("C000004"), subjectType: "CUSTOMER", subjectReference: "C000004", subjectName: "Northstar Sustainable Logistics Ltd", screeningType: "SANCTIONS", matchScore: 82, outcome: "FALSE_POSITIVE", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-14T11:00:00.000Z"), resolutionComment: "Different legal entity, country and registration number." },
-    { id: stableUuid("screen-c5-sanctions"), reference: "SCR-000005", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "Crescent Digital Trading FZ-LLC", screeningType: "SANCTIONS", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:00:00.000Z"), resolutionComment: "Confirmed fictional match; relationship rejected and debit block applied." },
-    { id: stableUuid("screen-c5-media"), reference: "SCR-000006", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "Crescent Digital Trading FZ-LLC", screeningType: "ADVERSE_MEDIA", matchScore: 96, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:05:00.000Z"), resolutionComment: "Confirmed fictional adverse-media subject." },
+    { id: stableUuid("screen-c5-sanctions"), reference: "SCR-000005", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م", screeningType: "SANCTIONS", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:00:00.000Z"), resolutionComment: "Confirmed fictional match; relationship rejected and debit block applied." },
+    { id: stableUuid("screen-c5-media"), reference: "SCR-000006", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م", screeningType: "ADVERSE_MEDIA", matchScore: 96, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:05:00.000Z"), resolutionComment: "Confirmed fictional adverse-media subject." },
     { id: stableUuid("screen-c7-possible"), reference: "SCR-000007", kycCaseId: kycCaseId("C000007"), customerId: customerId("C000007"), subjectType: "CUSTOMER", subjectReference: "C000007", subjectName: "Yousef Haddad", screeningType: "SANCTIONS", matchScore: 76, candidateDetails: { watchlistReference: "FWL-SAN-005", fictional: true }, outcome: "POSSIBLE_MATCH" },
     { id: stableUuid("screen-c8-clear"), reference: "SCR-000008", kycCaseId: kycCaseId("C000008"), customerId: customerId("C000008"), subjectType: "CUSTOMER", subjectReference: "C000008", subjectName: "Harbour Green Energy Ltd", screeningType: "SANCTIONS", matchScore: 0, outcome: "CLEAR" },
     { id: stableUuid("screen-c9-clear"), reference: "SCR-000009", kycCaseId: kycCaseId("C000009"), customerId: customerId("C000009"), subjectType: "CUSTOMER", subjectReference: "C000009", subjectName: "Layla Rahman", screeningType: "SANCTIONS", matchScore: 0, outcome: "CLEAR" },
