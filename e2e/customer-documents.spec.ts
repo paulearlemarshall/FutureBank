@@ -14,7 +14,7 @@ test("shows Amelia Hart's seeded Passport and National ID", async ({ page }) => 
   expect((await response.body()).byteLength).toBe(58533);
 });
 
-test("uploads and deletes a document through the browser", async ({ page }) => {
+test("uploads, replaces and deletes a document through the browser", async ({ page }) => {
   test.skip(!process.env.PLAYWRIGHT_BASE_URL, "Vercel Blob completion callbacks require a reachable preview URL");
   await page.goto("/customers/C000006?tab=documents");
   await expectReady(page, "customer-detail");
@@ -23,6 +23,17 @@ test("uploads and deletes a document through the browser", async ({ page }) => {
   await bp(page, "document-upload-national-id").click();
   await expect(bp(page, "status-document-national-id")).toContainText(/uploaded/i, { timeout: 30_000 });
   await expect(bp(page, "document-slot-national-id")).toContainText("browser-fixture.jpg", { timeout: 30_000 });
+  const preview = bp(page, "document-slot-national-id").locator("img.document-preview");
+  const initialPreviewUrl = await preview.getAttribute("src");
+  if (!initialPreviewUrl) throw new Error("Uploaded document preview did not have a source URL.");
+  expect(initialPreviewUrl).toContain("?v=");
+
+  await file.setInputFiles({ name: "browser-replacement.jpg", mimeType: "image/jpeg", buffer: Buffer.from([0xff, 0xd8, 0xff, 0x03, 0x04]) });
+  await bp(page, "document-upload-national-id").click();
+  await expect(bp(page, "status-document-national-id")).toContainText(/uploaded/i, { timeout: 30_000 });
+  await expect(bp(page, "document-slot-national-id")).toContainText("browser-replacement.jpg", { timeout: 30_000 });
+  await expect(preview).not.toHaveAttribute("src", initialPreviewUrl, { timeout: 30_000 });
+
   await bp(page, "document-delete-confirm-national-id").check();
   await bp(page, "document-delete-national-id").click();
   await expect(bp(page, "status-document-national-id")).toContainText(/deleted/i, { timeout: 30_000 });
