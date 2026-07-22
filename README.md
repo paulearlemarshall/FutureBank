@@ -4,6 +4,8 @@ FutureBank Core is a fictional core-banking application for Blue Prism demonstra
 
 All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 
+The system boundaries, authoritative owners, and non-negotiable invariants are mapped in [docs/architecture.md](docs/architecture.md). Coding agents should begin with [AGENTS.md](AGENTS.md), which routes tasks to the smallest relevant local context and proof.
+
 ## Deterministic demonstration baseline
 
 An administrative reset restores nine customers and nineteen accounts. The original identifiers `C000001`–`C000005` and `1000000001`–`1000000014` remain unchanged. Additional scenarios cover KYC not started, in progress, pending approval and expired; active, blocked and closed accounts; every reachable overdraft lifecycle state; booked, pending, rejected and expired payments; all hold and work-item states; and open, assigned and resolved overdraft alerts.
@@ -19,6 +21,7 @@ The production demonstration is available at [future-bank-demo.vercel.app](https
 - Next.js 16 App Router, React 19, and TypeScript
 - Drizzle ORM with Neon Serverless Postgres
 - Better Auth username/password sessions
+- Private Vercel Blob storage for authenticated Passport and National ID files
 - Vitest domain tests and Playwright browser tests
 - Versioned authenticated REST API with an OpenAPI 3.0 artifact
 - Vercel deployment
@@ -48,16 +51,20 @@ $headers = @{
 Invoke-RestMethod "http://localhost:3000/api/v1/customers?limit=9" -Headers $headers
 ```
 
-The committed OpenAPI 3.0 artifact is [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) and the running app serves the same document publicly at `/api/openapi.json`. See [`docs/api.md`](docs/api.md) for authentication, write examples and response conventions.
+The canonical OpenAPI source is [`openapi/futurebank.v1.source.json`](openapi/futurebank.v1.source.json). `npm run openapi:generate` produces the committed [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) artifact, and `npm run openapi:check` validates the source and rejects artifact drift. The running app serves the generated document publicly at `/api/openapi.json`. See [`docs/api.md`](docs/api.md) for authentication, write examples and response conventions.
 
 ## Quality checks
 
 ```powershell
+npm run verify:docs
+npm run openapi:check
 npm run lint
 npm run typecheck
 npm test
 npm run build
 ```
+
+Use `npm run verify:fast` for the documentation, OpenAPI, lint, typecheck and unit-test contract. `npm run verify:db` migrates and resets the configured disposable database, verifies the baseline, exercises database-backed workflows and verifies the restored baseline again. After installing the Playwright browsers, `npm run verify:full` adds the production build and canonical browser journeys.
 
 The unit suite covers monetary validation, role boundaries, same-currency transfer rules, insufficient funds, read-only accounts, balanced double-entry postings, deterministic seed identifiers, and baseline state coverage.
 
@@ -72,6 +79,8 @@ npm run test:e2e
 ```
 
 Set `PLAYWRIGHT_BASE_URL` to test a deployed environment. The suite runs serially in Chromium and Microsoft Edge because canonical journeys share deterministic demo data. The suite includes an administrator reset that restores the deterministic baseline, so run it only against a demonstration environment that is safe to reset.
+
+GitHub CI also runs the customer-document browser journey in an isolated job using a temporary public tunnel. That job exercises direct-to-Blob upload completion, image replacement and preview refresh, deletion, and namespace cleanup against a dedicated CI database and Blob namespace.
 
 Test evidence (traces, screenshots, and video) is retained on failure. Playwright's HTML report is written to `playwright-report/`.
 

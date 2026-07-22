@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "agent/**", "feature/**"]
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -37,20 +38,15 @@ jobs:
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       FUTUREBANK_BLOB_NAMESPACE: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx drizzle-kit migrate
-      - run: npx tsx scripts/reset.ts
-      - run: npx tsx scripts/verify-db.ts
-      - run: node --conditions=react-server --import tsx scripts/verify-workflows.ts
-      - run: npx tsx scripts/verify-db.ts
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
+      - run: touch .env.local
+      - run: npm run verify:db
+      - run: npm run verify:fast
       - run: npm run build
       - run: npx playwright install --with-deps chromium msedge
       - run: npm run test:e2e
@@ -87,20 +83,22 @@ jobs:
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       FUTUREBANK_BLOB_NAMESPACE: ci-tunnel-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx drizzle-kit migrate
-      - run: npx tsx scripts/reset.ts
+      - run: touch .env.local
+      - run: npm run db:migrate
+      - run: npm run db:reset
       - run: npm run build
 
       - name: Install cloudflared
         run: |
           curl -fsSL -o /usr/local/bin/cloudflared \
-            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+            https://github.com/cloudflare/cloudflared/releases/download/2026.7.2/cloudflared-linux-amd64
+          echo "ec905ea7b7e327ff8abdde8cb64697a2152de74dbcdbf6aec9db8364eb3886cd  /usr/local/bin/cloudflared" | sha256sum --check
           chmod +x /usr/local/bin/cloudflared
           cloudflared --version
 
@@ -139,6 +137,16 @@ jobs:
           exit 1
 
       - run: npx playwright install --with-deps chromium
+      - name: Wait for public tunnel readiness
+        run: |
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$TUNNEL_URL/api/health" || true)
+            if [ "$code" = "200" ]; then echo "Public tunnel ready"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::Public tunnel did not become healthy within timeout"
+          cat cloudflared.log
+          exit 1
       - name: Run browser-upload e2e spec against tunnel
         env:
           PLAYWRIGHT_BASE_URL: ${{ env.TUNNEL_URL }}
@@ -156,7 +164,7 @@ jobs:
 
       - name: Upload server and tunnel logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-upload-e2e-logs
           path: |
