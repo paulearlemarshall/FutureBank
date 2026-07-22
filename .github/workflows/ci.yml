@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "agent/**", "codex/**", "feature/**"]
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -136,6 +137,16 @@ jobs:
           exit 1
 
       - run: npx playwright install --with-deps chromium
+      - name: Wait for public tunnel readiness
+        run: |
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$TUNNEL_URL/api/health" || true)
+            if [ "$code" = "200" ]; then echo "Public tunnel ready"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::Public tunnel did not become healthy within timeout"
+          cat cloudflared.log
+          exit 1
       - name: Run browser-upload e2e spec against tunnel
         env:
           PLAYWRIGHT_BASE_URL: ${{ env.TUNNEL_URL }}
