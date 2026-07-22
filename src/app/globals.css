@@ -37,6 +37,9 @@ a { color: inherit; }
 
 button, input, select, textarea { font: inherit; }
 
+input[dir="auto"], textarea[dir="auto"] { text-align: start; }
+[dir="auto"] { unicode-bidi: plaintext; }
+
 button, a { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {

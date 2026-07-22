@@ -28,6 +28,33 @@ test("finds a seeded customer and persists an edit", async ({ page }) => {
   await expect(bp(page, "status-customer-form-status")).toContainText(/saved|updated/i);
 });
 
+test("searches and edits the seeded Arabic retail customer with stable bidi controls", async ({ page }) => {
+  await page.goto(`/customers?query=${encodeURIComponent("المنصوري")}`);
+  await expectReady(page, "customers");
+  await expect(bp(page, "customer-search-query")).toHaveAttribute("dir", "auto");
+  const row = bp(page, "customer-row-C000002");
+  await expect(row).toContainText("عمر المنصوري");
+  await bp(page, "customer-open-C000002").click();
+  await expectReady(page, "customer-detail");
+  await expect(bp(page, "customer-display-name")).toHaveText("عمر المنصوري");
+  await expect(bp(page, "customer-display-name")).toHaveAttribute("dir", "auto");
+
+  await bp(page, "customer-edit").click();
+  await expectReady(page, "customer-edit");
+  await expect(bp(page, "customer-given-name")).toHaveValue("عمر");
+  await expect(bp(page, "customer-given-name")).toHaveAttribute("dir", "auto");
+  await expect(bp(page, "customer-address-line1")).toHaveValue("١١ شارع المثال");
+  await expect(bp(page, "customer-address-line1")).toHaveAttribute("dir", "auto");
+  await expect(bp(page, "customer-tax-id")).toHaveAttribute("dir", "ltr");
+  await bp(page, "customer-address-line1").fill("١١ شارع المثال");
+  await bp(page, "customer-save").click();
+  await expect(bp(page, "status-customer-form-status")).toContainText(/saved|updated/i);
+
+  await page.goto(`/customers?query=${encodeURIComponent("Crescent Digital")}`);
+  await expectReady(page, "customers");
+  await expect(bp(page, "customer-row-C000005")).toContainText("شركة الهلال للتجارة الرقمية");
+});
+
 test("onboards a fully populated fictional retail customer", async ({ page }) => {
   await page.goto("/customers/new");
   await expectReady(page, "customer-new");

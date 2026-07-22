@@ -76,6 +76,8 @@ Consequential decisions use work items, optimistic versions, row/advisory locks,
 
 Reset restores exactly nine customers and nineteen accounts while preserving the original five customer numbers and fourteen account numbers. The baseline deliberately covers reachable KYC, account, payment, hold, work-item, facility, alert, screening, evidence, beneficiary, and restriction states.
 
+Two UAE scenarios exercise UTF-8 and bidirectional text end to end: `C000002` is an Arabic-script retail customer and `C000005` is an Arabic-script SME. Their short names retain Latin transliterations for operational search, while names, industries and primary addresses retain Arabic text. The English application shell remains LTR; native human-readable fields use automatic direction and structured banking identifiers remain explicitly LTR.
+
 Historical terminal scenarios retain fixed timestamps. Time-sensitive active and pending scenarios are anchored to the UTC day on which reset runs, so their due, review and expiry semantics remain stable without rewriting transaction history. `scripts/verify-db.ts` rejects a reset whose pending payment, active hold, non-terminal KYC case, open work item, live facility or verified active-case evidence has already aged out.
 
 Blue Prism compatibility is a public contract. New screens require native labelled controls, stable identifiers and `data-bp` values, fixed table ordering, a permanent `data-bp-page` readiness marker, and persistent status/error regions. Avoid portals, virtualized lists, canvas controls, generated selectors, and position-dependent automation.
