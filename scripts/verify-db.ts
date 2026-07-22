@@ -35,6 +35,27 @@ async function main() {
   expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 9);
   expectEqual("active payment holds", await scalar(sql`select count(*)::int as value from account_holds where status = 'ACTIVE'`), 1);
   expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 5);
+  expectEqual("expired active payment scenarios", await scalar(sql`
+    select count(*)::int as value from payment_orders where status = 'PENDING' and expires_at <= now()
+  `), 0);
+  expectEqual("expired active holds", await scalar(sql`
+    select count(*)::int as value from account_holds where status = 'ACTIVE' and expires_at <= now()
+  `), 0);
+  expectEqual("overdue non-terminal KYC cases", await scalar(sql`
+    select count(*)::int as value from kyc_cases where status in ('OPEN', 'IN_PROGRESS', 'AWAITING_INFORMATION', 'PENDING_APPROVAL') and due_at <= now()
+  `), 0);
+  expectEqual("overdue open work items", await scalar(sql`
+    select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED') and due_at <= now()
+  `), 0);
+  expectEqual("expired live facilities", await scalar(sql`
+    select count(*)::int as value from overdraft_facilities
+    where status in ('ACTIVE', 'PENDING_APPROVAL', 'PENDING_CHANGE', 'SUSPENDED') and expiry_date is not null and expiry_date <= current_date
+  `), 0);
+  expectEqual("expired evidence in active KYC scenarios", await scalar(sql`
+    select count(*)::int as value from kyc_evidence e join kyc_cases k on k.id = e.kyc_case_id
+    where k.status in ('OPEN', 'IN_PROGRESS', 'AWAITING_INFORMATION', 'PENDING_APPROVAL')
+      and e.verification_status = 'VERIFIED' and e.expires_at is not null and e.expires_at < current_date
+  `), 0);
   expectEqual("active debit restrictions", await scalar(sql`select count(*)::int as value from customer_restrictions where type = 'DEBIT_BLOCK' and active`), 2);
   expectEqual("account status coverage", await scalar(sql`select count(distinct status)::int as value from bank_accounts`), 3);
   expectEqual("payment status coverage", await scalar(sql`select count(distinct status)::int as value from payment_orders`), 4);

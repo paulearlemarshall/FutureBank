@@ -36,7 +36,7 @@ Do not use generated IDs, shadow DOM, canvas controls, virtualized tables, hover
 - Successful mutations render a persistent `[role="status"]` region with a deterministic message.
 - Failed validation or server mutations render `[role="alert"]`; field errors are associated through `aria-describedby`.
 - Tables use native `<table>`, `<thead>`, `<tbody>`, `<th>`, and `<td>` elements and retain stable column order.
-- Destructive actions require a normal text confirmation field and submit button; browser-native prompt dialogs are not part of the contract.
+- Destructive actions require a native, labelled confirmation control and submit button. High-impact administrative resets use typed text confirmation; fixed-scope actions such as deleting one customer-document slot may use a required checkbox. Browser-native prompt dialogs are not part of the contract.
 
 ## Canonical journeys
 
@@ -55,5 +55,7 @@ The Playwright suite treats these workflows as the compatibility baseline:
 11. View Amelia Hart's seeded Passport and National ID, replace or delete a slot, and verify reset restores the original files.
 
 Customer document controls retain these selectors for each `passport` / `national-id` slot: `document-slot-*`, `document-file-*`, `document-upload-*`, `document-view-*`, `document-delete-confirm-*`, `document-delete-*`, and `status-document-*`.
+
+Replacing an image changes its versioned preview URL while retaining the stable `document-slot-*` card and `status-document-*` region. Automation may wait for the status message and updated filename; it must not depend on the preview query-string value.
 
 The reset journey is destructive and is part of the canonical suite; it is not opt-in. Run the suite only against a disposable demonstration environment that is safe to restore to the deterministic baseline.

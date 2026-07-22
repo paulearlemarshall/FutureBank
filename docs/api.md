@@ -72,8 +72,9 @@ curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/doc
 
 ## OpenAPI
 
-- Repository artifact: `openapi/futurebank.v1.json`
+- Canonical source: `openapi/futurebank.v1.source.json`
+- Generated repository artifact: `openapi/futurebank.v1.json`
 - Runtime document: `/api/openapi.json`
 - API discovery: `/api/v1`
 
-The OpenAPI 3.0.3 document lists every implemented route with unique operation IDs, descriptions, typed success and error contracts, API-key and Bearer alternatives, actor selection, examples, upload constraints and raw binary document responses. The OpenAPI endpoint is public so tooling can import it without first configuring authentication; business endpoints remain authenticated.
+Run `npm run openapi:generate` after changing the canonical source and commit both source and artifact. `npm run openapi:check` validates OpenAPI 3.0.3 and fails when the generated artifact is stale. The document lists every implemented route with unique operation IDs, descriptions, typed success and error contracts, API-key and Bearer alternatives, actor selection, examples, upload constraints and raw binary document responses. The OpenAPI endpoint is public so tooling can import it without first configuring authentication; business endpoints remain authenticated.
