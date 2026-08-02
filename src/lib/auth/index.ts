@@ -18,7 +18,7 @@ const trustedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
 ].filter((value): value is string => Boolean(value));
-const usernameAttemptLimit = process.env.VERCEL_ENV === "production" ? 5 : 100;
+const usernameAttemptLimit = process.env.VERCEL_ENV === "production" ? 5 : 10_000;
 
 export const auth = betterAuth({
   appName: "FutureBank Core",
