@@ -23,7 +23,7 @@ The customer Documents tab always renders fixed Passport and National ID cards w
 - `PUT /api/v1/customers/{customerNumber}/documents/{slot}` with multipart field `file`
 - `DELETE /api/v1/customers/{customerNumber}/documents/{slot}`
 
-All endpoints require the normal FutureBank API key. Writes also apply the selected `X-Staff-Username` permissions. The content endpoint is the only route that returns raw bytes instead of a `{data}` JSON envelope.
+All endpoints require an actor-owned FutureBank API key. Writes apply the key owner's permissions. The content endpoint is the only route that returns raw bytes instead of a `{data}` JSON envelope.
 
 ## Deterministic baseline
 

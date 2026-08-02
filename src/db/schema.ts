@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   date,
   index,
@@ -107,6 +108,41 @@ export const verification = pgTable("verification", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   ...timestamps,
 }, (table) => [index("verification_identifier_idx").on(table.identifier)]);
+
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
+
+export const apikey = pgTable("apikey", {
+  id: text("id").primaryKey(),
+  configId: text("config_id").notNull().default("default"),
+  name: text("name"),
+  start: text("start"),
+  prefix: text("prefix"),
+  key: text("key").notNull().unique(),
+  referenceId: text("reference_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  refillInterval: integer("refill_interval"),
+  refillAmount: integer("refill_amount"),
+  lastRefillAt: timestamp("last_refill_at", { withTimezone: true }),
+  enabled: boolean("enabled").notNull().default(true),
+  rateLimitEnabled: boolean("rate_limit_enabled").notNull().default(true),
+  rateLimitTimeWindow: integer("rate_limit_time_window").notNull().default(60_000),
+  rateLimitMax: integer("rate_limit_max").notNull().default(600),
+  requestCount: integer("request_count").notNull().default(0),
+  remaining: integer("remaining"),
+  lastRequest: timestamp("last_request", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  permissions: text("permissions"),
+  metadata: text("metadata"),
+  ...timestamps,
+}, (table) => [
+  index("apikey_config_id_idx").on(table.configId),
+  index("apikey_reference_id_idx").on(table.referenceId),
+  index("apikey_key_idx").on(table.key),
+]);
 
 export const staffProfiles = pgTable("staff_profiles", {
   userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
@@ -813,6 +849,8 @@ export const auditEvents = pgTable("audit_events", {
   after: jsonb("after"),
 }, (table) => [index("audit_occurred_idx").on(table.occurredAt), index("audit_entity_idx").on(table.entityType, table.entityReference)]);
 
+// Retained as an additive-migration compatibility table. Browser sign-in no
+// longer reads or writes it; Better Auth owns rate limiting through rateLimit.
 export const loginAttempts = pgTable("login_attempts", {
   id: uuid("id").primaryKey().defaultRandom(),
   username: text("username").notNull(),

@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.9.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.10.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -288,11 +288,7 @@
           "Customers"
         ],
         "summary": "Create a fully populated customer",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -389,11 +385,7 @@
           "Customers"
         ],
         "summary": "Update a customer",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "description": "Complete replacement values for the mutable CRM fields.",
@@ -435,9 +427,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -500,9 +489,6 @@
           },
           {
             "$ref": "#/components/parameters/RestrictionReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -603,11 +589,7 @@
           "Accounts"
         ],
         "summary": "Open an account",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -860,9 +842,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AccountNumber"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -973,11 +952,7 @@
           "Beneficiaries"
         ],
         "summary": "Create a beneficiary",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "description": "Creates an active external beneficiary owned by the customer.",
@@ -1071,9 +1046,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1184,9 +1156,6 @@
         "summary": "Submit an internal or external payment",
         "parameters": [
           {
-            "$ref": "#/components/parameters/StaffActor"
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -1286,9 +1255,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/PaymentReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1321,11 +1287,7 @@
           "Payments"
         ],
         "summary": "Expire stale pending payments and release holds",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
@@ -1353,9 +1315,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/PaymentReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           },
           {
             "name": "Idempotency-Key",
@@ -1513,9 +1472,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/PaymentReversalReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1589,11 +1545,7 @@
           "Payment instructions"
         ],
         "summary": "Create a future-dated payment or standing order",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1682,9 +1634,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/PaymentInstructionReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1770,11 +1719,7 @@
           "Payment instructions"
         ],
         "summary": "Execute all instructions due on a business date",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1852,11 +1797,7 @@
           "Direct debits"
         ],
         "summary": "Register a direct debit mandate",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1944,9 +1885,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/DirectDebitMandateReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1989,9 +1927,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/DirectDebitMandateReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           },
           {
             "name": "Idempotency-Key",
@@ -2086,11 +2021,7 @@
           "End of day"
         ],
         "summary": "Run end-of-day posting",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -2220,11 +2151,7 @@
           "Reconciliation"
         ],
         "summary": "Run clearing reconciliation",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -2315,9 +2242,6 @@
           },
           {
             "$ref": "#/components/parameters/ReconciliationItemReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2452,9 +2376,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AccountingPeriodReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2500,9 +2421,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AccountingPeriodReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2703,9 +2621,6 @@
         "summary": "Submit a manual general-ledger journal",
         "parameters": [
           {
-            "$ref": "#/components/parameters/StaffActor"
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -2806,9 +2721,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/GeneralLedgerJournalReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2913,9 +2825,6 @@
         "summary": "Submit a loan application",
         "parameters": [
           {
-            "$ref": "#/components/parameters/StaffActor"
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -3016,9 +2925,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/LoanApplicationReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3106,11 +3012,7 @@
           "KYC"
         ],
         "summary": "Open a KYC case",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -3227,9 +3129,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3324,9 +3223,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3405,9 +3301,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3474,9 +3367,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "responses": {
@@ -3506,9 +3396,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3575,9 +3462,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "responses": {
@@ -3610,9 +3494,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3687,11 +3568,7 @@
           "Overdrafts"
         ],
         "summary": "Submit an arranged-overdraft application",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "description": "Submits an arranged-overdraft application and creates an approval work item.",
@@ -3832,9 +3709,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/FacilityReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3894,9 +3768,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/FacilityReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3932,9 +3803,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/FacilityReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -4004,9 +3872,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -4211,9 +4076,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkItemReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -4249,9 +4111,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkItemReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -4456,9 +4315,6 @@
           },
           {
             "$ref": "#/components/parameters/DocumentSlot"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -4556,9 +4412,6 @@
           },
           {
             "$ref": "#/components/parameters/DocumentSlot"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "responses": {
@@ -4700,26 +4553,16 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "The FUTUREBANK_API_KEY supplied in X-API-Key."
+        "description": "An actor-owned FutureBank API key supplied in X-API-Key. The key owner determines permissions and audit identity."
       },
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "API key",
-        "description": "The FUTUREBANK_API_KEY supplied as an HTTP Bearer token. This is an alternative to X-API-Key, not a staff OAuth token."
+        "description": "An actor-owned FutureBank API key supplied as an HTTP Bearer token. This is an alternative to X-API-Key, not a staff OAuth token."
       }
     },
     "parameters": {
-      "StaffActor": {
-        "name": "X-Staff-Username",
-        "in": "header",
-        "required": false,
-        "description": "Active staff username used as the audit actor. Required for writes. Permissions and maker-checker separation are evaluated for this user.",
-        "schema": {
-          "type": "string",
-          "example": "bp.operator"
-        }
-      },
       "Query": {
         "name": "query",
         "in": "query",

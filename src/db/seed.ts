@@ -1,4 +1,4 @@
-import { eq, lt, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Database } from "./index";
 import * as tables from "./schema";
 import {
@@ -550,7 +550,6 @@ export async function resetBaseline(database: Database, actor: { id: string; use
   await database.transaction(async (transaction) => {
     const tx = transaction as unknown as SeedDb;
     await tx.execute(sql`select pg_advisory_xact_lock(738_204_019)`);
-    await tx.delete(tables.loginAttempts).where(lt(tables.loginAttempts.attemptedAt, new Date(Date.now() - 24 * 60 * 60_000)));
     await clearBankingData(tx);
     await seedBaseline(tx, preparedDocuments);
     await tx.insert(tables.auditEvents).values({

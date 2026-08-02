@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth/client";
 import type { ActionState, AccountListItem, BeneficiaryView, CustomerDetail, CustomerListItem, ProductView } from "@/modules/contracts";
 import { Field, StatusRegion } from "./ui";
 
@@ -20,14 +21,46 @@ function ErrorText({ state, name }: { state: ActionState; name: string }) {
   return message ? <small id={`${name}-error`} className="field-error">{message}</small> : null;
 }
 
-export function LoginForm({ action }: { action: StateAction }) {
-  const [state, formAction, pending] = useActionState(action, idle);
+export function LoginForm() {
+  const [state, setState] = useState<ActionState>(idle);
+  const [pending, setPending] = useState(false);
   const router = useRouter();
-  useEffect(() => {
-    if (state.ok) router.replace("/dashboard");
-  }, [router, state.ok]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const username = String(form.get("username") ?? "").trim().toLowerCase();
+    const password = String(form.get("password") ?? "");
+    if (!username || !password) {
+      setState({
+        ok: false,
+        code: "INVALID_CREDENTIALS",
+        message: "Invalid username or password.",
+        fieldErrors: {
+          username: username ? [] : ["Username is required"],
+          password: password ? [] : ["Password is required"],
+        },
+      });
+      return;
+    }
+
+    setPending(true);
+    const { error } = await authClient.signIn.username({ username, password, rememberMe: false });
+    if (error) {
+      setState(error.status === 429
+        ? { ok: false, code: "RATE_LIMITED", message: "Too many sign-in attempts. Try again in 15 minutes." }
+        : { ok: false, code: "INVALID_CREDENTIALS", message: "Invalid username or password." });
+      setPending(false);
+      return;
+    }
+
+    setState({ ok: true, code: "SIGNED_IN", message: "Sign in successful." });
+    router.replace("/dashboard");
+    router.refresh();
+  }
+
   return (
-    <form action={formAction} data-bp="login-form">
+    <form onSubmit={submit} data-bp="login-form">
       <ActionFeedback state={state} id="login-status" />
       <Field id="login-username" label="Username" required>
         <input id="login-username" name="username" data-bp="login-username" autoComplete="username" required autoFocus aria-invalid={Boolean(state.fieldErrors?.username)} aria-describedby="login-username-error" />

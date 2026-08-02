@@ -21,19 +21,20 @@
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
-    "db:seed-staff": "dotenv -e .env.local -- tsx scripts/seed-staff.ts",
+    "auth:provision": "dotenv -e .env.local -- tsx scripts/seed-staff.ts",
     "db:reset": "dotenv -e .env.local -- tsx scripts/reset.ts",
     "db:verify": "dotenv -e .env.local -- tsx scripts/verify-db.ts",
     "db:verify-workflows": "dotenv -e .env.local -- node --conditions=react-server --import tsx scripts/verify-workflows.ts"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.6.23",
+    "@better-auth/api-key": "1.6.23",
+    "@better-auth/drizzle-adapter": "1.6.23",
     "@vercel/blob": "2.6.1",
     "@vercel/functions": "^3.7.5",
-    "better-auth": "^1.6.23",
+    "better-auth": "1.6.23",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.25.0",
-    "next": "16.2.10",
+    "next": "16.2.12",
     "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -52,10 +53,17 @@
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "@better-auth/core": "1.6.23",
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    }
   }
 }

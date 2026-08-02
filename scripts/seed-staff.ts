@@ -3,7 +3,7 @@ import { seedDemoStaff } from "../src/db/seed-auth";
 
 async function main() {
   await seedDemoStaff(db);
-  console.info("FutureBank demo staff credentials updated.");
+  console.info("FutureBank staff credentials and supplied actor-owned API keys provisioned.");
 }
 
 main().catch((error) => {
