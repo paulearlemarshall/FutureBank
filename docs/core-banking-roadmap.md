@@ -17,4 +17,16 @@ The nine-wave release was completed on 2 August 2026 at Git commit [`5a10fbc`](h
 
 Vercel production deployment [`dpl_4fkNrXqXJVbb7B8uMD7Zv78pDaxr`](https://future-bank-demo-dp2te1loh-paulearlemarshalls-projects.vercel.app) was `READY`, targeted production, identified commit `5a10fbc80a4357cf08f7ffb4cda5d02dd54776ab` on `main`, and owned the [`future-bank-demo.vercel.app`](https://future-bank-demo.vercel.app) alias. Live `/api/health` returned `status: ok` and `database: ready`; public `/api/openapi.json` returned OpenAPI 3.0.3, FutureBank API 1.9.0 and all loan-origination operations. Production migrations were applied without resetting demonstration data after creating Neon recovery branch `br-sweet-band-aumauovk`; read-only checks found the loan schema and all four currency loan-receivable controls, with zero unbalanced journals and zero duplicate subledger projections.
 
+## Authentication hardening closeout
+
+- [x] Replace the shared API key and caller-selected actor header with hashed, actor-owned API keys.
+- [x] Move username sign-in throttling to Better Auth's database-backed production control.
+- [x] Remove plaintext demo passwords and the legacy shared API key from new Vercel production runtimes after explicit database provisioning.
+- [x] Publish OpenAPI 1.10.0 and update the API/accessibility documentation.
+- [x] Pass pull-request and exact-merge CI, migrate production additively, exercise the live login/API journeys, and stop.
+
+The authentication closeout was released on 2 August 2026 at Git commit [`4823394`](https://github.com/paulearlemarshall/FutureBank/commit/4823394f10d265c1948a19b982ca9efc6d11228b). [GitHub CI run 30762966824](https://github.com/paulearlemarshall/FutureBank/actions/runs/30762966824) passed database/workflow verification, documentation, OpenAPI, lint, typecheck, unit tests, production build, the Chromium/Edge matrix and the isolated real-Blob journey. One Edge navigation timeout recovered on retry; the run completed successfully.
+
+Vercel deployment [`dpl_ENymG919rBHRt5SoDPSNtUd2f97m`](https://future-bank-demo-pea5iovhu-paulearlemarshalls-projects.vercel.app) was `READY`, targeted production, and owned the [`future-bank-demo.vercel.app`](https://future-bank-demo.vercel.app) alias. Live health returned 200, OpenAPI reported 1.10.0, an operator-owned key returned 200, the removed actor header returned 400, all four stored password hashes matched their retained provisioning inputs, and an operator reached a ready dashboard. Migration `0015_auth_simplification` and credential/key provisioning were applied without resetting production after creating recovery branch `br-red-salad-au84k1qd`, retained until 9 August 2026.
+
 Arrears, collections, collateral, enterprise limits, foreign exchange, term-deposit rollover, bulk corporate payments, cards, ATM/POS, teller/cash, trade finance, channels and safe-deposit operations are explicitly outside this release. They are not an active backlog and must not be added to navigation. Further feature innovation is stopped after Wave 9 unless a future user explicitly starts a new product cycle.
