@@ -3,6 +3,7 @@ import { db, pool } from "../src/db";
 import { resetBaseline } from "../src/db/seed";
 import { seedDemoStaff } from "../src/db/seed-auth";
 import { stableUuid } from "../src/db/seed-manifest";
+import { runDuePaymentInstructions } from "../src/modules/services/payment-instructions";
 import { approvePendingPayment } from "../src/modules/services/payments";
 
 async function main() {
@@ -28,7 +29,27 @@ async function main() {
     `);
     const row = result.rows[0] as unknown as Record<string, number>;
     for (const [label, value] of Object.entries(row)) if (Number(value) !== 1) throw new Error(`${label}: expected 1, received ${value}`);
-    console.info("Workflow integration verification passed: row locking prevented double approval and booked exactly one held payment.");
+
+    const scheduleDateResult = await db.execute(sql`select next_execution_date::text as value from payment_instructions where reference = 'PIN-000001'`);
+    const businessDate = String((scheduleDateResult.rows[0] as { value: string }).value);
+    const firstRun = await runDuePaymentInstructions({ businessDate }, supervisor);
+    const secondRun = await runDuePaymentInstructions({ businessDate }, supervisor);
+    if (firstRun.booked !== 1 || firstRun.failed !== 0) throw new Error(`Instruction run: expected one booking, received ${firstRun.booked} booked and ${firstRun.failed} failed`);
+    if (secondRun.attempted !== 0) throw new Error(`Instruction rerun: expected zero attempts, received ${secondRun.attempted}`);
+    const instructionResult = await db.execute(sql`
+      select
+        (select count(*)::int from payment_instruction_executions e join payment_instructions i on i.id = e.instruction_id where i.reference = 'PIN-000001' and e.status = 'BOOKED') as executions,
+        (select count(*)::int from payment_orders where idempotency_key like 'payment-instruction:%' and status = 'BOOKED') as payment_orders,
+        (select count(*)::int from ledger_transactions l join payment_orders p on p.id = l.payment_order_id where p.idempotency_key like 'payment-instruction:%') as ledger_transactions,
+        (select count(*)::int from ledger_entries e join ledger_transactions l on l.id = e.transaction_id join payment_orders p on p.id = l.payment_order_id where p.idempotency_key like 'payment-instruction:%') as ledger_entries,
+        (select count(*)::int from payment_instructions where reference = 'PIN-000001' and status = 'COMPLETED' and version = 2) as completed_instructions
+    `);
+    const instructionRow = instructionResult.rows[0] as unknown as Record<string, number>;
+    for (const label of ["executions", "payment_orders", "ledger_transactions", "completed_instructions"]) {
+      if (Number(instructionRow[label]) !== 1) throw new Error(`${label}: expected 1, received ${instructionRow[label]}`);
+    }
+    if (Number(instructionRow.ledger_entries) !== 2) throw new Error(`ledger_entries: expected 2, received ${instructionRow.ledger_entries}`);
+    console.info("Workflow integration verification passed: locking prevented double approval, and a due instruction booked exactly once through the balanced ledger path.");
   } finally {
     await resetBaseline(db, admin);
   }

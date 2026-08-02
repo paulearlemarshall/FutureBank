@@ -356,6 +356,58 @@ export type PaymentApprovalDetail = {
   workItem: WorkQueueItem | null;
 };
 
+export type PaymentInstructionType = "SCHEDULED" | "STANDING_ORDER";
+export type PaymentInstructionStatus = "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED" | "FAILED";
+export type PaymentInstructionFrequency = "ONCE" | "WEEKLY" | "MONTHLY";
+export type PaymentInstructionExecutionStatus = "PROCESSING" | "BOOKED" | "PENDING" | "FAILED";
+
+export type PaymentInstructionExecutionView = {
+  scheduledFor: string;
+  status: PaymentInstructionExecutionStatus;
+  paymentReference: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  attemptedAt: string;
+  completedAt: string | null;
+};
+
+export type PaymentInstructionView = {
+  reference: string;
+  type: PaymentInstructionType;
+  status: PaymentInstructionStatus;
+  paymentType: "INTERNAL" | "EXTERNAL";
+  sourceAccountNumber: string;
+  customerNumber: string;
+  customerName: string;
+  destinationReference: string;
+  amount: string;
+  currency: string;
+  description: string;
+  frequency: PaymentInstructionFrequency;
+  startDate: string;
+  nextExecutionDate: string;
+  endDate: string | null;
+  lastExecutionAt: string | null;
+  createdBy: string;
+  cancellationReason: string | null;
+  version: number;
+  executions: PaymentInstructionExecutionView[];
+};
+
+export type ProcessingRunView = {
+  reference: string;
+  type: "PAYMENT_INSTRUCTIONS";
+  businessDate: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  attempted: number;
+  booked: number;
+  pending: number;
+  failed: number;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+};
+
 export type LoanView = {
   originalPrincipal: string;
   outstandingPrincipal: string;

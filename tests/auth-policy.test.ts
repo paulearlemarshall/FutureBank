@@ -18,6 +18,10 @@ describe("role boundaries", () => {
   it("separates operator, supervisor and compliance duties", () => {
     expect(hasPermission("OPERATOR", "PAYMENT_INITIATE")).toBe(true);
     expect(hasPermission("OPERATOR", "PAYMENT_DECIDE")).toBe(false);
+    expect(hasPermission("OPERATOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(true);
+    expect(hasPermission("OPERATOR", "PAYMENT_SCHEDULE_EXECUTE")).toBe(false);
+    expect(hasPermission("SUPERVISOR", "PAYMENT_SCHEDULE_EXECUTE")).toBe(true);
+    expect(hasPermission("SUPERVISOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(false);
     expect(hasPermission("SUPERVISOR", "OVERDRAFT_DECIDE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "KYC_DECIDE")).toBe(false);
     expect(hasPermission("COMPLIANCE", "KYC_DECIDE")).toBe(true);

@@ -1,6 +1,6 @@
 # FutureBank Core
 
-FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, customer, account, statement, and audit workflows.
+FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, future-dated payment, standing-order, customer, account, statement, and audit workflows.
 
 All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 
@@ -12,7 +12,7 @@ An administrative reset restores nine customers and nineteen accounts. The origi
 
 The baseline includes two Arabic-language UAE records without changing identifier counts: retail customer `C000002` and SME customer `C000005`. Arabic-script names and addresses, Latin short-name transliterations, authenticated API search/write, and RTL-aware native form controls are covered by reset, database and browser verification.
 
-Useful starting records include `KYC-000007` for an unresolved fictional match, `KYC-000008` for Compliance approval, `1000000017` for a blocked account, `1000000018` for a closed account, `ODF-000006` for a pending limit change, and `PAY-000002`–`PAY-000004` for terminal payment and hold outcomes.
+Useful starting records include `KYC-000007` for an unresolved fictional match, `KYC-000008` for Compliance approval, `1000000017` for a blocked account, `1000000018` for a closed account, `ODF-000006` for a pending limit change, `PAY-000002`–`PAY-000004` for terminal payment and hold outcomes, and `PIN-000001`–`PIN-000003` for future-dated, recurring and cancelled payment instructions.
 
 ## Live demonstration
 
@@ -53,7 +53,7 @@ $headers = @{
 Invoke-RestMethod "http://localhost:3000/api/v1/customers?limit=9" -Headers $headers
 ```
 
-The canonical OpenAPI source is [`openapi/futurebank.v1.source.json`](openapi/futurebank.v1.source.json). `npm run openapi:generate` produces the committed [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) artifact, and `npm run openapi:check` validates the source and rejects artifact drift. The running app serves the generated document publicly at `/api/openapi.json`. See [`docs/api.md`](docs/api.md) for authentication, write examples and response conventions.
+The canonical OpenAPI source is [`openapi/futurebank.v1.source.json`](openapi/futurebank.v1.source.json). `npm run openapi:generate` produces the committed [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) artifact, and `npm run openapi:check` validates the source and rejects artifact drift. The running app serves the generated document publicly at `/api/openapi.json`, allowing an external actor to discover the contract without credentials; all `/api/v1` business routes remain authenticated. See [`docs/api.md`](docs/api.md) for accessibility, authentication, payment-instruction and response conventions.
 
 ## Quality checks
 

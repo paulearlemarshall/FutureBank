@@ -78,6 +78,27 @@ export const baselineBeneficiaries = beneficiaryNames.map((name, index) => ({
   status: index === 12 ? "INACTIVE" as const : "ACTIVE" as const,
 }));
 
+export const baselinePaymentInstructions = [
+  {
+    reference: "PIN-000001", type: "SCHEDULED" as const, status: "ACTIVE" as const, paymentType: "INTERNAL" as const,
+    sourceAccountNumber: "1000000002", destinationAccountNumber: "1000000001", beneficiaryKey: null,
+    amount: "125.00", currency: "GBP", description: "Future-dated savings transfer", frequency: "ONCE" as const,
+    startOffsetDays: 2, endOffsetDays: null, createdBy: "operator" as const,
+  },
+  {
+    reference: "PIN-000002", type: "STANDING_ORDER" as const, status: "ACTIVE" as const, paymentType: "EXTERNAL" as const,
+    sourceAccountNumber: "1000000004", destinationAccountNumber: null, beneficiaryKey: "beneficiary-2",
+    amount: "750.00", currency: "AED", description: "Monthly fictional service payment", frequency: "MONTHLY" as const,
+    startOffsetDays: 5, endOffsetDays: 370, createdBy: "operator" as const,
+  },
+  {
+    reference: "PIN-000003", type: "STANDING_ORDER" as const, status: "CANCELLED" as const, paymentType: "EXTERNAL" as const,
+    sourceAccountNumber: "1000000009", destinationAccountNumber: null, beneficiaryKey: "beneficiary-9",
+    amount: "980.00", currency: "GBP", description: "Cancelled fictional supplier schedule", frequency: "WEEKLY" as const,
+    startOffsetDays: 10, endOffsetDays: null, createdBy: "operator" as const,
+  },
+] as const;
+
 const transactionDescriptions = ["Salary credit", "Card purchase", "Utility payment", "Online transfer", "Account fee", "Interest payment", "Standing order", "Cash withdrawal", "Supplier payment", "Insurance premium"];
 
 export type BaselineTransaction = {
@@ -154,5 +175,6 @@ export function validateBaselineSeed(): string[] {
   const ids = [...baselineCustomers.map((item) => item.customerNumber), ...baselineAccounts.map((item) => item.accountNumber), ...baselineTransactions.map((item) => item.reference)];
   if (new Set(ids).size !== ids.length) errors.push("Baseline identifiers must be unique");
   if (baselineBeneficiaries.length < 12) errors.push("Expected at least twelve beneficiaries");
+  if (baselinePaymentInstructions.length !== 3) errors.push("Expected three payment instruction scenarios");
   return errors;
 }

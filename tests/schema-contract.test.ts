@@ -17,7 +17,10 @@ import {
   loanDetails,
   loanRepayments,
   overdraftFacilities,
+  paymentInstructionExecutions,
+  paymentInstructions,
   paymentOrders,
+  processingRuns,
   products,
   session,
   staffProfiles,
@@ -42,6 +45,9 @@ describe("database model contract", () => {
       bankAccounts,
       beneficiaries,
       paymentOrders,
+      paymentInstructions,
+      paymentInstructionExecutions,
+      processingRuns,
       ledgerTransactions,
       ledgerEntries,
       clearingAccounts,
@@ -59,6 +65,9 @@ describe("database model contract", () => {
       "customer_document_files",
       "bank_accounts",
       "payment_orders",
+      "payment_instructions",
+      "payment_instruction_executions",
+      "processing_runs",
       "ledger_transactions",
       "ledger_entries",
       "clearing_entries",
@@ -73,6 +82,7 @@ describe("database model contract", () => {
       bankAccounts.availableBalance,
       overdraftFacilities.approvedLimit,
       paymentOrders.amount,
+      paymentInstructions.amount,
       ledgerTransactions.amount,
       ledgerEntries.amount,
       ledgerEntries.balanceAfter,
@@ -96,6 +106,9 @@ describe("database model contract", () => {
     expect(bankAccounts.accountNumber.isUnique).toBe(true);
     expect(paymentOrders.reference.isUnique).toBe(true);
     expect(paymentOrders.idempotencyKey.isUnique).toBe(true);
+    expect(paymentInstructions.reference.isUnique).toBe(true);
+    expect(paymentInstructionExecutions.idempotencyKey.isUnique).toBe(true);
+    expect(processingRuns.reference.isUnique).toBe(true);
     expect(ledgerTransactions.reference.isUnique).toBe(true);
   });
 

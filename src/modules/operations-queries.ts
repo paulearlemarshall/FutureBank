@@ -5,11 +5,11 @@ import { db } from "@/db";
 import {
   accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
-  paymentOrders, screeningChecks, workItemEvents, workItems,
+  paymentInstructionExecutions, paymentInstructions, paymentOrders, processingRuns, screeningChecks, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail,
+  KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, ProcessingRunView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -166,4 +166,85 @@ export async function listPayments(options: { status?: PaymentApprovalDetail["st
     .orderBy(desc(paymentOrders.createdAt));
   const details = await Promise.all(rows.map((row) => getPaymentApproval(row.reference)));
   return details.filter((item): item is PaymentApprovalDetail => item !== null);
+}
+
+export async function getPaymentInstruction(reference: string): Promise<PaymentInstructionView | null> {
+  await requireUser();
+  const [instruction] = await db.select().from(paymentInstructions).where(eq(paymentInstructions.reference, reference)).limit(1);
+  if (!instruction) return null;
+  const [[source], destinationRows, beneficiaryRows, [creator], executions] = await Promise.all([
+    db.select({ account: bankAccounts, customer: customers }).from(bankAccounts)
+      .innerJoin(customers, eq(bankAccounts.customerId, customers.id))
+      .where(eq(bankAccounts.id, instruction.sourceAccountId)).limit(1),
+    instruction.destinationAccountId
+      ? db.select({ accountNumber: bankAccounts.accountNumber }).from(bankAccounts).where(eq(bankAccounts.id, instruction.destinationAccountId)).limit(1)
+      : Promise.resolve([]),
+    instruction.beneficiaryId
+      ? db.select({ name: beneficiaries.name }).from(beneficiaries).where(eq(beneficiaries.id, instruction.beneficiaryId)).limit(1)
+      : Promise.resolve([]),
+    db.select({ username: user.username, email: user.email }).from(user).where(eq(user.id, instruction.createdBy)).limit(1),
+    db.select({ execution: paymentInstructionExecutions, paymentReference: paymentOrders.reference })
+      .from(paymentInstructionExecutions)
+      .leftJoin(paymentOrders, eq(paymentInstructionExecutions.paymentOrderId, paymentOrders.id))
+      .where(eq(paymentInstructionExecutions.instructionId, instruction.id))
+      .orderBy(desc(paymentInstructionExecutions.scheduledFor)),
+  ]);
+  if (!source) return null;
+  return {
+    reference: instruction.reference,
+    type: instruction.type,
+    status: instruction.status,
+    paymentType: instruction.paymentType,
+    sourceAccountNumber: source.account.accountNumber,
+    customerNumber: source.customer.customerNumber,
+    customerName: displayName(source.customer),
+    destinationReference: destinationRows[0]?.accountNumber ?? beneficiaryRows[0]?.name ?? "—",
+    amount: instruction.amount,
+    currency: instruction.currency,
+    description: instruction.description,
+    frequency: instruction.frequency,
+    startDate: instruction.startDate,
+    nextExecutionDate: instruction.nextExecutionDate,
+    endDate: instruction.endDate,
+    lastExecutionAt: instruction.lastExecutionAt ? iso(instruction.lastExecutionAt) : null,
+    createdBy: creator?.username ?? creator?.email ?? "Unknown",
+    cancellationReason: instruction.cancellationReason,
+    version: instruction.version,
+    executions: executions.map(({ execution, paymentReference }) => ({
+      scheduledFor: execution.scheduledFor,
+      status: execution.status,
+      paymentReference,
+      failureCode: execution.failureCode,
+      failureMessage: execution.failureMessage,
+      attemptedAt: iso(execution.attemptedAt),
+      completedAt: execution.completedAt ? iso(execution.completedAt) : null,
+    })),
+  };
+}
+
+export async function listPaymentInstructions(): Promise<PaymentInstructionView[]> {
+  await requireUser();
+  const rows = await db.select({ reference: paymentInstructions.reference }).from(paymentInstructions)
+    .orderBy(asc(paymentInstructions.nextExecutionDate), asc(paymentInstructions.reference));
+  const details = await Promise.all(rows.map((row) => getPaymentInstruction(row.reference)));
+  return details.filter((item): item is PaymentInstructionView => item !== null);
+}
+
+export async function listPaymentInstructionRuns(limit = 10): Promise<ProcessingRunView[]> {
+  await requireUser();
+  const rows = await db.select().from(processingRuns).where(eq(processingRuns.type, "PAYMENT_INSTRUCTIONS"))
+    .orderBy(desc(processingRuns.startedAt)).limit(limit);
+  return rows.map((run) => ({
+    reference: run.reference,
+    type: "PAYMENT_INSTRUCTIONS",
+    businessDate: run.businessDate,
+    status: run.status,
+    attempted: run.attempted,
+    booked: run.booked,
+    pending: run.pending,
+    failed: run.failed,
+    startedAt: iso(run.startedAt),
+    completedAt: run.completedAt ? iso(run.completedAt) : null,
+    errorMessage: run.errorMessage,
+  }));
 }

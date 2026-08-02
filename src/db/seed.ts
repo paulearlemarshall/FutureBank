@@ -8,6 +8,7 @@ import {
   baselineCustomerAddressOverrides,
   baselineCustomers,
   baselineProducts,
+  baselinePaymentInstructions,
   baselineTransactions,
   stableUuid,
   validateBaselineSeed,
@@ -34,6 +35,9 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.clearingEntries);
   await tx.delete(tables.ledgerEntries);
   await tx.delete(tables.ledgerTransactions);
+  await tx.delete(tables.paymentInstructionExecutions);
+  await tx.delete(tables.processingRuns);
+  await tx.delete(tables.paymentInstructions);
   await tx.delete(tables.paymentOrders);
   await tx.delete(tables.overdraftAlerts);
   await tx.delete(tables.overdraftUsageSnapshots);
@@ -277,6 +281,33 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   await tx.insert(tables.beneficiaries).values(baselineBeneficiaries.map((item) => ({
     ...item, customerId: customerId(item.customerNumber), status: item.status,
   })));
+
+  await tx.insert(tables.paymentInstructions).values(baselinePaymentInstructions.map((item) => {
+    const startDate = timeline.date(item.startOffsetDays);
+    return {
+      id: stableUuid(`payment-instruction-${item.reference}`),
+      reference: item.reference,
+      type: item.type,
+      status: item.status,
+      paymentType: item.paymentType,
+      sourceAccountId: bankAccountId(item.sourceAccountNumber),
+      destinationAccountId: item.destinationAccountNumber ? bankAccountId(item.destinationAccountNumber) : null,
+      beneficiaryId: item.beneficiaryKey ? stableUuid(item.beneficiaryKey) : null,
+      amount: item.amount,
+      currency: item.currency,
+      description: item.description,
+      frequency: item.frequency,
+      anchorDay: Number(startDate.slice(-2)),
+      startDate,
+      nextExecutionDate: startDate,
+      endDate: item.endOffsetDays === null ? null : timeline.date(item.endOffsetDays),
+      createdBy: staffId(item.createdBy),
+      cancelledBy: item.status === "CANCELLED" ? staffId("operator") : null,
+      cancellationReason: item.status === "CANCELLED" ? "Customer cancelled before the first occurrence" : null,
+      cancelledAt: item.status === "CANCELLED" ? timeline.instant(-1, 15) : null,
+      version: item.status === "CANCELLED" ? 2 : 1,
+    };
+  }));
 
   const pendingPaymentId = stableUuid("payment-pending-pep");
   const bookedPaymentId = stableUuid("payment-booked-approved");

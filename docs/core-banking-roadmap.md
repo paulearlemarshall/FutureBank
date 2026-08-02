@@ -1,8 +1,10 @@
 # Core-banking roadmap
 
-FutureBank v2 deliberately exposes only working navigation. The following representative modules are documented for later delivery and do not appear as inactive menu entries.
+FutureBank deliberately exposes only working navigation. Wave 1 delivered future-dated payments, weekly/monthly standing orders, cancellation, execution history and idempotent business-date processing through the existing payment and ledger controls.
 
-1. Standing orders, direct-debit mandates, scheduled payments, reversals, and statement export.
+The following representative modules remain documented for later delivery and do not appear as inactive menu entries.
+
+1. Direct-debit mandates, payment reversals, and statement export.
 2. Charges, interest accrual and posting, reconciliation, general ledger, and end-of-day processing.
 3. Loan origination, arrears, collections, collateral, and enterprise limits.
 4. Foreign exchange, term-deposit maturity and rollover, and bulk corporate payments.

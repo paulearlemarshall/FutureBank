@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.1.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, payments, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.2.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -50,6 +50,10 @@
     {
       "name": "Payments",
       "description": "Internal and external payment processing."
+    },
+    {
+      "name": "Payment instructions",
+      "description": "Future-dated payments, standing orders and idempotent due-instruction processing."
     },
     {
       "name": "KYC",
@@ -1232,6 +1236,270 @@
         },
         "operationId": "postPaymentsExpiryRun",
         "description": "Expire stale pending payments and release holds. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
+      }
+    },
+    "/payment-instructions": {
+      "get": {
+        "tags": [
+          "Payment instructions"
+        ],
+        "summary": "List future-dated payments and standing orders",
+        "responses": {
+          "200": {
+            "description": "Payment instruction register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PaymentInstruction"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listPaymentInstructions",
+        "description": "Lists future payment intent separately from payment orders and ledger bookings."
+      },
+      "post": {
+        "tags": [
+          "Payment instructions"
+        ],
+        "summary": "Create a future-dated payment or standing order",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInstructionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "createPaymentInstruction",
+        "description": "Creates future intent without reserving funds. The selected staff actor requires PAYMENT_INSTRUCTION_MAINTAIN permission."
+      }
+    },
+    "/payment-instructions/{instructionReference}": {
+      "get": {
+        "tags": [
+          "Payment instructions"
+        ],
+        "summary": "Get a payment instruction and execution history",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentInstructionReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment instruction detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PaymentInstruction"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getPaymentInstruction",
+        "description": "Returns schedule state plus every booked, pending or failed occurrence."
+      }
+    },
+    "/payment-instructions/{instructionReference}/cancellation": {
+      "post": {
+        "tags": [
+          "Payment instructions"
+        ],
+        "summary": "Cancel an active payment instruction",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentInstructionReference"
+          },
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInstructionCancellation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "cancelPaymentInstruction",
+        "description": "Cancels with optimistic version checking and rejects cancellation while an occurrence is processing."
+      }
+    },
+    "/payment-instructions/processing-runs": {
+      "get": {
+        "tags": [
+          "Payment instructions"
+        ],
+        "summary": "List recent due-instruction processing runs",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Processing run history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProcessingRun"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listPaymentInstructionProcessingRuns",
+        "description": "Lists recent batch outcomes and occurrence counters."
+      },
+      "post": {
+        "tags": [
+          "Payment instructions"
+        ],
+        "summary": "Execute all instructions due on a business date",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInstructionRunWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "runPaymentInstructions",
+        "description": "Claims due occurrences, rechecks live payment controls and uses a stable occurrence idempotency key before booking through the existing payment and ledger service."
       }
     },
     "/kyc-cases": {
@@ -2948,6 +3216,15 @@
           "type": "string"
         }
       },
+      "PaymentInstructionReference": {
+        "name": "instructionReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^PIN-"
+        }
+      },
       "CaseReference": {
         "name": "caseReference",
         "in": "path",
@@ -3401,6 +3678,106 @@
           }
         },
         "description": "PaymentWrite API data contract."
+      },
+      "PaymentInstructionWrite": {
+        "type": "object",
+        "description": "Future-dated or recurring payment intent. Scheduled instructions require ONCE; standing orders require WEEKLY or MONTHLY.",
+        "required": [
+          "type",
+          "paymentType",
+          "sourceAccountNumber",
+          "amount",
+          "description",
+          "frequency",
+          "startDate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "STANDING_ORDER"
+            ]
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "EXTERNAL"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "destinationAccountNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "beneficiaryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 140
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "ONCE",
+              "WEEKLY",
+              "MONTHLY"
+            ]
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentInstructionCancellation": {
+        "type": "object",
+        "description": "Optimistic cancellation request.",
+        "required": [
+          "expectedVersion",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        }
+      },
+      "PaymentInstructionRunWrite": {
+        "type": "object",
+        "description": "Business date for a due-instruction run.",
+        "required": [
+          "businessDate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
       },
       "DocumentSlot": {
         "type": "string",
@@ -4278,6 +4655,246 @@
           },
           "workItem": {
             "$ref": "#/components/schemas/WorkQueueItem",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentInstructionExecution": {
+        "type": "object",
+        "description": "One scheduled occurrence and its linked payment outcome.",
+        "required": [
+          "scheduledFor",
+          "status",
+          "paymentReference",
+          "failureCode",
+          "failureMessage",
+          "attemptedAt",
+          "completedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "scheduledFor": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "BOOKED",
+              "PENDING",
+              "FAILED"
+            ]
+          },
+          "paymentReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "attemptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentInstruction": {
+        "type": "object",
+        "description": "Future payment intent, schedule state and occurrence history. It does not represent reserved funds or a ledger booking.",
+        "required": [
+          "reference",
+          "type",
+          "status",
+          "paymentType",
+          "sourceAccountNumber",
+          "customerNumber",
+          "customerName",
+          "destinationReference",
+          "amount",
+          "currency",
+          "description",
+          "frequency",
+          "startDate",
+          "nextExecutionDate",
+          "endDate",
+          "lastExecutionAt",
+          "createdBy",
+          "cancellationReason",
+          "version",
+          "executions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "STANDING_ORDER"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "CANCELLED",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "EXTERNAL"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "destinationReference": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "ONCE",
+              "WEEKLY",
+              "MONTHLY"
+            ]
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "nextExecutionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "lastExecutionAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "executions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentInstructionExecution"
+            }
+          }
+        }
+      },
+      "ProcessingRun": {
+        "type": "object",
+        "description": "Outcome counters for one due-instruction processing run.",
+        "required": [
+          "reference",
+          "type",
+          "businessDate",
+          "status",
+          "attempted",
+          "booked",
+          "pending",
+          "failed",
+          "startedAt",
+          "completedAt",
+          "errorMessage"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PAYMENT_INSTRUCTIONS"
+            ]
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attempted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "booked": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
             "nullable": true
           }
         }

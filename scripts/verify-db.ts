@@ -49,6 +49,15 @@ async function main() {
   expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 19);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
+  expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);
+  expectEqual("active payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions where status = 'ACTIVE'`), 2);
+  expectEqual("cancelled payment instruction scenarios", await scalar(sql`select count(*)::int as value from payment_instructions where status = 'CANCELLED' and cancellation_reason is not null and version = 2`), 1);
+  expectEqual("invalid payment instruction targets", await scalar(sql`
+    select count(*)::int as value from payment_instructions where
+      (payment_type = 'INTERNAL' and (destination_account_id is null or beneficiary_id is not null)) or
+      (payment_type = 'EXTERNAL' and (beneficiary_id is null or destination_account_id is not null))
+  `), 0);
+  expectEqual("past-due active payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions where status = 'ACTIVE' and next_execution_date < current_date`), 0);
   expectEqual("KYC cases", await scalar(sql`select count(*)::int as value from kyc_cases`), 8);
   expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 9);
   expectEqual("active payment holds", await scalar(sql`select count(*)::int as value from account_holds where status = 'ACTIVE'`), 1);

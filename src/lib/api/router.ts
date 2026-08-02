@@ -20,14 +20,15 @@ import {
   resolveOverdraftAlertAction, setOverdraftStatusAction,
 } from "@/modules/actions/overdrafts";
 import { approvePendingPaymentAction, expirePendingPaymentsAction, rejectPendingPaymentAction } from "@/modules/actions/payments";
+import { cancelPaymentInstructionAction, createPaymentInstructionAction, runPaymentInstructionsAction } from "@/modules/actions/payment-instructions";
 import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/workflow";
 import {
   getAccount, getCustomer, getDashboardSummary, listAccounts, listAuditEvents, listBeneficiaries,
   listCustomers, listProducts,
 } from "@/modules/queries";
 import {
-  getKycCase, getOverdraftFacility, getPaymentApproval, getWorkItem, listKycCases,
-  listOverdraftFacilities, listPayments, listWorkQueue,
+  getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getWorkItem, listKycCases,
+  listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
   ApiError, binaryStreamResponse, formDataFromObject, integerQuery, jsonResponse, readJsonObject, responseForAction,
@@ -73,8 +74,8 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.0.0", openapi: "/api/openapi.json",
-      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      name: "FutureBank API", version: "1.2.0", openapi: "/api/openapi.json",
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -135,6 +136,15 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!item) notFound("Payment");
       return jsonResponse(item);
     }
+    if (segments[0] === "payment-instructions" && segments.length === 2 && segments[1] === "processing-runs") {
+      return jsonResponse(await listPaymentInstructionRuns(integerQuery(url, "limit", 10)));
+    }
+    if (segments[0] === "payment-instructions" && segments.length === 1) return jsonResponse(await listPaymentInstructions());
+    if (segments[0] === "payment-instructions" && segments.length === 2) {
+      const item = await getPaymentInstruction(segments[1]);
+      if (!item) notFound("Payment instruction");
+      return jsonResponse(item);
+    }
     if (segments[0] === "kyc-cases" && segments.length === 1) return jsonResponse(await listKycCases());
     if (segments[0] === "kyc-cases" && segments.length === 2) {
       const item = await getKycCase(segments[1]);
@@ -185,6 +195,15 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       return responseForAction(body.decision === "REJECT"
         ? await rejectPendingPaymentAction(initialActionState, form)
         : await approvePendingPaymentAction(initialActionState, form));
+    }
+    if (segments[0] === "payment-instructions" && segments.length === 1) {
+      return responseForAction(await createPaymentInstructionAction(initialActionState, await bodyForm(request)), 201);
+    }
+    if (segments[0] === "payment-instructions" && segments.length === 2 && segments[1] === "processing-runs") {
+      return responseForAction(await runPaymentInstructionsAction(initialActionState, await bodyForm(request)), 202);
+    }
+    if (segments[0] === "payment-instructions" && segments.length === 3 && segments[2] === "cancellation") {
+      return responseForAction(await cancelPaymentInstructionAction(initialActionState, await bodyForm(request, { reference: segments[1] })));
     }
     if (segments[0] === "kyc-cases" && segments.length === 1) {
       const body = await readJsonObject(request);

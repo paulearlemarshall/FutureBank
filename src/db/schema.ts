@@ -28,6 +28,11 @@ export const accountStatusEnum = pgEnum("account_status", ["ACTIVE", "BLOCKED", 
 export const beneficiaryStatusEnum = pgEnum("beneficiary_status", ["ACTIVE", "INACTIVE"]);
 export const paymentTypeEnum = pgEnum("payment_type", ["INTERNAL", "EXTERNAL"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["BOOKED", "PENDING", "REJECTED", "EXPIRED"]);
+export const paymentInstructionTypeEnum = pgEnum("payment_instruction_type", ["SCHEDULED", "STANDING_ORDER"]);
+export const paymentInstructionStatusEnum = pgEnum("payment_instruction_status", ["ACTIVE", "PAUSED", "CANCELLED", "COMPLETED", "FAILED"]);
+export const paymentInstructionFrequencyEnum = pgEnum("payment_instruction_frequency", ["ONCE", "WEEKLY", "MONTHLY"]);
+export const paymentInstructionExecutionStatusEnum = pgEnum("payment_instruction_execution_status", ["PROCESSING", "BOOKED", "PENDING", "FAILED"]);
+export const processingRunStatusEnum = pgEnum("processing_run_status", ["RUNNING", "COMPLETED", "FAILED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
 export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
 export const workItemStatusEnum = pgEnum("work_item_status", ["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
@@ -396,6 +401,68 @@ export const paymentOrders = pgTable("payment_orders", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   bookedAt: timestamp("booked_at", { withTimezone: true }),
 }, (table) => [index("payment_source_idx").on(table.sourceAccountId)]);
+
+export const paymentInstructions = pgTable("payment_instructions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  type: paymentInstructionTypeEnum("type").notNull(),
+  status: paymentInstructionStatusEnum("status").notNull().default("ACTIVE"),
+  paymentType: paymentTypeEnum("payment_type").notNull(),
+  sourceAccountId: uuid("source_account_id").notNull().references(() => bankAccounts.id, { onDelete: "restrict" }),
+  destinationAccountId: uuid("destination_account_id").references(() => bankAccounts.id, { onDelete: "restrict" }),
+  beneficiaryId: uuid("beneficiary_id").references(() => beneficiaries.id, { onDelete: "restrict" }),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  description: text("description").notNull(),
+  frequency: paymentInstructionFrequencyEnum("frequency").notNull(),
+  anchorDay: integer("anchor_day").notNull(),
+  startDate: date("start_date").notNull(),
+  nextExecutionDate: date("next_execution_date").notNull(),
+  endDate: date("end_date"),
+  lastExecutionAt: timestamp("last_execution_at", { withTimezone: true }),
+  createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+  cancellationReason: text("cancellation_reason"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [
+  index("payment_instructions_due_idx").on(table.status, table.nextExecutionDate),
+  index("payment_instructions_source_idx").on(table.sourceAccountId),
+]);
+
+export const processingRuns = pgTable("processing_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  type: text("type").notNull(),
+  businessDate: date("business_date").notNull(),
+  status: processingRunStatusEnum("status").notNull().default("RUNNING"),
+  requestedBy: text("requested_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  attempted: integer("attempted").notNull().default(0),
+  booked: integer("booked").notNull().default(0),
+  pending: integer("pending").notNull().default(0),
+  failed: integer("failed").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  errorMessage: text("error_message"),
+}, (table) => [index("processing_runs_type_date_idx").on(table.type, table.businessDate)]);
+
+export const paymentInstructionExecutions = pgTable("payment_instruction_executions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  instructionId: uuid("instruction_id").notNull().references(() => paymentInstructions.id, { onDelete: "restrict" }),
+  processingRunId: uuid("processing_run_id").references(() => processingRuns.id, { onDelete: "set null" }),
+  scheduledFor: date("scheduled_for").notNull(),
+  status: paymentInstructionExecutionStatusEnum("status").notNull().default("PROCESSING"),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  paymentOrderId: uuid("payment_order_id").references(() => paymentOrders.id, { onDelete: "set null" }),
+  failureCode: text("failure_code"),
+  failureMessage: text("failure_message"),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("payment_instruction_execution_occurrence_idx").on(table.instructionId, table.scheduledFor),
+  index("payment_instruction_execution_run_idx").on(table.processingRunId),
+]);
 
 export const ledgerTransactions = pgTable("ledger_transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
