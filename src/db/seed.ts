@@ -36,6 +36,9 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.workItemEvents);
   await tx.delete(tables.workItems);
   await tx.delete(tables.accountHolds);
+  await tx.delete(tables.loanRepayments);
+  await tx.delete(tables.loanDetails);
+  await tx.delete(tables.loanApplications);
   await tx.delete(tables.generalLedgerLines);
   await tx.delete(tables.generalLedgerJournals);
   await tx.delete(tables.reconciliationItems);
@@ -57,8 +60,6 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.overdraftUsageSnapshots);
   await tx.delete(tables.overdraftLimitHistory);
   await tx.delete(tables.overdraftFacilities);
-  await tx.delete(tables.loanRepayments);
-  await tx.delete(tables.loanDetails);
   await tx.delete(tables.accountStatusHistory);
   await tx.delete(tables.beneficiaries);
   await tx.delete(tables.bankAccounts);
@@ -405,6 +406,16 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     reason: "Duplicate supplier settlement identified during reconciliation", idempotencyKey: "SEED-REVERSAL-PENDING-0001",
     requestedBy: staffId("operator"), createdAt: timeline.instant(0, 10), updatedAt: timeline.instant(0, 10),
   });
+  await tx.insert(tables.loanApplications).values({
+    id: stableUuid("loan-application-pending"), reference: "LOA-000001", customerId: customerId("C000004"),
+    productId: productId("LOAN-GBP"), destinationAccountId: bankAccountId("1000000009"), branchId: branchId("LON001"),
+    principal: "48000.00", currency: "GBP", termMonths: 24, annualInterestRate: "6.2500",
+    firstPaymentDate: timeline.date(30), projectedInstallment: "2250.00", monthlyIncome: "30000.00",
+    monthlyCommitments: "7000.00", debtServiceRatio: "30.83", riskGrade: "B",
+    purpose: "Purchase fictional low-emission delivery vehicles", status: "PENDING_APPROVAL",
+    idempotencyKey: "SEED-LOAN-PENDING-0001", requestedBy: staffId("operator"), submittedAt: timeline.instant(0, 12),
+    createdAt: timeline.instant(0, 12), updatedAt: timeline.instant(0, 12),
+  });
   await tx.insert(tables.accountHolds).values([
     { id: stableUuid("hold-pending-pep"), reference: "HLD-000001", accountId: bankAccountId("1000000004"), paymentOrderId: pendingPaymentId, amount: "2500.00", currency: "AED", status: "ACTIVE", expiresAt: pendingScenarioExpiry },
     { id: stableUuid("hold-booked-approved"), reference: "HLD-000002", accountId: bankAccountId("1000000016"), paymentOrderId: bookedPaymentId, amount: bookedPaymentTransaction.amount, currency: "GBP", status: "CONSUMED", expiresAt: new Date("2026-07-18T18:00:00.000Z"), releasedAt: new Date("2026-07-18T16:30:00.000Z"), releaseReason: "Consumed when approved payment booked" },
@@ -423,6 +434,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: stableUuid("work-alert-resolved"), reference: "WRK-000009", type: "OVERDRAFT_ALERT" as const, status: "COMPLETED" as const, priority: "HIGH" as const, entityType: "OVERDRAFT_ALERT", entityReference: "ODA-000003", title: "Resolved high-utilization alert", description: "Historical intervention and resolution example.", requiredRole: "SUPERVISOR" as const, assignedTo: staffId("supervisor"), decisionComment: "Customer reduced utilization and supplied a cash-flow forecast.", completedAt: new Date("2026-07-04T10:00:00.000Z"), dueAt: new Date("2026-07-03T17:00:00.000Z") },
     { id: stableUuid("work-payment-reversal"), reference: "WRK-000010", type: "PAYMENT_REVERSAL" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "PAYMENT_REVERSAL", entityReference: "REV-000001", title: "Approve payment reversal REV-000001", description: "Review the duplicate supplier settlement and post an equal-and-opposite correction.", requiredRole: "SUPERVISOR" as const, dueAt: timeline.instant(1, 10) },
     { id: stableUuid("work-general-ledger-journal"), reference: "WRK-000011", type: "GENERAL_LEDGER_JOURNAL" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "GENERAL_LEDGER_JOURNAL", entityReference: "GLJ-000001", title: "Approve manual journal GLJ-000001", description: "Review the fictional accrual evidence before posting this manual journal.", requiredRole: "ADMIN" as const, dueAt: timeline.instant(1, 11) },
+    { id: stableUuid("work-loan-origination"), reference: "WRK-000012", type: "LOAN_ORIGINATION" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "LOAN_APPLICATION", entityReference: "LOA-000001", title: "Approve loan application LOA-000001", description: "Review current KYC, affordability, product terms and destination ownership before disbursement.", requiredRole: "SUPERVISOR" as const, dueAt: timeline.instant(2, 12) },
   ];
   await tx.insert(tables.workItems).values(seededWorkItems.map((item) => ({ ...item, createdBy: staffId(item.type === "GENERAL_LEDGER_JOURNAL" ? "supervisor" : "operator") })));
   const seededWorkItemEvents: Array<typeof tables.workItemEvents.$inferInsert> = [];
@@ -488,10 +500,14 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
       createdAt: new Date(item.bookedAt), updatedAt: new Date(item.bookedAt),
     })));
   }
-  const generalLedgerLineRows = baselineTransactions.flatMap((item) => [
-    { id: stableUuid(`general-ledger-line-${item.reference}-account`), journalId: stableUuid(`general-ledger-journal-${item.reference}`), accountId: generalLedgerAccountId(`2100-${item.currency}`), lineNumber: 1, direction: item.direction, amount: item.amount, narrative: `${item.reference} · ${item.description}`, createdAt: new Date(item.bookedAt) },
+  const generalLedgerLineRows = baselineTransactions.flatMap((item) => {
+    const account = baselineAccounts.find((candidate) => candidate.accountNumber === item.accountNumber)!;
+    const product = baselineProducts.find((candidate) => candidate.code === account.productCode)!;
+    return [
+    { id: stableUuid(`general-ledger-line-${item.reference}-account`), journalId: stableUuid(`general-ledger-journal-${item.reference}`), accountId: generalLedgerAccountId(`${product.kind === "LOAN" ? "1200" : "2100"}-${item.currency}`), lineNumber: 1, direction: item.direction, amount: item.amount, narrative: `${item.reference} · ${item.description}`, createdAt: new Date(item.bookedAt) },
     { id: stableUuid(`general-ledger-line-${item.reference}-clearing`), journalId: stableUuid(`general-ledger-journal-${item.reference}`), accountId: generalLedgerAccountId(`1100-${item.currency}`), lineNumber: 2, direction: item.direction === "DEBIT" ? "CREDIT" as const : "DEBIT" as const, amount: item.amount, narrative: `${item.reference} · ${item.description}`, createdAt: new Date(item.bookedAt) },
-  ]);
+  ];
+  });
   for (let offset = 0; offset < generalLedgerLineRows.length; offset += 100) {
     await tx.insert(tables.generalLedgerLines).values(generalLedgerLineRows.slice(offset, offset + 100));
   }

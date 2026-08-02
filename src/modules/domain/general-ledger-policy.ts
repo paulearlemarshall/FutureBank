@@ -13,13 +13,13 @@ function isValidDate(value: string): boolean {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 
-export function generalLedgerAccountCode(kind: "SETTLEMENT" | "CUSTOMER" | "FEE_INCOME" | "INTEREST_EXPENSE", currency: string): string {
-  const prefix = kind === "SETTLEMENT" ? "1100" : kind === "CUSTOMER" ? "2100" : kind === "FEE_INCOME" ? "4100" : "5100";
+export function generalLedgerAccountCode(kind: "SETTLEMENT" | "LOAN" | "CUSTOMER" | "FEE_INCOME" | "INTEREST_EXPENSE", currency: string): string {
+  const prefix = kind === "SETTLEMENT" ? "1100" : kind === "LOAN" ? "1200" : kind === "CUSTOMER" ? "2100" : kind === "FEE_INCOME" ? "4100" : "5100";
   return `${prefix}-${currency}`;
 }
 
-export function generalLedgerAccountCodeForLeg(input: { transactionType: string; legType: "ACCOUNT" | "CLEARING"; currency: string }): string {
-  if (input.legType === "ACCOUNT") return generalLedgerAccountCode("CUSTOMER", input.currency);
+export function generalLedgerAccountCodeForLeg(input: { transactionType: string; legType: "ACCOUNT" | "CLEARING"; accountKind?: string | null; currency: string }): string {
+  if (input.legType === "ACCOUNT") return generalLedgerAccountCode(input.accountKind === "LOAN" ? "LOAN" : "CUSTOMER", input.currency);
   if (input.transactionType === "ACCOUNT_CHARGE") return generalLedgerAccountCode("FEE_INCOME", input.currency);
   if (input.transactionType === "DEPOSIT_INTEREST") return generalLedgerAccountCode("INTEREST_EXPENSE", input.currency);
   return generalLedgerAccountCode("SETTLEMENT", input.currency);

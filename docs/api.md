@@ -1,6 +1,6 @@
 # FutureBank REST API
 
-The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, general-ledger journals and trial balances, accounting-period close, KYC, overdrafts and work items.
+The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, general-ledger journals and trial balances, accounting-period close, loan origination, KYC, overdrafts and work items.
 
 ## External discovery and accessibility
 
@@ -183,7 +183,7 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/accounting-periods/ACP-
 
 ## General ledger
 
-- `GET /general-ledger/accounts` returns the 16 seeded GBP/AED/USD/EUR settlement, customer-control, fee-income and interest-expense accounts.
+- `GET /general-ledger/accounts` returns the 20 seeded GBP/AED/USD/EUR settlement, customer-deposit, loan-receivable, fee-income and interest-expense accounts.
 - `GET /general-ledger/journals` and `GET /general-ledger/journals/{journalReference}` expose automated projections and manual-journal evidence.
 - `GET /general-ledger/trial-balance?toDate=YYYY-MM-DD&fromDate=YYYY-MM-DD&currency=GBP` aggregates posted journals only; `toDate` is required.
 - `POST /general-ledger/journals` lets a Supervisor submit a same-currency debit and credit with `Idempotency-Key`.
@@ -198,6 +198,23 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/general-ledger/journals
   -H "Idempotency-Key: manual-journal-demo-0001" \
   -H "Content-Type: application/json" \
   -d '{"valueDate":"2026-08-02","currency":"GBP","debitAccountCode":"5100-GBP","creditAccountCode":"1100-GBP","amount":"25.00","description":"Fictional accrual correction","comment":"Prepared from fictional period-end evidence."}'
+```
+
+## Loan origination
+
+- `GET /loans` and `GET /loans/{applicationReference}` expose applications, independent-work state and any booked repayment schedule.
+- `POST /loans` lets an Operator or Admin submit a proposal with `Idempotency-Key`; it does not move money.
+- `POST /loans/{applicationReference}/decision` lets a distinct Supervisor or Admin approve or reject using the work-item reference, expected version and evidence comment.
+
+Submission requires an active customer with approved KYC, no blocking restriction, an active loan product and the customer's own active same-currency deposit account. Principal is limited to 1,000.00–1,000,000.00, term to 6–60 months, and total projected debt service to 40% of monthly income. Approval rechecks every live control and the open posting date. It then atomically creates one read-only loan account, exact equal-principal/decreasing-interest schedule, balanced subledger disbursement, loan-receivable/customer-deposit GL projection and destination credit. Concurrent or retried approval cannot book twice; rejection has no accounting effect.
+
+```bash
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/loans" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.operator" \
+  -H "Idempotency-Key: loan-demo-0001" \
+  -H "Content-Type: application/json" \
+  -d '{"customerNumber":"C000004","productCode":"LOAN-GBP","destinationAccountNumber":"1000000009","principal":"12000.00","termMonths":12,"firstPaymentDate":"2026-09-01","monthlyIncome":"20000.00","monthlyCommitments":"1000.00","purpose":"Fictional working-capital demonstration evidence.","riskGrade":"B"}'
 ```
 
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.

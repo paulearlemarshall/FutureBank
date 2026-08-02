@@ -12,6 +12,8 @@ describe("maker-checker policy", () => {
     expect(canCheckWorkItem("ACCOUNTING_PERIOD_CLOSE", "SUPERVISOR")).toBe(false);
     expect(canCheckWorkItem("GENERAL_LEDGER_JOURNAL", "ADMIN")).toBe(true);
     expect(canCheckWorkItem("GENERAL_LEDGER_JOURNAL", "SUPERVISOR")).toBe(false);
+    expect(canCheckWorkItem("LOAN_ORIGINATION", "SUPERVISOR")).toBe(true);
+    expect(canCheckWorkItem("LOAN_ORIGINATION", "ADMIN")).toBe(true);
   });
 
   it("rejects self approval, stale versions and completed work", () => {

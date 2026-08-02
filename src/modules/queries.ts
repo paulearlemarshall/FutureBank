@@ -4,7 +4,7 @@ import { desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   addresses, auditEvents, bankAccounts, beneficiaries, branches, contactPoints, customerRelationships,
-  customerDocumentFiles, customers, identityDocuments, ledgerEntries, ledgerTransactions, loanDetails, loanRepayments, overdraftAlerts,
+  customerDocumentFiles, customers, identityDocuments, ledgerEntries, ledgerTransactions, loanApplications, loanDetails, loanRepayments, overdraftAlerts,
   overdraftFacilities, paymentOrders, products, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
@@ -185,6 +185,9 @@ export async function getAccount(accountNumber: string): Promise<AccountDetail |
     status: transaction.status,
   }));
   const [loan] = await db.select().from(loanDetails).where(eq(loanDetails.accountId, row.account.id)).limit(1);
+  const [application] = loan?.originationApplicationId
+    ? await db.select({ reference: loanApplications.reference }).from(loanApplications).where(eq(loanApplications.id, loan.originationApplicationId)).limit(1)
+    : [];
   const repayments = loan ? await db.select().from(loanRepayments).where(eq(loanRepayments.accountId, row.account.id)).orderBy(desc(loanRepayments.dueDate)) : [];
   const [facility] = await db.select({ reference: overdraftFacilities.reference }).from(overdraftFacilities)
     .where(sql`${overdraftFacilities.accountId} = ${row.account.id} and ${overdraftFacilities.status} in ('ACTIVE', 'PENDING_APPROVAL', 'PENDING_CHANGE', 'SUSPENDED')`)
@@ -197,12 +200,15 @@ export async function getAccount(accountNumber: string): Promise<AccountDetail |
     maturityDate: row.account.maturityDate,
     transactions,
     loan: loan ? {
+      applicationReference: application?.reference ?? null,
       originalPrincipal: loan.originalPrincipal,
       outstandingPrincipal: loan.outstandingPrincipal,
       interestRate: loan.interestRate,
       installmentAmount: loan.installmentAmount,
       nextPaymentDate: loan.nextPaymentDate,
-      repayments: repayments.map((item) => ({ dueDate: item.dueDate, paidAt: item.paidAt, principal: item.principal, interest: item.interest, status: item.status })),
+      termMonths: loan.termMonths,
+      maturityDate: loan.maturityDate,
+      repayments: repayments.map((item) => ({ sequence: item.sequence, dueDate: item.dueDate, paidAt: item.paidAt, principal: item.principal, interest: item.interest, status: item.status })),
     } : null,
   };
 }

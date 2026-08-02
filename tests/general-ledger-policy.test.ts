@@ -7,6 +7,8 @@ describe("general ledger policy", () => {
     expect(generalLedgerAccountCodeForLeg({ transactionType: "PAYMENT", legType: "CLEARING", currency: "GBP" })).toBe("1100-GBP");
     expect(generalLedgerAccountCodeForLeg({ transactionType: "ACCOUNT_CHARGE", legType: "CLEARING", currency: "AED" })).toBe("4100-AED");
     expect(generalLedgerAccountCodeForLeg({ transactionType: "DEPOSIT_INTEREST", legType: "CLEARING", currency: "AED" })).toBe("5100-AED");
+    expect(generalLedgerAccountCodeForLeg({ transactionType: "LOAN_ORIGINATION", legType: "ACCOUNT", accountKind: "LOAN", currency: "GBP" })).toBe("1200-GBP");
+    expect(generalLedgerAccountCodeForLeg({ transactionType: "LOAN_ORIGINATION", legType: "ACCOUNT", accountKind: "CURRENT", currency: "GBP" })).toBe("2100-GBP");
   });
 
   it("validates exact balanced manual journals", () => {

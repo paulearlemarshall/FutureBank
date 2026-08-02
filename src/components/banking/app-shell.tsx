@@ -24,6 +24,7 @@ const navGroups = [
       ["Reconciliation", "/reconciliation", "nav-reconciliation"],
       ["Accounting periods", "/accounting-periods", "nav-accounting-periods"],
       ["General ledger", "/general-ledger", "nav-general-ledger"],
+      ["Loan origination", "/loans", "nav-loans"],
       ["Arranged overdrafts", "/overdrafts", "nav-overdrafts"],
       ["Product catalogue", "/products", "nav-products"],
     ],

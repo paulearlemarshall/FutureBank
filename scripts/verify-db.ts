@@ -62,7 +62,8 @@ async function main() {
   expectEqual("seeded reconciliation runs", await scalar(sql`select count(*)::int as value from reconciliation_runs`), 0);
   expectEqual("accounting periods", await scalar(sql`select count(*)::int as value from accounting_periods`), 3);
   expectEqual("closed historical accounting periods", await scalar(sql`select count(*)::int as value from accounting_periods where reference = 'ACP-000003' and status = 'CLOSED' and closed_at is not null`), 1);
-  expectEqual("general ledger accounts", await scalar(sql`select count(*)::int as value from general_ledger_accounts where active and posting_allowed`), 16);
+  expectEqual("general ledger accounts", await scalar(sql`select count(*)::int as value from general_ledger_accounts where active and posting_allowed`), 20);
+  expectEqual("loan receivable control accounts", await scalar(sql`select count(*)::int as value from general_ledger_accounts where code like '1200-%' and type = 'ASSET' and system_controlled`), 4);
   expectEqual("pending manual general ledger journals", await scalar(sql`select count(*)::int as value from general_ledger_journals where reference = 'GLJ-000001' and source = 'MANUAL' and status = 'PENDING_APPROVAL' and total_debit = total_credit`), 1);
   expectEqual("subledger general ledger coverage", await scalar(sql`
     select count(*)::int as value from ledger_transactions ledger_transaction
@@ -79,6 +80,7 @@ async function main() {
     ) unbalanced
   `), 0);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
+  expectEqual("pending loan applications", await scalar(sql`select count(*)::int as value from loan_applications where reference = 'LOA-000001' and status = 'PENDING_APPROVAL' and loan_account_id is null and origination_transaction_id is null`), 1);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
   expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);
   expectEqual("direct debit mandates", await scalar(sql`select count(*)::int as value from direct_debit_mandates`), 3);
@@ -102,7 +104,7 @@ async function main() {
   expectEqual("KYC cases", await scalar(sql`select count(*)::int as value from kyc_cases`), 8);
   expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 9);
   expectEqual("active payment holds", await scalar(sql`select count(*)::int as value from account_holds where status = 'ACTIVE'`), 1);
-  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 7);
+  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 8);
   expectEqual("expired active payment scenarios", await scalar(sql`
     select count(*)::int as value from payment_orders where status = 'PENDING' and expires_at <= now()
   `), 0);

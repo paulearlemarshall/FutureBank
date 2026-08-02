@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { PaymentApprovalDetail, PaymentReversalView, WorkItemPriority, WorkItemStatus, WorkItemType } from "@/modules/contracts";
+import type { LoanApplicationStatus, PaymentApprovalDetail, PaymentReversalView, WorkItemPriority, WorkItemStatus, WorkItemType } from "@/modules/contracts";
 import { initialActionState } from "@/modules/contracts";
 import { requirePermission } from "@/lib/auth/session";
 import { isDocumentSlot } from "@/modules/domain/document-policy";
@@ -27,6 +27,7 @@ import { runEndOfDayAction } from "@/modules/actions/end-of-day";
 import { resolveReconciliationItemAction, runReconciliationAction } from "@/modules/actions/reconciliation";
 import { decideAccountingPeriodCloseAction, requestAccountingPeriodCloseAction } from "@/modules/actions/accounting-periods";
 import { createManualGeneralLedgerJournalAction, decideManualGeneralLedgerJournalAction } from "@/modules/actions/general-ledger";
+import { decideLoanApplicationAction, submitLoanApplicationAction } from "@/modules/actions/loan-originations";
 import { cancelPaymentInstructionAction, createPaymentInstructionAction, runPaymentInstructionsAction } from "@/modules/actions/payment-instructions";
 import { cancelDirectDebitMandateAction, createDirectDebitMandateAction, submitDirectDebitCollectionAction } from "@/modules/actions/direct-debits";
 import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/workflow";
@@ -35,7 +36,7 @@ import {
   listCustomers, listProducts,
 } from "@/modules/queries";
 import {
-  getAccountingPeriod, getDirectDebitMandate, getEndOfDayRun, getGeneralLedgerJournal, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getReconciliationRun, getTrialBalance, getWorkItem, listAccountingPeriods, listDirectDebitMandates, listEndOfDayRuns, listGeneralLedgerAccounts, listGeneralLedgerJournals, listKycCases, listReconciliationRuns,
+  getAccountingPeriod, getDirectDebitMandate, getEndOfDayRun, getGeneralLedgerJournal, getKycCase, getLoanApplication, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getReconciliationRun, getTrialBalance, getWorkItem, listAccountingPeriods, listDirectDebitMandates, listEndOfDayRuns, listGeneralLedgerAccounts, listGeneralLedgerJournals, listKycCases, listLoanApplications, listReconciliationRuns,
   listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPaymentReversals, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
@@ -44,8 +45,9 @@ import {
 
 const paymentStatuses = new Set<PaymentApprovalDetail["status"]>(["BOOKED", "PENDING", "REJECTED", "EXPIRED"]);
 const paymentReversalStatuses = new Set<PaymentReversalView["status"]>(["PENDING_APPROVAL", "BOOKED", "REJECTED"]);
+const loanApplicationStatuses = new Set<LoanApplicationStatus>(["PENDING_APPROVAL", "APPROVED", "REJECTED"]);
 const workStatuses = new Set<WorkItemStatus>(["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
-const workTypes = new Set<WorkItemType>(["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE", "GENERAL_LEDGER_JOURNAL"]);
+const workTypes = new Set<WorkItemType>(["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE", "GENERAL_LEDGER_JOURNAL", "LOAN_ORIGINATION"]);
 const priorities = new Set<WorkItemPriority>(["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 
 function notFound(resource = "API route"): never {
@@ -97,8 +99,8 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.8.0", openapi: "/api/openapi.json",
-      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      name: "FutureBank API", version: "1.9.0", openapi: "/api/openapi.json",
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -231,6 +233,12 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!item) notFound("General-ledger journal");
       return jsonResponse(item);
     }
+    if (segments[0] === "loans" && segments.length === 1) return jsonResponse(await listLoanApplications({ status: enumQuery(url, "status", loanApplicationStatuses) }));
+    if (segments[0] === "loans" && segments.length === 2) {
+      const item = await getLoanApplication(segments[1]);
+      if (!item) notFound("Loan application");
+      return jsonResponse(item);
+    }
     if (segments[0] === "kyc-cases" && segments.length === 1) return jsonResponse(await listKycCases());
     if (segments[0] === "kyc-cases" && segments.length === 2) {
       const item = await getKycCase(segments[1]);
@@ -328,6 +336,14 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     }
     if (segments[0] === "general-ledger" && segments.length === 4 && segments[1] === "journals" && segments[3] === "decision") {
       return responseForAction(await decideManualGeneralLedgerJournalAction(initialActionState, await bodyForm(request, { journalReference: segments[2] })));
+    }
+    if (segments[0] === "loans" && segments.length === 1) {
+      const body = await readJsonObject(request);
+      const idempotencyKey = request.headers.get("idempotency-key")?.trim() || body.idempotencyKey;
+      return responseForAction(await submitLoanApplicationAction(initialActionState, formDataFromObject({ ...body, idempotencyKey })), 201);
+    }
+    if (segments[0] === "loans" && segments.length === 3 && segments[2] === "decision") {
+      return responseForAction(await decideLoanApplicationAction(initialActionState, await bodyForm(request, { applicationReference: segments[1] })));
     }
     if (segments[0] === "kyc-cases" && segments.length === 1) {
       const body = await readJsonObject(request);

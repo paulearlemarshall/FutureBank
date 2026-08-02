@@ -19,6 +19,7 @@ import {
   ledgerEntries,
   ledgerTransactions,
   loanDetails,
+  loanApplications,
   loanRepayments,
   overdraftFacilities,
   paymentInstructionExecutions,
@@ -71,6 +72,7 @@ describe("database model contract", () => {
       clearingAccounts,
       clearingEntries,
       loanDetails,
+      loanApplications,
       loanRepayments,
       auditEvents,
     ].map(tableName);
@@ -99,6 +101,7 @@ describe("database model contract", () => {
       "ledger_entries",
       "clearing_entries",
       "loan_details",
+      "loan_applications",
       "audit_events",
     ]));
   });
@@ -125,6 +128,10 @@ describe("database model contract", () => {
       loanDetails.originalPrincipal,
       loanDetails.outstandingPrincipal,
       loanDetails.installmentAmount,
+      loanApplications.principal,
+      loanApplications.projectedInstallment,
+      loanApplications.monthlyIncome,
+      loanApplications.monthlyCommitments,
       loanRepayments.principal,
       loanRepayments.interest,
     ];
@@ -142,6 +149,8 @@ describe("database model contract", () => {
     expect(paymentReversals.reference.isUnique).toBe(true);
     expect(paymentReversals.idempotencyKey.isUnique).toBe(true);
     expect(paymentInstructions.reference.isUnique).toBe(true);
+    expect(loanApplications.reference.isUnique).toBe(true);
+    expect(loanApplications.idempotencyKey.isUnique).toBe(true);
     expect(paymentInstructionExecutions.idempotencyKey.isUnique).toBe(true);
     expect(processingRuns.reference.isUnique).toBe(true);
     expect(endOfDayRuns.reference.isUnique).toBe(true);

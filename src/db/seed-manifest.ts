@@ -106,6 +106,7 @@ export const baselineProductChargeRules = [
 
 export const baselineGeneralLedgerAccounts = ["GBP", "AED", "USD", "EUR"].flatMap((currency) => [
   { code: `1100-${currency}`, name: `${currency} settlement clearing`, type: "ASSET" as const, currency, systemControlled: true },
+  { code: `1200-${currency}`, name: `${currency} loan receivables`, type: "ASSET" as const, currency, systemControlled: true },
   { code: `2100-${currency}`, name: `${currency} customer deposit control`, type: "LIABILITY" as const, currency, systemControlled: true },
   { code: `4100-${currency}`, name: `${currency} fee income`, type: "INCOME" as const, currency, systemControlled: false },
   { code: `5100-${currency}`, name: `${currency} deposit interest expense`, type: "EXPENSE" as const, currency, systemControlled: false },
@@ -196,7 +197,7 @@ export function validateBaselineSeed(): string[] {
   if (baselinePaymentInstructions.length !== 3) errors.push("Expected three payment instruction scenarios");
   if (baselineDirectDebitMandates.length !== 3) errors.push("Expected three direct debit mandate scenarios");
   if (baselineProductChargeRules.length !== 2) errors.push("Expected two daily overdraft charge rules");
-  if (baselineGeneralLedgerAccounts.length !== 16) errors.push("Expected sixteen currency general-ledger accounts");
+  if (baselineGeneralLedgerAccounts.length !== 20) errors.push("Expected twenty currency general-ledger accounts");
   if (baselineTransactions.filter((item) => item.valueDate === "2026-07-18").length !== 18) errors.push("Expected eighteen internal clearing entries for the reconciliation scenario");
   return errors;
 }

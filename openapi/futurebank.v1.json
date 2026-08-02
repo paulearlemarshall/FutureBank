@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.8.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.9.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -78,6 +78,10 @@
     {
       "name": "General ledger",
       "description": "Multi-currency chart of accounts, exact subledger projection, controlled manual journals and posted trial balances."
+    },
+    {
+      "name": "Loans",
+      "description": "Affordability-controlled loan applications, independent decisions, exact schedules and atomic disbursement."
     },
     {
       "name": "KYC",
@@ -2844,6 +2848,216 @@
         "description": "A distinct Admin locks the work item and journal, rechecks the open accounting period, account availability, currency and exact balance, then posts once or rejects without movement."
       }
     },
+    "/loans": {
+      "get": {
+        "tags": [
+          "Loans"
+        ],
+        "summary": "List loan applications",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_APPROVAL",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan-application register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LoanApplicationSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listLoanApplications",
+        "description": "Lists pending, approved or rejected loan proposals with snapshotted terms, affordability ratio and booking references."
+      },
+      "post": {
+        "tags": [
+          "Loans"
+        ],
+        "summary": "Submit a loan application",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanApplicationWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "submitLoanApplication",
+        "description": "An Operator submits exact fictional affordability data against an active loan product and the customer's own currency-matched deposit account. The proposal is idempotent and creates a Supervisor approval item without ledger movement."
+      }
+    },
+    "/loans/{applicationReference}": {
+      "get": {
+        "tags": [
+          "Loans"
+        ],
+        "summary": "Get a loan application",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LoanApplicationReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan application, decision evidence, booking references and schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/LoanApplication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getLoanApplication",
+        "description": "Returns exact terms, affordability inputs, maker-checker evidence and the generated repayment schedule after approval."
+      }
+    },
+    "/loans/{applicationReference}/decision": {
+      "post": {
+        "tags": [
+          "Loans"
+        ],
+        "summary": "Approve or reject a loan application",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LoanApplicationReference"
+          },
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanApplicationDecisionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "decideLoanApplication",
+        "description": "A distinct Supervisor or Admin locks and rechecks current KYC, restrictions, affordability, product, destination, posting period and terms. Approval creates one loan account, exact schedule, balanced subledger transaction, general-ledger projection and destination credit atomically; rejection creates no financial movement."
+      }
+    },
     "/kyc-cases": {
       "get": {
         "tags": [
@@ -4630,6 +4844,15 @@
           "pattern": "^(GL-|GLJ-)"
         }
       },
+      "LoanApplicationReference": {
+        "name": "applicationReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^LOA-"
+        }
+      },
       "CaseReference": {
         "name": "caseReference",
         "in": "path",
@@ -5942,7 +6165,8 @@
               "OVERDRAFT_CHANGE",
               "OVERDRAFT_ALERT",
               "ACCOUNTING_PERIOD_CLOSE",
-              "GENERAL_LEDGER_JOURNAL"
+              "GENERAL_LEDGER_JOURNAL",
+              "LOAN_ORIGINATION"
             ]
           },
           "status": {
@@ -7670,6 +7894,306 @@
         }
       },
       "GeneralLedgerJournalDecisionWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workItemReference",
+          "expectedVersion",
+          "decision",
+          "comment"
+        ],
+        "properties": {
+          "workItemReference": {
+            "type": "string",
+            "pattern": "^WRK-"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
+      },
+      "LoanApplicationSummary": {
+        "type": "object",
+        "required": [
+          "reference",
+          "customerNumber",
+          "customerName",
+          "productCode",
+          "destinationAccountNumber",
+          "principal",
+          "approvedPrincipal",
+          "currency",
+          "termMonths",
+          "annualInterestRate",
+          "firstPaymentDate",
+          "projectedInstallment",
+          "debtServiceRatio",
+          "riskGrade",
+          "purpose",
+          "status",
+          "loanAccountNumber",
+          "submittedBy",
+          "submittedAt",
+          "decidedBy",
+          "decisionComment",
+          "decidedAt",
+          "version",
+          "workItem"
+        ],
+        "properties": {
+          "reference": {
+            "type": "string",
+            "pattern": "^LOA-"
+          },
+          "customerNumber": {
+            "type": "string",
+            "pattern": "^C[0-9]{6}$"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "destinationAccountNumber": {
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "approvedPrincipal": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "termMonths": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 60
+          },
+          "annualInterestRate": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,4})?$"
+          },
+          "firstPaymentDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "projectedInstallment": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "debtServiceRatio": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+          },
+          "riskGrade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_APPROVAL",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "loanAccountNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedBy": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "workItem": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkQueueItem"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "LoanScheduleLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "dueDate",
+          "paidAt",
+          "principal",
+          "interest",
+          "status"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "interest": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "LoanApplication": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/LoanApplicationSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "monthlyIncome",
+              "monthlyCommitments",
+              "originationTransactionReference",
+              "schedule"
+            ],
+            "properties": {
+              "monthlyIncome": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "monthlyCommitments": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "originationTransactionReference": {
+                "type": "string",
+                "nullable": true
+              },
+              "schedule": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LoanScheduleLine"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "LoanApplicationWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "customerNumber",
+          "productCode",
+          "destinationAccountNumber",
+          "principal",
+          "termMonths",
+          "firstPaymentDate",
+          "monthlyIncome",
+          "monthlyCommitments",
+          "purpose",
+          "riskGrade"
+        ],
+        "properties": {
+          "customerNumber": {
+            "type": "string",
+            "pattern": "^C[0-9]{6}$"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "destinationAccountNumber": {
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "termMonths": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 60
+          },
+          "firstPaymentDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "monthlyIncome": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "monthlyCommitments": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "riskGrade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ]
+          }
+        }
+      },
+      "LoanApplicationDecisionWrite": {
         "type": "object",
         "additionalProperties": false,
         "required": [

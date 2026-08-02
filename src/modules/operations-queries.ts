@@ -4,12 +4,12 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   accountHolds, accountingPeriods, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, generalLedgerAccounts, generalLedgerJournals, generalLedgerLines, ledgerTransactions,
-  kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
-  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, reconciliationItems, reconciliationRuns, screeningChecks, settlementRecords, user, workItemEvents, workItems,
+  kycCases, kycEvidence, kycRiskFactors, loanApplications, loanRepayments, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
+  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, products, reconciliationItems, reconciliationRuns, screeningChecks, settlementRecords, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  AccountingPeriodView, DirectDebitMandateView, EndOfDayRunView, GeneralLedgerAccountView, GeneralLedgerJournalView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView, TrialBalanceView,
+  AccountingPeriodView, DirectDebitMandateView, EndOfDayRunView, GeneralLedgerAccountView, GeneralLedgerJournalView, KycCaseDetail, KycCaseSummary, LoanApplicationDetail, LoanApplicationStatus, LoanApplicationSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView, TrialBalanceView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -158,6 +158,62 @@ export async function getPaymentApproval(reference: string): Promise<PaymentAppr
     workItem: workRows[0] ? mapWorkItem(workRows[0]) : null,
     reversal,
   };
+}
+
+export async function listLoanApplications(options: { status?: LoanApplicationStatus } = {}): Promise<LoanApplicationSummary[]> {
+  await requireUser();
+  const rows = await db.select({ application: loanApplications, customer: customers, product: products, destination: bankAccounts })
+    .from(loanApplications).innerJoin(customers, eq(loanApplications.customerId, customers.id))
+    .innerJoin(products, eq(loanApplications.productId, products.id))
+    .innerJoin(bankAccounts, eq(loanApplications.destinationAccountId, bankAccounts.id))
+    .where(options.status ? eq(loanApplications.status, options.status) : undefined)
+    .orderBy(desc(loanApplications.submittedAt), loanApplications.reference);
+  if (!rows.length) return [];
+  const actorIds = [...new Set(rows.flatMap(({ application }) => [application.requestedBy, application.decidedBy]).filter((id): id is string => Boolean(id)))];
+  const loanAccountIds = rows.map(({ application }) => application.loanAccountId).filter((id): id is string => Boolean(id));
+  const references = rows.map(({ application }) => application.reference);
+  const [actors, loanAccounts, workRows] = await Promise.all([
+    db.select({ id: user.id, username: user.username, email: user.email }).from(user).where(inArray(user.id, actorIds)),
+    loanAccountIds.length ? db.select({ id: bankAccounts.id, accountNumber: bankAccounts.accountNumber }).from(bankAccounts).where(inArray(bankAccounts.id, loanAccountIds)) : Promise.resolve([]),
+    db.select().from(workItems).where(and(eq(workItems.entityType, "LOAN_APPLICATION"), inArray(workItems.entityReference, references))).orderBy(desc(workItems.createdAt)),
+  ]);
+  const actorById = new Map(actors.map((actor) => [actor.id, actor.username ?? actor.email]));
+  const accountById = new Map(loanAccounts.map((account) => [account.id, account.accountNumber]));
+  const workByReference = new Map<string, typeof workItems.$inferSelect>();
+  for (const item of workRows) if (!workByReference.has(item.entityReference)) workByReference.set(item.entityReference, item);
+  return rows.map(({ application, customer, product, destination }) => {
+    const work = workByReference.get(application.reference);
+    return {
+      reference: application.reference, customerNumber: customer.customerNumber, customerName: displayName(customer),
+      productCode: product.code, destinationAccountNumber: destination.accountNumber, principal: application.principal,
+      approvedPrincipal: application.approvedPrincipal, currency: application.currency, termMonths: application.termMonths,
+      annualInterestRate: application.annualInterestRate, firstPaymentDate: application.firstPaymentDate,
+      projectedInstallment: application.projectedInstallment, debtServiceRatio: application.debtServiceRatio,
+      riskGrade: application.riskGrade, purpose: application.purpose, status: application.status,
+      loanAccountNumber: application.loanAccountId ? accountById.get(application.loanAccountId) ?? null : null,
+      submittedBy: actorById.get(application.requestedBy) ?? "Unknown", submittedAt: iso(application.submittedAt),
+      decidedBy: application.decidedBy ? actorById.get(application.decidedBy) ?? null : null,
+      decisionComment: application.decisionComment, decidedAt: application.decidedAt ? iso(application.decidedAt) : null,
+      version: application.version, workItem: work ? mapWorkItem(work) : null,
+    };
+  });
+}
+
+export async function getLoanApplication(reference: string): Promise<LoanApplicationDetail | null> {
+  await requireUser();
+  const [application] = await db.select().from(loanApplications).where(eq(loanApplications.reference, reference)).limit(1);
+  if (!application) return null;
+  const summaries = await listLoanApplications();
+  const summary = summaries.find((item) => item.reference === reference);
+  if (!summary) return null;
+  const [schedule, transactionRows] = await Promise.all([
+    application.loanAccountId ? db.select().from(loanRepayments).where(eq(loanRepayments.accountId, application.loanAccountId)).orderBy(asc(loanRepayments.sequence), asc(loanRepayments.dueDate)) : Promise.resolve([]),
+    application.originationTransactionId ? db.select({ reference: ledgerTransactions.reference }).from(ledgerTransactions).where(eq(ledgerTransactions.id, application.originationTransactionId)).limit(1) : Promise.resolve([]),
+  ]);
+  return { ...summary, monthlyIncome: application.monthlyIncome, monthlyCommitments: application.monthlyCommitments,
+    originationTransactionReference: transactionRows[0]?.reference ?? null,
+    schedule: schedule.map((line) => ({ sequence: line.sequence, dueDate: line.dueDate, paidAt: line.paidAt,
+      principal: line.principal, interest: line.interest, status: line.status })) };
 }
 
 export async function listPendingPayments(): Promise<PaymentApprovalDetail[]> {

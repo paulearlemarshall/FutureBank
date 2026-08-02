@@ -23,6 +23,9 @@ test("serves the OpenAPI 3 artifact without authentication", async ({ request })
   expect(document.paths["/general-ledger/trial-balance"].get).toBeDefined();
   expect(document.paths["/general-ledger/journals"].post).toBeDefined();
   expect(document.paths["/general-ledger/journals/{journalReference}/decision"].post).toBeDefined();
+  expect(document.paths["/loans"].post).toBeDefined();
+  expect(document.paths["/loans/{applicationReference}"].get).toBeDefined();
+  expect(document.paths["/loans/{applicationReference}/decision"].post).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
@@ -117,7 +120,7 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.8.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.9.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
@@ -132,7 +135,7 @@ test("reads the deterministic chart, journal register and posted trial balance",
   const headers = { "X-API-Key": apiKey! };
   const accounts = await request.get("/api/v1/general-ledger/accounts", { headers });
   expect(accounts.ok()).toBe(true);
-  expect((await accounts.json()).data).toHaveLength(16);
+  expect((await accounts.json()).data).toHaveLength(20);
   const journals = await request.get("/api/v1/general-ledger/journals", { headers });
   expect(journals.ok()).toBe(true);
   expect((await journals.json()).data).toEqual(expect.arrayContaining([expect.objectContaining({ reference: "GLJ-000001", source: "MANUAL", status: "PENDING_APPROVAL" })]));
@@ -142,6 +145,29 @@ test("reads the deterministic chart, journal register and posted trial balance",
   const trial = await request.get("/api/v1/general-ledger/trial-balance?toDate=2026-08-02", { headers });
   expect(trial.ok()).toBe(true);
   expect((await trial.json()).data).toMatchObject({ balanced: true, currency: null });
+});
+
+test("discovers the deterministic pending loan application and empty pre-booking schedule", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const headers = { "X-API-Key": apiKey! };
+  const list = await request.get("/api/v1/loans", { headers });
+  expect(list.ok()).toBe(true);
+  expect((await list.json()).data).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      reference: "LOA-000001",
+      customerNumber: "C000004",
+      status: "PENDING_APPROVAL",
+      principal: "48000.00",
+      debtServiceRatio: "30.83",
+    }),
+  ]));
+  const detail = await request.get("/api/v1/loans/LOA-000001", { headers });
+  expect(detail.ok()).toBe(true);
+  expect((await detail.json()).data).toMatchObject({
+    reference: "LOA-000001",
+    workItem: { reference: "WRK-000012", status: "OPEN" },
+    schedule: [],
+  });
 });
 
 test("discovers accounting periods and enforces close evidence through the API", async ({ request }) => {

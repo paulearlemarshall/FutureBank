@@ -201,7 +201,7 @@ export type AccountDetail = AccountListItem & {
 };
 
 export type WorkItemStatus = "OPEN" | "ASSIGNED" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
-export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT" | "ACCOUNTING_PERIOD_CLOSE" | "GENERAL_LEDGER_JOURNAL";
+export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT" | "ACCOUNTING_PERIOD_CLOSE" | "GENERAL_LEDGER_JOURNAL" | "LOAN_ORIGINATION";
 export type WorkItemPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
 export type WorkQueueItem = {
@@ -618,12 +618,59 @@ export type DirectDebitMandateView = {
 };
 
 export type LoanView = {
+  applicationReference: string | null;
   originalPrincipal: string;
   outstandingPrincipal: string;
   interestRate: string;
   installmentAmount: string;
   nextPaymentDate: string;
+  termMonths: number | null;
+  maturityDate: string | null;
   repayments: Array<{
+    sequence: number | null;
+    dueDate: string;
+    paidAt: string | null;
+    principal: string;
+    interest: string;
+    status: string;
+  }>;
+};
+
+export type LoanApplicationStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+
+export type LoanApplicationSummary = {
+  reference: string;
+  customerNumber: string;
+  customerName: string;
+  productCode: string;
+  destinationAccountNumber: string;
+  principal: string;
+  approvedPrincipal: string | null;
+  currency: string;
+  termMonths: number;
+  annualInterestRate: string;
+  firstPaymentDate: string;
+  projectedInstallment: string;
+  debtServiceRatio: string;
+  riskGrade: string;
+  purpose: string;
+  status: LoanApplicationStatus;
+  loanAccountNumber: string | null;
+  submittedBy: string;
+  submittedAt: string;
+  decidedBy: string | null;
+  decisionComment: string | null;
+  decidedAt: string | null;
+  version: number;
+  workItem: WorkQueueItem | null;
+};
+
+export type LoanApplicationDetail = LoanApplicationSummary & {
+  monthlyIncome: string;
+  monthlyCommitments: string;
+  originationTransactionReference: string | null;
+  schedule: Array<{
+    sequence: number | null;
     dueDate: string;
     paidAt: string | null;
     principal: string;

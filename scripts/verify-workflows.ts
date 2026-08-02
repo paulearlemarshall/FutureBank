@@ -11,6 +11,7 @@ import { runEndOfDay } from "../src/modules/services/end-of-day";
 import { resolveReconciliationItem, runClearingReconciliation } from "../src/modules/services/reconciliation";
 import { assertPostingDateOpen, decideAccountingPeriodClose, requestAccountingPeriodClose } from "../src/modules/services/accounting-periods";
 import { decideManualGeneralLedgerJournal } from "../src/modules/services/general-ledger";
+import { decideLoanApplication } from "../src/modules/services/loan-originations";
 import { BankingError } from "../src/modules/services/errors";
 
 async function main() {
@@ -56,6 +57,32 @@ async function main() {
     `);
     const journalRow = journalResult.rows[0] as unknown as Record<string, number>;
     if (Number(journalRow.journals) !== 1 || Number(journalRow.lines) !== 2 || Number(journalRow.approved_work_items) !== 1) throw new Error("Approved manual journal did not retain balanced maker-checker evidence");
+
+    const loanAttempts = await Promise.allSettled([
+      decideLoanApplication({ applicationReference: "LOA-000001", workItemReference: "WRK-000012", expectedVersion: 1, decision: "APPROVE", comment: "Concurrent independent loan-origination approval A." }, supervisor),
+      decideLoanApplication({ applicationReference: "LOA-000001", workItemReference: "WRK-000012", expectedVersion: 1, decision: "APPROVE", comment: "Concurrent independent loan-origination approval B." }, supervisor),
+    ]);
+    if (loanAttempts.filter((item) => item.status === "fulfilled").length !== 1 || loanAttempts.filter((item) => item.status === "rejected").length !== 1) {
+      const outcomes = loanAttempts.map((item) => item.status === "fulfilled" ? "fulfilled" : `rejected:${item.reason instanceof Error ? item.reason.message : String(item.reason)}`).join(", ");
+      throw new Error(`Loan-origination race did not produce exactly one successful decision (${outcomes})`);
+    }
+    const loanResult = await db.execute(sql`
+      select
+        (select count(*)::int from loan_applications where reference = 'LOA-000001' and status = 'APPROVED' and version = 2 and approved_principal = 48000.00) as applications,
+        (select count(*)::int from bank_accounts account join loan_applications application on application.loan_account_id = account.id where application.reference = 'LOA-000001' and account.read_only and account.balance = 48000.00) as accounts,
+        (select count(*)::int from loan_details detail join loan_applications application on application.id = detail.origination_application_id where application.reference = 'LOA-000001' and detail.term_months = 24 and detail.outstanding_principal = 48000.00) as details,
+        (select count(*)::int from loan_repayments repayment join loan_applications application on application.loan_account_id = repayment.account_id where application.reference = 'LOA-000001' and repayment.status = 'SCHEDULED') as schedule_lines,
+        (select coalesce(sum(repayment.principal), 0)::text from loan_repayments repayment join loan_applications application on application.loan_account_id = repayment.account_id where application.reference = 'LOA-000001') as scheduled_principal,
+        (select count(*)::int from ledger_entries entry join loan_applications application on application.origination_transaction_id = entry.transaction_id where application.reference = 'LOA-000001') as ledger_entries,
+        (select count(*)::int from general_ledger_journals journal join loan_applications application on application.origination_transaction_id = journal.source_ledger_transaction_id where application.reference = 'LOA-000001' and journal.status = 'POSTED' and journal.total_debit = journal.total_credit) as journals,
+        (select count(*)::int from general_ledger_lines line join general_ledger_journals journal on journal.id = line.journal_id join loan_applications application on application.origination_transaction_id = journal.source_ledger_transaction_id join general_ledger_accounts account on account.id = line.account_id where application.reference = 'LOA-000001' and account.code in ('1200-GBP', '2100-GBP')) as control_lines,
+        (select count(*)::int from work_items where reference = 'WRK-000012' and status = 'APPROVED' and version = 2) as approved_work_items,
+        (select count(*)::int from bank_accounts where account_number = '1000000009' and balance = 390190.44) as disbursements
+    `);
+    const loanRow = loanResult.rows[0] as unknown as Record<string, number | string>;
+    const expectedLoan = { applications: 1, accounts: 1, details: 1, schedule_lines: 24, ledger_entries: 2, journals: 1, control_lines: 2, approved_work_items: 1, disbursements: 1 };
+    for (const [label, expected] of Object.entries(expectedLoan)) if (Number(loanRow[label]) !== expected) throw new Error(`loan origination ${label}: expected ${expected}, received ${loanRow[label]}`);
+    if (String(loanRow.scheduled_principal) !== "48000.00") throw new Error(`loan origination scheduled principal: expected 48000.00, received ${loanRow.scheduled_principal}`);
 
     const scheduleDateResult = await db.execute(sql`select next_execution_date::text as value from payment_instructions where reference = 'PIN-000001'`);
     const businessDate = String((scheduleDateResult.rows[0] as { value: string }).value);
@@ -188,7 +215,7 @@ async function main() {
     } catch (error) {
       if (!(error instanceof BankingError) || error.code !== "ACCOUNTING_PERIOD_CLOSED") throw error;
     }
-    console.info("Workflow integration verification passed: locking prevented duplicate decisions; scheduled, direct-debit, reversal, charge, and interest postings projected exactly once into balanced general-ledger journals; clearing evidence was fully resolved; and independent period close froze the value date.");
+    console.info("Workflow integration verification passed: locking prevented duplicate payment, journal, loan, and reversal decisions; loan origination created one exact schedule and atomic disbursement; all runtime postings projected exactly once into balanced general-ledger journals; clearing evidence was fully resolved; and independent period close froze the value date.");
   } finally {
     await resetBaseline(db, admin);
   }

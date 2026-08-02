@@ -92,6 +92,20 @@
       "when": 1785682893213,
       "tag": "0012_backfill-general-ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785685935941,
+      "tag": "0013_early_karma",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785685953705,
+      "tag": "0014_loan-ledger-backfill",
+      "breakpoints": true
     }
   ]
 }

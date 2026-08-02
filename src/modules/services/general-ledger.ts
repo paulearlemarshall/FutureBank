@@ -13,7 +13,7 @@ import { createApprovalWorkItem, decideWorkItem, lockApprovalWorkItem } from "./
 
 type GeneralLedgerTx = Pick<Database, "execute" | "insert" | "select" | "update">;
 
-type SourceLeg = { id: string; leg_type: "ACCOUNT" | "CLEARING"; direction: "DEBIT" | "CREDIT"; amount: string };
+type SourceLeg = { id: string; leg_type: "ACCOUNT" | "CLEARING"; account_kind: string | null; direction: "DEBIT" | "CREDIT"; amount: string };
 
 function totals(lines: Array<{ direction: "DEBIT" | "CREDIT"; amount: string }>) {
   const debit = lines.filter((line) => line.direction === "DEBIT").reduce((sum, line) => sum + moneyToMinorUnits(line.amount), 0n);
@@ -32,15 +32,17 @@ export async function postSubledgerToGeneralLedger(tx: GeneralLedgerTx, ledgerTr
   const transaction = (transactionResult.rows as unknown as Array<{ id: string; reference: string; value_date: string; type: string; currency: string; description: string; booked_at: Date | string }>)[0];
   if (!transaction) throw new BankingError("LEDGER_TRANSACTION_NOT_FOUND", "The source ledger transaction was not found.");
   const legResult = await tx.execute(sql`
-    select id::text, 'ACCOUNT'::text as leg_type, direction::text, amount::text from ledger_entries where transaction_id = ${ledgerTransactionId}
+    select entry.id::text, 'ACCOUNT'::text as leg_type, product.kind::text as account_kind, entry.direction::text, entry.amount::text
+    from ledger_entries entry join bank_accounts account on account.id = entry.account_id join products product on product.id = account.product_id
+    where entry.transaction_id = ${ledgerTransactionId}
     union all
-    select id::text, 'CLEARING'::text as leg_type, direction::text, amount::text from clearing_entries where transaction_id = ${ledgerTransactionId}
+    select id::text, 'CLEARING'::text as leg_type, null::text as account_kind, direction::text, amount::text from clearing_entries where transaction_id = ${ledgerTransactionId}
     order by leg_type, id
   `);
   const legs = legResult.rows as unknown as SourceLeg[];
   if (legs.length < 2 || !isBalancedGeneralLedger(legs)) throw new BankingError("SUBLEDGER_UNBALANCED", "The source transaction does not contain balanced ledger legs.");
 
-  const codes = legs.map((leg) => generalLedgerAccountCodeForLeg({ transactionType: transaction.type, legType: leg.leg_type, currency: transaction.currency }));
+  const codes = legs.map((leg) => generalLedgerAccountCodeForLeg({ transactionType: transaction.type, legType: leg.leg_type, accountKind: leg.account_kind, currency: transaction.currency }));
   const accounts = await tx.select({ id: generalLedgerAccounts.id, code: generalLedgerAccounts.code, active: generalLedgerAccounts.active, postingAllowed: generalLedgerAccounts.postingAllowed })
     .from(generalLedgerAccounts).where(inArray(generalLedgerAccounts.code, [...new Set(codes)]));
   const accountByCode = new Map(accounts.map((account) => [account.code, account]));

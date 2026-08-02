@@ -43,10 +43,11 @@ export const accountingPeriodStatusEnum = pgEnum("accounting_period_status", ["O
 export const generalLedgerAccountTypeEnum = pgEnum("general_ledger_account_type", ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]);
 export const generalLedgerJournalSourceEnum = pgEnum("general_ledger_journal_source", ["SUBLEDGER", "MANUAL"]);
 export const generalLedgerJournalStatusEnum = pgEnum("general_ledger_journal_status", ["PENDING_APPROVAL", "POSTED", "REJECTED"]);
+export const loanApplicationStatusEnum = pgEnum("loan_application_status", ["PENDING_APPROVAL", "APPROVED", "REJECTED"]);
 export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
 export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
-export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE", "GENERAL_LEDGER_JOURNAL"]);
+export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE", "GENERAL_LEDGER_JOURNAL", "LOAN_ORIGINATION"]);
 export const workItemStatusEnum = pgEnum("work_item_status", ["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
 export const workItemPriorityEnum = pgEnum("work_item_priority", ["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 export const kycCaseTypeEnum = pgEnum("kyc_case_type", ["ONBOARDING", "PERIODIC_REVIEW", "TRIGGER_EVENT", "REMEDIATION"]);
@@ -740,25 +741,64 @@ export const paymentReversals = pgTable("payment_reversals", {
   ...timestamps,
 }, (table) => [index("payment_reversals_status_idx").on(table.status)]);
 
+export const loanApplications = pgTable("loan_applications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
+  productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
+  destinationAccountId: uuid("destination_account_id").notNull().references(() => bankAccounts.id, { onDelete: "restrict" }),
+  branchId: uuid("branch_id").notNull().references(() => branches.id, { onDelete: "restrict" }),
+  principal: numeric("principal", { precision: 18, scale: 2 }).notNull(),
+  approvedPrincipal: numeric("approved_principal", { precision: 18, scale: 2 }),
+  currency: text("currency").notNull(),
+  termMonths: integer("term_months").notNull(),
+  annualInterestRate: numeric("annual_interest_rate", { precision: 7, scale: 4 }).notNull(),
+  firstPaymentDate: date("first_payment_date").notNull(),
+  projectedInstallment: numeric("projected_installment", { precision: 18, scale: 2 }).notNull(),
+  monthlyIncome: numeric("monthly_income", { precision: 18, scale: 2 }).notNull(),
+  monthlyCommitments: numeric("monthly_commitments", { precision: 18, scale: 2 }).notNull(),
+  debtServiceRatio: numeric("debt_service_ratio", { precision: 7, scale: 2 }).notNull(),
+  riskGrade: text("risk_grade").notNull(),
+  purpose: text("purpose").notNull(),
+  status: loanApplicationStatusEnum("status").notNull().default("PENDING_APPROVAL"),
+  loanAccountId: uuid("loan_account_id").unique().references(() => bankAccounts.id, { onDelete: "set null" }),
+  originationTransactionId: uuid("origination_transaction_id").unique().references(() => ledgerTransactions.id, { onDelete: "set null" }),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  requestedBy: text("requested_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+  decisionComment: text("decision_comment"),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [
+  index("loan_applications_customer_idx").on(table.customerId, table.submittedAt),
+  index("loan_applications_status_idx").on(table.status, table.submittedAt),
+]);
+
 export const loanDetails = pgTable("loan_details", {
   accountId: uuid("account_id").primaryKey().references(() => bankAccounts.id, { onDelete: "cascade" }),
+  originationApplicationId: uuid("origination_application_id").unique().references(() => loanApplications.id, { onDelete: "set null" }),
   originalPrincipal: numeric("original_principal", { precision: 18, scale: 2 }).notNull(),
   outstandingPrincipal: numeric("outstanding_principal", { precision: 18, scale: 2 }).notNull(),
   interestRate: numeric("interest_rate", { precision: 7, scale: 4 }).notNull(),
   installmentAmount: numeric("installment_amount", { precision: 18, scale: 2 }).notNull(),
   nextPaymentDate: date("next_payment_date").notNull(),
+  termMonths: integer("term_months"),
+  maturityDate: date("maturity_date"),
   ...timestamps,
 });
 
 export const loanRepayments = pgTable("loan_repayments", {
   id: uuid("id").primaryKey().defaultRandom(),
   accountId: uuid("account_id").notNull().references(() => bankAccounts.id, { onDelete: "cascade" }),
+  sequence: integer("sequence"),
   dueDate: date("due_date").notNull(),
   paidAt: date("paid_at"),
   principal: numeric("principal", { precision: 18, scale: 2 }).notNull(),
   interest: numeric("interest", { precision: 18, scale: 2 }).notNull(),
   status: text("status").notNull(),
-}, (table) => [index("loan_repayments_account_idx").on(table.accountId)]);
+}, (table) => [index("loan_repayments_account_idx").on(table.accountId), uniqueIndex("loan_repayments_sequence_idx").on(table.accountId, table.sequence)]);
 
 export const auditEvents = pgTable("audit_events", {
   id: uuid("id").primaryKey().defaultRandom(),

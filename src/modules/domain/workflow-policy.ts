@@ -9,6 +9,7 @@ const checkerRoles: Record<WorkItemType, readonly StaffRole[]> = {
   OVERDRAFT_ALERT: ["SUPERVISOR", "ADMIN"],
   ACCOUNTING_PERIOD_CLOSE: ["ADMIN"],
   GENERAL_LEDGER_JOURNAL: ["ADMIN"],
+  LOAN_ORIGINATION: ["SUPERVISOR", "ADMIN"],
 };
 
 export function canCheckWorkItem(type: WorkItemType, role: StaffRole): boolean {

@@ -15,6 +15,7 @@ const entityHref = (type: string, reference: string) => type === "KYC_CASE" ? `/
     : type === "PAYMENT_REVERSAL" ? `/payment-reversals/${reference}`
       : type === "ACCOUNTING_PERIOD" ? `/accounting-periods/${reference}`
         : type === "GENERAL_LEDGER_JOURNAL" ? `/general-ledger/journals/${reference}`
+          : type === "LOAN_APPLICATION" ? `/loans/${reference}`
           : type === "OVERDRAFT" ? `/overdrafts/${reference}` : "/overdrafts";
 
 export default async function WorkItemPage({ params }: { params: Promise<{ reference: string }> }) {

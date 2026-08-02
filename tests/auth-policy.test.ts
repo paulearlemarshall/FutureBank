@@ -33,6 +33,9 @@ describe("role boundaries", () => {
     expect(hasPermission("SUPERVISOR", "ACCOUNTING_PERIOD_CLOSE_DECIDE")).toBe(false);
     expect(hasPermission("SUPERVISOR", "GENERAL_LEDGER_JOURNAL_INITIATE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "GENERAL_LEDGER_JOURNAL_DECIDE")).toBe(false);
+    expect(hasPermission("OPERATOR", "LOAN_ORIGINATION_INITIATE")).toBe(true);
+    expect(hasPermission("OPERATOR", "LOAN_ORIGINATION_DECIDE")).toBe(false);
+    expect(hasPermission("SUPERVISOR", "LOAN_ORIGINATION_DECIDE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(false);
     expect(hasPermission("OPERATOR", "DIRECT_DEBIT_MAINTAIN")).toBe(true);
     expect(hasPermission("OPERATOR", "DIRECT_DEBIT_COLLECT")).toBe(true);
@@ -48,5 +51,7 @@ describe("role boundaries", () => {
     expect(hasPermission("ADMIN", "ACCOUNTING_PERIOD_CLOSE_DECIDE")).toBe(true);
     expect(hasPermission("ADMIN", "GENERAL_LEDGER_JOURNAL_INITIATE")).toBe(false);
     expect(hasPermission("ADMIN", "GENERAL_LEDGER_JOURNAL_DECIDE")).toBe(true);
+    expect(hasPermission("ADMIN", "LOAN_ORIGINATION_INITIATE")).toBe(true);
+    expect(hasPermission("ADMIN", "LOAN_ORIGINATION_DECIDE")).toBe(true);
   });
 });

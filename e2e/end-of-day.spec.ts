@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { bp, expectReady, login } from "./helpers";
 
 test("runs daily charges and interest once and exposes balanced posting references", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await login(page, "supervisor");
   await page.goto("/end-of-day");
   await expectReady(page, "end-of-day");
@@ -19,4 +19,13 @@ test("runs daily charges and interest once and exposes balanced posting referenc
   await expect(table.locator("tbody tr")).toHaveCount(9);
   await expect(table).toContainText("PCR-000001");
   await expect(table).toContainText("Interest");
+
+  // This journey changes balances used by later baseline-inspection tests.
+  await bp(page, "sign-out").click();
+  await login(page, "admin");
+  await page.goto("/admin/reset");
+  await expectReady(page, "admin-reset");
+  await bp(page, "reset-confirmation").fill("RESET FUTUREBANK");
+  await bp(page, "reset-submit").click();
+  await expect(bp(page, "status-reset-status")).toContainText(/reset complete|restored/i, { timeout: 90_000 });
 });
