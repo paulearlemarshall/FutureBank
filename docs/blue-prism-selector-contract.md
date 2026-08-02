@@ -55,6 +55,7 @@ The Playwright suite treats these workflows as the compatibility baseline:
 10. Create a risk-triggered pending payment, verify its hold, then approve, reject, or expire it.
 11. View Amelia Hart's seeded Passport and National ID, replace or delete a slot, and verify reset restores the original files.
 12. Run one end-of-day business date, observe persistent posting feedback, and inspect the fixed-column charge and interest tables.
+13. Inspect the accounting-period register, request close as Supervisor, and apply the independent Admin decision through persistent versioned forms.
 13. Reconcile one settlement date, inspect fixed-column exact and exception outcomes, and resolve an exception with persistent versioned feedback.
 
 Customer document controls retain these selectors for each `passport` / `national-id` slot: `document-slot-*`, `document-file-*`, `document-upload-*`, `document-view-*`, `document-delete-confirm-*`, `document-delete-*`, and `status-document-*`.

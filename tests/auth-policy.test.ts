@@ -29,6 +29,8 @@ describe("role boundaries", () => {
     expect(hasPermission("OPERATOR", "RECONCILIATION_EXECUTE")).toBe(false);
     expect(hasPermission("SUPERVISOR", "RECONCILIATION_EXECUTE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "RECONCILIATION_RESOLVE")).toBe(true);
+    expect(hasPermission("SUPERVISOR", "ACCOUNTING_PERIOD_CLOSE_INITIATE")).toBe(true);
+    expect(hasPermission("SUPERVISOR", "ACCOUNTING_PERIOD_CLOSE_DECIDE")).toBe(false);
     expect(hasPermission("SUPERVISOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(false);
     expect(hasPermission("OPERATOR", "DIRECT_DEBIT_MAINTAIN")).toBe(true);
     expect(hasPermission("OPERATOR", "DIRECT_DEBIT_COLLECT")).toBe(true);
@@ -40,5 +42,7 @@ describe("role boundaries", () => {
     expect(hasPermission("ADMIN", "DEMO_RESET")).toBe(true);
     expect(hasPermission("ADMIN", "END_OF_DAY_EXECUTE")).toBe(true);
     expect(hasPermission("ADMIN", "RECONCILIATION_RESOLVE")).toBe(true);
+    expect(hasPermission("ADMIN", "ACCOUNTING_PERIOD_CLOSE_INITIATE")).toBe(false);
+    expect(hasPermission("ADMIN", "ACCOUNTING_PERIOD_CLOSE_DECIDE")).toBe(true);
   });
 });

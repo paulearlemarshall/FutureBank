@@ -10,6 +10,7 @@ import type { SessionUser } from "@/modules/contracts";
 import { calculateDailyInterest, validateDailyOverdraftCharge, validateEndOfDayDate } from "@/modules/domain/end-of-day-policy";
 import { minorUnitsToMoney, moneyToMinorUnits, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 import { BankingError } from "./errors";
+import { assertPostingDateOpen } from "./accounting-periods";
 
 function reference(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -61,6 +62,7 @@ async function postCharge(input: { runId: string; candidate: Candidate; business
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${idempotencyKey}))`);
+      await assertPostingDateOpen(tx, input.businessDate);
       const [existing] = await tx.select().from(endOfDayPostings).where(eq(endOfDayPostings.idempotencyKey, idempotencyKey)).limit(1);
       if (existing) return { status: existing.status, type: existing.type };
       const accountResult = await tx.execute(sql`select id, account_number, product_id, currency, balance, available_balance, status, read_only from bank_accounts where id = ${input.candidate.accountId} for update`);
@@ -101,6 +103,7 @@ async function postInterest(input: { runId: string; candidate: Candidate; busine
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${idempotencyKey}))`);
+      await assertPostingDateOpen(tx, input.businessDate);
       const [existing] = await tx.select().from(endOfDayPostings).where(eq(endOfDayPostings.idempotencyKey, idempotencyKey)).limit(1);
       if (existing) return { status: existing.status, type: existing.type };
       const result = await tx.execute(sql`select a.id, a.account_number, a.currency, a.balance, a.available_balance, a.status, a.read_only, p.kind, p.interest_rate, p.active from bank_accounts a join products p on p.id = a.product_id where a.id = ${input.candidate.accountId} for update of a, p`);

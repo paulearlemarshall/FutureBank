@@ -39,10 +39,11 @@ export const endOfDayPostingTypeEnum = pgEnum("end_of_day_posting_type", ["CHARG
 export const endOfDayPostingStatusEnum = pgEnum("end_of_day_posting_status", ["PROCESSING", "BOOKED", "FAILED"]);
 export const reconciliationItemTypeEnum = pgEnum("reconciliation_item_type", ["MATCHED", "AMOUNT_MISMATCH", "DIRECTION_MISMATCH", "CURRENCY_MISMATCH", "MISSING_INTERNAL", "MISSING_EXTERNAL"]);
 export const reconciliationItemStatusEnum = pgEnum("reconciliation_item_status", ["MATCHED", "OPEN", "RESOLVED"]);
+export const accountingPeriodStatusEnum = pgEnum("accounting_period_status", ["OPEN", "CLOSING", "CLOSED"]);
 export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
 export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
-export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
+export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE"]);
 export const workItemStatusEnum = pgEnum("work_item_status", ["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
 export const workItemPriorityEnum = pgEnum("work_item_priority", ["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 export const kycCaseTypeEnum = pgEnum("kyc_case_type", ["ONBOARDING", "PERIODIC_REVIEW", "TRIGGER_EVENT", "REMEDIATION"]);
@@ -506,6 +507,23 @@ export const reconciliationRuns = pgTable("reconciliation_runs", {
   businessDate: date("business_date").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const accountingPeriods = pgTable("accounting_periods", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  code: text("code").notNull().unique(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  status: accountingPeriodStatusEnum("status").notNull().default("OPEN"),
+  closeRequestedBy: text("close_requested_by").references(() => user.id, { onDelete: "set null" }),
+  closeRequestComment: text("close_request_comment"),
+  closeRequestedAt: timestamp("close_requested_at", { withTimezone: true }),
+  closedBy: text("closed_by").references(() => user.id, { onDelete: "set null" }),
+  closeDecisionComment: text("close_decision_comment"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [index("accounting_period_dates_idx").on(table.startDate, table.endDate, table.status)]);
 
 export const paymentInstructionExecutions = pgTable("payment_instruction_executions", {
   id: uuid("id").primaryKey().defaultRandom(),

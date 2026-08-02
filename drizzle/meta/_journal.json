@@ -64,6 +64,13 @@
       "when": 1785678870390,
       "tag": "0008_rainy_ender_wiggin",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785680022816,
+      "tag": "0009_strong_infant_terrible",
+      "breakpoints": true
     }
   ]
 }

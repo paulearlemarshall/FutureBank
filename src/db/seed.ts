@@ -72,6 +72,7 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.contactPoints);
   await tx.delete(tables.addresses);
   await tx.delete(tables.auditEvents);
+  await tx.delete(tables.accountingPeriods);
   await tx.delete(tables.customers);
   await tx.delete(tables.productChargeRules);
   await tx.delete(tables.products);
@@ -90,6 +91,16 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     id: stableUuid(`product-charge-rule-${item.reference}`), reference: item.reference, productId: productId(item.productCode),
     type: item.type, amount: item.amount, currency: item.currency, effectiveFrom: item.effectiveFrom,
   })));
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth();
+  const currentStart = `${currentYear}-${(currentMonth + 1).toString().padStart(2, "0")}-01`;
+  const currentEndDate = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
+  const currentEnd = currentEndDate.toISOString().slice(0, 10);
+  await tx.insert(tables.accountingPeriods).values([
+    { id: stableUuid("accounting-period-control-july"), reference: "ACP-000001", code: "2026-07-CONTROL", startDate: "2026-07-01", endDate: "2026-07-18", status: "OPEN", version: 1 },
+    { id: stableUuid("accounting-period-current"), reference: "ACP-000002", code: `${currentYear}-${(currentMonth + 1).toString().padStart(2, "0")}`, startDate: currentStart, endDate: currentEnd, status: "OPEN", version: 1 },
+    { id: stableUuid("accounting-period-closed"), reference: "ACP-000003", code: "2026-06", startDate: "2026-06-01", endDate: "2026-06-30", status: "CLOSED", closedBy: staffId("admin"), closeDecisionComment: "Seeded historical period closed after fictional control completion.", closedAt: new Date("2026-07-01T09:00:00.000Z"), version: 3 },
+  ]);
   await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, ...item, kycReviewDate: timeline.date(reviewOffsets[item.customerNumber]) })));
 
   if (preparedDocuments.length) {

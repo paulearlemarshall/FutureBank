@@ -11,6 +11,7 @@ import { validateInternalReversalFunds, validateReversalRequest } from "@/module
 import { minorUnitsToMoney, moneyToMinorUnits, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 import { BankingError } from "./errors";
 import { createApprovalWorkItem, decideWorkItem, lockApprovalWorkItem } from "./workflow";
+import { assertPostingDateOpen } from "./accounting-periods";
 
 function reference(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -80,7 +81,9 @@ export async function decidePaymentReversal(input: DecisionInput & { decision: "
     const amount = moneyToMinorUnits(reversal.amount);
     const transactionReference = reference("TXR");
     const now = new Date();
-    const [transaction] = await tx.insert(ledgerTransactions).values({ reference: transactionReference, bookedAt: now, valueDate: now.toISOString().slice(0, 10), description: `Reversal of ${payment.reference}: ${comment}`, type: "PAYMENT_REVERSAL", status: "BOOKED", currency: reversal.currency, amount: reversal.amount, counterparty: original.reference, paymentOrderId: payment.id }).returning();
+    const valueDate = now.toISOString().slice(0, 10);
+    await assertPostingDateOpen(tx, valueDate);
+    const [transaction] = await tx.insert(ledgerTransactions).values({ reference: transactionReference, bookedAt: now, valueDate, description: `Reversal of ${payment.reference}: ${comment}`, type: "PAYMENT_REVERSAL", status: "BOOKED", currency: reversal.currency, amount: reversal.amount, counterparty: original.reference, paymentOrderId: payment.id }).returning();
 
     if (payment.type === "INTERNAL") {
       if (!payment.destination_account_id) throw new BankingError("DESTINATION_NOT_FOUND", "The original destination account is missing.");

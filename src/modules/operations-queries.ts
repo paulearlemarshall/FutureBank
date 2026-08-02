@@ -3,13 +3,13 @@ import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, ledgerTransactions,
+  accountHolds, accountingPeriods, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, ledgerTransactions,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
   paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, reconciliationItems, reconciliationRuns, screeningChecks, settlementRecords, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  DirectDebitMandateView, EndOfDayRunView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView,
+  AccountingPeriodView, DirectDebitMandateView, EndOfDayRunView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -362,6 +362,31 @@ export async function getLatestSettlementBusinessDate(): Promise<string | null> 
   await requireUser();
   const [row] = await db.select({ businessDate: settlementRecords.businessDate }).from(settlementRecords).orderBy(desc(settlementRecords.businessDate)).limit(1);
   return row?.businessDate ?? null;
+}
+
+export async function getAccountingPeriod(reference: string): Promise<AccountingPeriodView | null> {
+  await requireUser();
+  const [period] = await db.select().from(accountingPeriods).where(eq(accountingPeriods.reference, reference)).limit(1);
+  if (!period) return null;
+  const [requesterRows, closerRows, workRows] = await Promise.all([
+    period.closeRequestedBy ? db.select({ username: user.username, email: user.email }).from(user).where(eq(user.id, period.closeRequestedBy)).limit(1) : Promise.resolve([]),
+    period.closedBy ? db.select({ username: user.username, email: user.email }).from(user).where(eq(user.id, period.closedBy)).limit(1) : Promise.resolve([]),
+    db.select().from(workItems).where(and(eq(workItems.entityType, "ACCOUNTING_PERIOD"), eq(workItems.entityReference, period.reference))).orderBy(desc(workItems.createdAt)).limit(1),
+  ]);
+  return {
+    reference: period.reference, code: period.code, startDate: period.startDate, endDate: period.endDate, status: period.status, version: period.version,
+    closeRequestedBy: requesterRows[0]?.username ?? requesterRows[0]?.email ?? null, closeRequestComment: period.closeRequestComment,
+    closeRequestedAt: period.closeRequestedAt ? iso(period.closeRequestedAt) : null,
+    closedBy: closerRows[0]?.username ?? closerRows[0]?.email ?? null, closeDecisionComment: period.closeDecisionComment,
+    closedAt: period.closedAt ? iso(period.closedAt) : null, workItem: workRows[0] ? mapWorkItem(workRows[0]) : null,
+  };
+}
+
+export async function listAccountingPeriods(): Promise<AccountingPeriodView[]> {
+  await requireUser();
+  const rows = await db.select({ reference: accountingPeriods.reference }).from(accountingPeriods).orderBy(desc(accountingPeriods.endDate));
+  const details = await Promise.all(rows.map((row) => getAccountingPeriod(row.reference)));
+  return details.filter((item): item is AccountingPeriodView => item !== null);
 }
 
 export async function getDirectDebitMandate(reference: string): Promise<DirectDebitMandateView | null> {

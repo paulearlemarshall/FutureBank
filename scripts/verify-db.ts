@@ -60,6 +60,8 @@ async function main() {
   `), 1);
   expectEqual("settlement missing-internal scenario", await scalar(sql`select count(*)::int as value from settlement_records where transaction_reference = 'EXT-ONLY-20260718-001'`), 1);
   expectEqual("seeded reconciliation runs", await scalar(sql`select count(*)::int as value from reconciliation_runs`), 0);
+  expectEqual("accounting periods", await scalar(sql`select count(*)::int as value from accounting_periods`), 3);
+  expectEqual("closed historical accounting periods", await scalar(sql`select count(*)::int as value from accounting_periods where reference = 'ACP-000003' and status = 'CLOSED' and closed_at is not null`), 1);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
   expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);

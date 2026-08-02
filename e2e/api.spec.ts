@@ -17,6 +17,8 @@ test("serves the OpenAPI 3 artifact without authentication", async ({ request })
   expect(document.paths["/end-of-day-runs/{runReference}"].get).toBeDefined();
   expect(document.paths["/reconciliation-runs"].post).toBeDefined();
   expect(document.paths["/reconciliation-runs/{runReference}/items/{itemReference}/resolution"].post).toBeDefined();
+  expect(document.paths["/accounting-periods/{periodReference}/close-requests"].post).toBeDefined();
+  expect(document.paths["/accounting-periods/{periodReference}/close-decisions"].post).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
@@ -111,7 +113,7 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.6.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.7.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
@@ -119,6 +121,27 @@ test("discovers seeded payment instructions through the authenticated API", asyn
     expect.objectContaining({ reference: "PIN-000002", type: "STANDING_ORDER", status: "ACTIVE", frequency: "MONTHLY" }),
     expect.objectContaining({ reference: "PIN-000003", status: "CANCELLED" }),
   ]));
+});
+
+test("discovers accounting periods and enforces close evidence through the API", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const readHeaders = { "X-API-Key": apiKey! };
+  const list = await request.get("/api/v1/accounting-periods", { headers: readHeaders });
+  expect(list.ok()).toBe(true);
+  expect((await list.json()).data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ reference: "ACP-000001", code: "2026-07-CONTROL", status: "OPEN", version: 1 }),
+    expect.objectContaining({ reference: "ACP-000003", code: "2026-06", status: "CLOSED", version: 3 }),
+  ]));
+  const detail = await request.get("/api/v1/accounting-periods/ACP-000001", { headers: readHeaders });
+  expect(detail.ok()).toBe(true);
+  expect((await detail.json()).data).toMatchObject({ endDate: "2026-07-18", workItem: null });
+
+  const close = await request.post("/api/v1/accounting-periods/ACP-000001/close-requests", {
+    headers: { ...readHeaders, "X-Staff-Username": "bp.supervisor" },
+    data: { expectedVersion: 1, comment: "Attempt close before all final control evidence is available." },
+  });
+  expect(close.status()).toBe(409);
+  expect((await close.json()).error.code).toMatch(/END_OF_DAY_INCOMPLETE|RECONCILIATION_STALE|RECONCILIATION_EXCEPTIONS_OPEN/);
 });
 
 test("discovers the deterministic failed end-of-day run", async ({ request }) => {

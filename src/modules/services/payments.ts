@@ -12,6 +12,7 @@ import { kycPaymentControl } from "@/modules/domain/kyc-policy";
 import { createApprovalWorkItem, decideWorkItem, lockApprovalWorkItem } from "./workflow";
 export { BankingError } from "./errors";
 import { BankingError } from "./errors";
+import { assertPostingDateOpen } from "./accounting-periods";
 
 type LockedAccount = {
   id: string;
@@ -88,6 +89,8 @@ export async function bookInternalTransfer(input: PaymentInput & { destinationAc
   return db.transaction(async (tx) => {
     const [existing] = await tx.select().from(paymentOrders).where(eq(paymentOrders.idempotencyKey, input.idempotencyKey)).limit(1);
     if (existing) return { reference: existing.reference, duplicate: true };
+    const valueDate = new Date().toISOString().slice(0, 10);
+    await assertPostingDateOpen(tx, valueDate);
 
     const result = await tx.execute(sql`
       select id, account_number, customer_id, currency, balance, available_balance, status, read_only
@@ -124,7 +127,7 @@ export async function bookInternalTransfer(input: PaymentInput & { destinationAc
       description: input.description, idempotencyKey: input.idempotencyKey, initiatedBy: actor.username, bookedAt: new Date(),
     }).returning();
     const [transaction] = await tx.insert(ledgerTransactions).values({
-      reference: transactionReference, bookedAt: new Date(), valueDate: new Date().toISOString().slice(0, 10),
+      reference: transactionReference, bookedAt: new Date(), valueDate,
       description: input.description, type: "INTERNAL_TRANSFER", status: "BOOKED", currency: source.currency,
       amount: policy.amount, counterparty: input.destinationAccountNumber, paymentOrderId: order.id,
     }).returning();
@@ -204,6 +207,9 @@ export async function bookExternalPayment(input: PaymentInput & { beneficiaryId:
       return { reference: paymentReference, duplicate: false, pending: true };
     }
 
+    const valueDate = new Date().toISOString().slice(0, 10);
+    await assertPostingDateOpen(tx, valueDate);
+
     const clearingResult = await tx.execute(sql`
       select id, balance from clearing_accounts where currency = ${source.currency} order by code limit 1 for update
     `);
@@ -222,7 +228,7 @@ export async function bookExternalPayment(input: PaymentInput & { beneficiaryId:
       idempotencyKey: input.idempotencyKey, initiatedBy: actor.username, bookedAt: new Date(),
     }).returning();
     const [transaction] = await tx.insert(ledgerTransactions).values({
-      reference: transactionReference, bookedAt: new Date(), valueDate: new Date().toISOString().slice(0, 10), description: input.description,
+      reference: transactionReference, bookedAt: new Date(), valueDate, description: input.description,
       type: "EXTERNAL_PAYMENT", status: "BOOKED", currency: source.currency, amount: policy.amount,
       counterparty: beneficiary.name, paymentOrderId: order.id,
     }).returning();
@@ -278,9 +284,11 @@ export async function approvePendingPayment(input: { paymentReference: string; w
     const clearingResult = await tx.execute(sql`select id, balance from clearing_accounts where currency = ${source.currency} order by code limit 1 for update`);
     const clearing = (clearingResult.rows as unknown as Array<{ id: string; balance: string }>)[0];
     if (!clearing) throw new BankingError("CLEARING_UNAVAILABLE", "The clearing account is unavailable.");
+    const valueDate = new Date().toISOString().slice(0, 10);
+    await assertPostingDateOpen(tx, valueDate);
     const clearingAfter = minorUnitsToMoney(signedMoneyToMinorUnits(clearing.balance) + moneyToMinorUnits(payment.amount));
     const [transaction] = await tx.insert(ledgerTransactions).values({
-      reference: reference("TX"), bookedAt: new Date(), valueDate: new Date().toISOString().slice(0, 10), description: payment.description,
+      reference: reference("TX"), bookedAt: new Date(), valueDate, description: payment.description,
       type: "EXTERNAL_PAYMENT", status: "BOOKED", currency: payment.currency, amount: payment.amount, counterparty: beneficiary.name, paymentOrderId: payment.id,
     }).returning();
     await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: source.id, direction: "DEBIT", amount: payment.amount, balanceAfter: sourceAfter });

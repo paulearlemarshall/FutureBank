@@ -8,6 +8,8 @@ describe("maker-checker policy", () => {
     expect(canCheckWorkItem("PAYMENT_APPROVAL", "SUPERVISOR")).toBe(true);
     expect(canCheckWorkItem("PAYMENT_REVERSAL", "SUPERVISOR")).toBe(true);
     expect(canCheckWorkItem("OVERDRAFT_APPROVAL", "ADMIN")).toBe(true);
+    expect(canCheckWorkItem("ACCOUNTING_PERIOD_CLOSE", "ADMIN")).toBe(true);
+    expect(canCheckWorkItem("ACCOUNTING_PERIOD_CLOSE", "SUPERVISOR")).toBe(false);
   });
 
   it("rejects self approval, stale versions and completed work", () => {

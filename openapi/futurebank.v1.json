@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.6.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.7.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, maker-checker accounting-period close, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -70,6 +70,10 @@
     {
       "name": "Reconciliation",
       "description": "Fictional external settlement matching and durable clearing exceptions."
+    },
+    {
+      "name": "Accounting periods",
+      "description": "Period-end evidence, independent close approval and authoritative posting-date gates."
     },
     {
       "name": "KYC",
@@ -2342,6 +2346,191 @@
         "description": "Records a version-checked resolution comment and audit event without modifying settlement records, clearing entries, or ledger transactions."
       }
     },
+    "/accounting-periods": {
+      "get": {
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "List accounting periods",
+        "responses": {
+          "200": {
+            "description": "Accounting-period register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccountingPeriod"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listAccountingPeriods",
+        "description": "Lists open, closing and closed periods with versioned close evidence."
+      }
+    },
+    "/accounting-periods/{periodReference}": {
+      "get": {
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "Get an accounting period",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountingPeriodReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accounting period and latest close work item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AccountingPeriod"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAccountingPeriod",
+        "description": "Returns period status, request and decision evidence, version and latest maker-checker work item."
+      }
+    },
+    "/accounting-periods/{periodReference}/close-requests": {
+      "post": {
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "Request accounting-period close",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountingPeriodReference"
+          },
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountingPeriodCloseRequestWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "requestAccountingPeriodClose",
+        "description": "A Supervisor locks the period, proves final end-of-day and later reconciliation evidence, zero open exceptions, full clearing coverage, no running process and a balanced ledger, then creates an Admin approval item and freezes the period while closing."
+      }
+    },
+    "/accounting-periods/{periodReference}/close-decisions": {
+      "post": {
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "Approve or reject accounting-period close",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountingPeriodReference"
+          },
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountingPeriodCloseDecisionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "decideAccountingPeriodClose",
+        "description": "A distinct Admin rechecks all close gates under locks and either closes the period or returns it to OPEN. CLOSING and CLOSED dates reject every runtime ledger writer."
+      }
+    },
     "/kyc-cases": {
       "get": {
         "tags": [
@@ -4108,6 +4297,15 @@
         "schema": {
           "type": "string",
           "pattern": "^RCI-"
+        }
+      },
+      "AccountingPeriodReference": {
+        "name": "periodReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^ACP-"
         }
       },
       "CaseReference": {
@@ -6651,6 +6849,139 @@
             "items": {
               "$ref": "#/components/schemas/ReconciliationItem"
             }
+          }
+        }
+      },
+      "AccountingPeriodCloseRequestWrite": {
+        "type": "object",
+        "required": [
+          "expectedVersion",
+          "comment"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
+      },
+      "AccountingPeriodCloseDecisionWrite": {
+        "type": "object",
+        "required": [
+          "workItemReference",
+          "expectedVersion",
+          "decision",
+          "comment"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "workItemReference": {
+            "type": "string",
+            "pattern": "^WRK-"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
+      },
+      "AccountingPeriod": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "code",
+          "startDate",
+          "endDate",
+          "status",
+          "version",
+          "closeRequestedBy",
+          "closeRequestComment",
+          "closeRequestedAt",
+          "closedBy",
+          "closeDecisionComment",
+          "closedAt",
+          "workItem"
+        ],
+        "properties": {
+          "reference": {
+            "type": "string",
+            "pattern": "^ACP-"
+          },
+          "code": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "CLOSING",
+              "CLOSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "closeRequestedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeRequestComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeRequestedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeDecisionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "workItem": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkQueueItem"
+              }
+            ],
+            "nullable": true
           }
         }
       },

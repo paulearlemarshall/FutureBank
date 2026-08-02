@@ -201,7 +201,7 @@ export type AccountDetail = AccountListItem & {
 };
 
 export type WorkItemStatus = "OPEN" | "ASSIGNED" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
-export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT";
+export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT" | "ACCOUNTING_PERIOD_CLOSE";
 export type WorkItemPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
 export type WorkQueueItem = {
@@ -508,6 +508,22 @@ export type ReconciliationRunView = {
   completedAt: string | null;
   errorMessage: string | null;
   items: ReconciliationItemView[];
+};
+
+export type AccountingPeriodView = {
+  reference: string;
+  code: string;
+  startDate: string;
+  endDate: string;
+  status: "OPEN" | "CLOSING" | "CLOSED";
+  version: number;
+  closeRequestedBy: string | null;
+  closeRequestComment: string | null;
+  closeRequestedAt: string | null;
+  closedBy: string | null;
+  closeDecisionComment: string | null;
+  closedAt: string | null;
+  workItem: WorkQueueItem | null;
 };
 
 export type DirectDebitCollectionView = {

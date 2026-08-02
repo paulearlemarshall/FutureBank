@@ -9,9 +9,11 @@ import { approvePendingPayment } from "../src/modules/services/payments";
 import { decidePaymentReversal } from "../src/modules/services/payment-reversals";
 import { runEndOfDay } from "../src/modules/services/end-of-day";
 import { resolveReconciliationItem, runClearingReconciliation } from "../src/modules/services/reconciliation";
+import { assertPostingDateOpen, decideAccountingPeriodClose, requestAccountingPeriodClose } from "../src/modules/services/accounting-periods";
+import { BankingError } from "../src/modules/services/errors";
 
 async function main() {
-  const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin" };
+  const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin", name: "Blue Prism Admin", role: "ADMIN" as const };
   const supervisor = { id: stableUuid("auth-user-supervisor"), username: "bp.supervisor", name: "Blue Prism Supervisor", role: "SUPERVISOR" as const };
   const operator = { id: stableUuid("auth-user-operator"), username: "bp.operator", name: "Blue Prism Operator", role: "OPERATOR" as const };
   if (process.env.SKIP_DEMO_STAFF_SEED !== "true") await seedDemoStaff(db);
@@ -86,10 +88,11 @@ async function main() {
     for (const [label, value] of Object.entries(reversalResult.rows[0] as unknown as Record<string, number>)) if (Number(value) !== 1) throw new Error(`payment reversal ${label}: expected 1, received ${value}`);
 
     const dateResult = await db.execute(sql`select current_date::text as value`);
-    const endOfDayDate = String((dateResult.rows[0] as { value: string }).value);
+    const today = String((dateResult.rows[0] as { value: string }).value);
+    const endOfDayDate = "2026-07-18";
     const endOfDayAttempts = await Promise.all([
-      runEndOfDay({ businessDate: endOfDayDate }, supervisor),
-      runEndOfDay({ businessDate: endOfDayDate }, supervisor),
+      runEndOfDay({ businessDate: endOfDayDate, today }, supervisor),
+      runEndOfDay({ businessDate: endOfDayDate, today }, supervisor),
     ]);
     if (new Set(endOfDayAttempts.map((attempt) => attempt.reference)).size !== 1 || endOfDayAttempts.filter((attempt) => attempt.duplicate).length !== 1) {
       throw new Error("End-of-day race did not return one original and one duplicate run");
@@ -114,8 +117,8 @@ async function main() {
     const expectedEndOfDay = { runs: 1, completed_runs: 1, charges: 2, interests: 7, ledger_transactions: 9, unbalanced: 0 };
     for (const [label, expected] of Object.entries(expectedEndOfDay)) if (Number(endOfDayRow[label]) !== expected) throw new Error(`end of day ${label}: expected ${expected}, received ${endOfDayRow[label]}`);
     const reconciliationAttempts = await Promise.all([
-      runClearingReconciliation({ businessDate: "2026-07-18", today: endOfDayDate }, supervisor),
-      runClearingReconciliation({ businessDate: "2026-07-18", today: endOfDayDate }, supervisor),
+      runClearingReconciliation({ businessDate: endOfDayDate, today }, supervisor),
+      runClearingReconciliation({ businessDate: endOfDayDate, today }, supervisor),
     ]);
     if (new Set(reconciliationAttempts.map((attempt) => attempt.reference)).size !== 1 || reconciliationAttempts.filter((attempt) => attempt.duplicate).length !== 1) throw new Error("Reconciliation race did not return one original and one duplicate run");
     const reconciliationResult = await db.execute(sql`
@@ -125,17 +128,32 @@ async function main() {
         (select count(*)::int from reconciliation_items where status = 'OPEN') as open_exceptions,
         (select count(*)::int from reconciliation_items where type = 'AMOUNT_MISMATCH') as amount_mismatches,
         (select count(*)::int from reconciliation_items where type = 'MISSING_INTERNAL') as missing_internal,
-        (select count(*)::int from processing_runs where type = 'CLEARING_RECONCILIATION' and business_date = '2026-07-18' and status = 'COMPLETED' and attempted = 19 and booked = 17 and failed = 2) as completed_runs
+        (select count(*)::int from reconciliation_items where type = 'MISSING_EXTERNAL') as missing_external,
+        (select count(*)::int from processing_runs where type = 'CLEARING_RECONCILIATION' and business_date = '2026-07-18' and status = 'COMPLETED' and attempted = 28 and booked = 17 and failed = 11) as completed_runs
     `);
     const reconciliationRow = reconciliationResult.rows[0] as unknown as Record<string, number>;
-    const expectedReconciliation = { runs: 1, matched: 17, open_exceptions: 2, amount_mismatches: 1, missing_internal: 1, completed_runs: 1 };
+    const expectedReconciliation = { runs: 1, matched: 17, open_exceptions: 11, amount_mismatches: 1, missing_internal: 1, missing_external: 9, completed_runs: 1 };
     for (const [label, expected] of Object.entries(expectedReconciliation)) if (Number(reconciliationRow[label]) !== expected) throw new Error(`reconciliation ${label}: expected ${expected}, received ${reconciliationRow[label]}`);
-    const exceptionResult = await db.execute(sql`select reference, version from reconciliation_items where type = 'AMOUNT_MISMATCH' limit 1`);
-    const exception = exceptionResult.rows[0] as unknown as { reference: string; version: number };
-    await resolveReconciliationItem({ itemReference: exception.reference, runReference: reconciliationAttempts[0].reference, expectedVersion: exception.version, comment: "Verified fictional bank statement amount and recorded the control outcome." }, supervisor);
-    const resolutionResult = await db.execute(sql`select count(*)::int as value from reconciliation_items where reference = ${exception.reference} and status = 'RESOLVED' and version = 2 and resolution_comment is not null`);
-    if (Number((resolutionResult.rows[0] as { value: number }).value) !== 1) throw new Error("Reconciliation exception resolution was not persisted with version evidence");
-    console.info("Workflow integration verification passed: locking prevented double approval; scheduled, direct-debit, reversal, charge, and interest postings booked exactly once; and clearing reconciliation produced and resolved durable exceptions without ledger mutation.");
+    const exceptionResult = await db.execute(sql`select reference, version from reconciliation_items where status = 'OPEN' order by reference`);
+    await Promise.all((exceptionResult.rows as unknown as Array<{ reference: string; version: number }>).map((exception) =>
+      resolveReconciliationItem({ itemReference: exception.reference, runReference: reconciliationAttempts[0].reference, expectedVersion: exception.version, comment: "Verified fictional settlement evidence and recorded the period-close control outcome." }, supervisor),
+    ));
+    const resolutionResult = await db.execute(sql`select count(*)::int as value from reconciliation_items where status = 'RESOLVED' and version = 2 and resolution_comment is not null`);
+    if (Number((resolutionResult.rows[0] as { value: number }).value) !== 11) throw new Error("Reconciliation exceptions were not persisted with version evidence");
+
+    const workItemReference = await requestAccountingPeriodClose({ periodReference: "ACP-000001", expectedVersion: 1, comment: "Period-end processing, reconciliation, and exception evidence are complete." }, supervisor);
+    const workItemResult = await db.execute(sql`select version from work_items where reference = ${workItemReference}`);
+    const workItemVersion = Number((workItemResult.rows[0] as { version: number }).version);
+    await decideAccountingPeriodClose({ periodReference: "ACP-000001", workItemReference, expectedVersion: workItemVersion, decision: "APPROVE", comment: "Independent review confirms the period-end controls and balanced ledger." }, admin);
+    const periodResult = await db.execute(sql`select count(*)::int as value from accounting_periods where reference = 'ACP-000001' and status = 'CLOSED' and version = 3 and closed_by = ${admin.id}`);
+    if (Number((periodResult.rows[0] as { value: number }).value) !== 1) throw new Error("Accounting period did not retain approved close evidence");
+    try {
+      await assertPostingDateOpen(db, endOfDayDate);
+      throw new Error("Closed accounting period accepted a posting date");
+    } catch (error) {
+      if (!(error instanceof BankingError) || error.code !== "ACCOUNTING_PERIOD_CLOSED") throw error;
+    }
+    console.info("Workflow integration verification passed: locking prevented duplicate decisions; scheduled, direct-debit, reversal, charge, and interest postings booked exactly once; clearing evidence was fully resolved; and independent period close froze the value date.");
   } finally {
     await resetBaseline(db, admin);
   }

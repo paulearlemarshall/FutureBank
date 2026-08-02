@@ -36,6 +36,7 @@ REST handlers are adapters over the same application services used by the UI. Th
 | Payment reversals | payment-reversal service, reversal table and existing workflow/ledger owners | maker-checker race and equal-and-opposite ledger verification |
 | Product charges, deposit interest and end of day | end-of-day policy/service, product charge rules, run/posting tables and existing ledger owner | exact calculation tests, once-per-date race and balanced workflow verification |
 | Clearing reconciliation | reconciliation policy/service, imported settlement records and run/item tables | exact/mismatch policy tests, once-per-date race and versioned resolution verification |
+| Accounting-period close | accounting-period service, period table, shared posting-date guard and close work items | final EOD/reconciliation coverage gates, maker-checker workflow and closed-date rejection verification |
 | Arranged overdrafts | overdraft policy/services and facility tables | overdraft tests and approval/alert journeys |
 | Customer-document files | document policy/service plus private Blob adapter | feature specification and real-Blob journey |
 | Public API | `openapi/futurebank.v1.source.json` and API adapter | generated artifact, drift check and API contract tests |
@@ -62,6 +63,7 @@ Consequential decisions use work items, optimistic versions, row/advisory locks,
 - A reversal never edits or deletes the original payment or transaction. One full-value request per booked payment requires a distinct supervisor; approval posts a linked equal-and-opposite transaction exactly once, while internal reversals also require available funds at the original destination.
 - One end-of-day run owns each business date. Active effective-dated product rules determine daily overdraft charges, product annual rates determine daily deposit interest on a 365-day basis with exact half-up cent rounding, and each account/type occurrence is idempotent. Booked customer legs have equal-and-opposite currency-clearing legs; failures are durable posting outcomes rather than partial balance mutations.
 - One reconciliation run owns each imported settlement date. It compares evidence with immutable clearing entries by reference, currency, exact amount and direction. Exceptions and their versioned, commented resolutions are durable control records; reconciliation never repairs or mutates the ledger.
+- Accounting periods are authoritative posting-date boundaries. A Supervisor may request close only after final end-of-day, a later completed reconciliation covering every period-end clearing entry, zero open exceptions, zero running period processes and a balanced ledger. A distinct Admin rechecks those controls under locks. Both `CLOSING` and `CLOSED` freeze value dates through the shared guard used by runtime ledger writers.
 - Available balance reconciles ledger balance, the active arranged overdraft limit, and active holds.
 - Only eligible current accounts with acceptable KYC and restrictions may receive or increase an overdraft facility.
 - Limit reductions cannot strand utilization plus holds, and suspension prevents further drawing while preserving debt.

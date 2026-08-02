@@ -13,6 +13,7 @@ import { requireActionUser } from "@/lib/auth/session";
 import type { ActionState } from "@/modules/contracts";
 import { moneyToMinorUnits, minorUnitsToMoney, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 import { BankingError, bookExternalPayment, bookInternalTransfer } from "@/modules/services/payments";
+import { assertPostingDateOpen } from "@/modules/services/accounting-periods";
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "").trim();
 const optionalText = (formData: FormData, key: string) => text(formData, key) || null;
@@ -167,11 +168,13 @@ export async function openAccountAction(_previous: ActionState, formData: FormDa
       await tx.insert(accountStatusHistory).values({ accountId: created.id, previousStatus: null, newStatus: "ACTIVE", reason: "Account opened", changedBy: actor.username });
       const deposit = moneyToMinorUnits(parsed.data.initialDeposit);
       if (deposit > 0n) {
+        const valueDate = new Date().toISOString().slice(0, 10);
+        await assertPostingDateOpen(tx, valueDate);
         const clearingResult = await tx.execute(sql`select id, balance from clearing_accounts where currency = ${product.currency} order by code limit 1 for update`);
         const clearing = (clearingResult.rows as unknown as Array<{ id: string; balance: string }>)[0];
         if (!clearing) throw new BankingError("CLEARING_UNAVAILABLE", "Opening deposit clearing is unavailable.");
         const clearingAfter = minorUnitsToMoney(signedMoneyToMinorUnits(clearing.balance) - deposit);
-        const [transaction] = await tx.insert(ledgerTransactions).values({ reference: `OPEN-${next}`, bookedAt: new Date(), valueDate: new Date().toISOString().slice(0, 10), description: "Opening deposit", type: "OPENING_DEPOSIT", status: "BOOKED", currency: product.currency, amount: parsed.data.initialDeposit, counterparty: "Opening Deposit Clearing" }).returning();
+        const [transaction] = await tx.insert(ledgerTransactions).values({ reference: `OPEN-${next}`, bookedAt: new Date(), valueDate, description: "Opening deposit", type: "OPENING_DEPOSIT", status: "BOOKED", currency: product.currency, amount: parsed.data.initialDeposit, counterparty: "Opening Deposit Clearing" }).returning();
         await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: created.id, direction: "CREDIT", amount: parsed.data.initialDeposit, balanceAfter: parsed.data.initialDeposit });
         await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "DEBIT", amount: parsed.data.initialDeposit, balanceAfter: clearingAfter });
         await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: new Date() }).where(eq(clearingAccounts.id, clearing.id));

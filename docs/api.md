@@ -1,6 +1,6 @@
 # FutureBank REST API
 
-The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, KYC, overdrafts and work items.
+The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, accounting-period close, KYC, overdrafts and work items.
 
 ## External discovery and accessibility
 
@@ -164,6 +164,22 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/reconciliation-runs" \
 ```
 
 The control matches fictional external settlement records to immutable clearing entries by transaction reference, currency, exact decimal amount and direction. Missing-side and mismatch outcomes remain open until a Supervisor or Admin records a version-checked resolution comment. Reconciliation and resolution never alter settlement evidence, clearing entries, ledger transactions, or balances.
+
+## Accounting periods
+
+- `GET /accounting-periods` and `GET /accounting-periods/{periodReference}` expose the period register, versioned close evidence and latest work item.
+- `POST /accounting-periods/{periodReference}/close-requests` lets a Supervisor request close with an expected period version and evidence comment.
+- `POST /accounting-periods/{periodReference}/close-decisions` lets a distinct Admin approve or reject with the work-item reference, expected work-item version and decision comment.
+
+Close is accepted only after a completed end-of-day run at the end date and a later completed reconciliation that covers every period-end clearing entry. All reconciliation exceptions must be resolved, no processing run may remain active in the period, and every ledger transaction must balance. The period is frozen while `CLOSING`; approval makes that boundary permanent as `CLOSED`, while rejection returns it to `OPEN`.
+
+```bash
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/accounting-periods/ACP-000001/close-requests" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.supervisor" \
+  -H "Content-Type: application/json" \
+  -d '{"expectedVersion":1,"comment":"Final processing and reconciliation controls are complete."}'
+```
 
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.
 

@@ -25,6 +25,8 @@ const authenticatedRoutes = [
   ["/end-of-day", "end-of-day"],
   ["/end-of-day/EOD-000001", "end-of-day-detail"],
   ["/reconciliation", "reconciliation"],
+  ["/accounting-periods", "accounting-periods"],
+  ["/accounting-periods/ACP-000001", "accounting-period-detail"],
   ["/work-queue", "work-queue"],
   ["/work-queue/WRK-000001", "work-item-detail"],
   ["/kyc", "kyc-register"],
