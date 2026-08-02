@@ -23,13 +23,14 @@ import {
 } from "@/modules/actions/overdrafts";
 import { approvePendingPaymentAction, expirePendingPaymentsAction, rejectPendingPaymentAction } from "@/modules/actions/payments";
 import { cancelPaymentInstructionAction, createPaymentInstructionAction, runPaymentInstructionsAction } from "@/modules/actions/payment-instructions";
+import { cancelDirectDebitMandateAction, createDirectDebitMandateAction, submitDirectDebitCollectionAction } from "@/modules/actions/direct-debits";
 import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/workflow";
 import {
   getAccount, getCustomer, getDashboardSummary, listAccounts, listAuditEvents, listBeneficiaries,
   listCustomers, listProducts,
 } from "@/modules/queries";
 import {
-  getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getWorkItem, listKycCases,
+  getDirectDebitMandate, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getWorkItem, listDirectDebitMandates, listKycCases,
   listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
@@ -76,8 +77,8 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.2.0", openapi: "/api/openapi.json",
-      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      name: "FutureBank API", version: "1.3.0", openapi: "/api/openapi.json",
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "direct-debits", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -165,6 +166,12 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!item) notFound("Payment instruction");
       return jsonResponse(item);
     }
+    if (segments[0] === "direct-debits" && segments.length === 1) return jsonResponse(await listDirectDebitMandates());
+    if (segments[0] === "direct-debits" && segments.length === 2) {
+      const item = await getDirectDebitMandate(segments[1]);
+      if (!item) notFound("Direct debit mandate");
+      return jsonResponse(item);
+    }
     if (segments[0] === "kyc-cases" && segments.length === 1) return jsonResponse(await listKycCases());
     if (segments[0] === "kyc-cases" && segments.length === 2) {
       const item = await getKycCase(segments[1]);
@@ -224,6 +231,13 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     }
     if (segments[0] === "payment-instructions" && segments.length === 3 && segments[2] === "cancellation") {
       return responseForAction(await cancelPaymentInstructionAction(initialActionState, await bodyForm(request, { reference: segments[1] })));
+    }
+    if (segments[0] === "direct-debits" && segments.length === 1) return responseForAction(await createDirectDebitMandateAction(initialActionState, await bodyForm(request)), 201);
+    if (segments[0] === "direct-debits" && segments.length === 3 && segments[2] === "cancellation") return responseForAction(await cancelDirectDebitMandateAction(initialActionState, await bodyForm(request, { reference: segments[1] })));
+    if (segments[0] === "direct-debits" && segments.length === 3 && segments[2] === "collections") {
+      const body = await readJsonObject(request);
+      const idempotencyKey = request.headers.get("idempotency-key")?.trim() || body.idempotencyKey;
+      return responseForAction(await submitDirectDebitCollectionAction(initialActionState, formDataFromObject({ ...body, mandateReference: segments[1], idempotencyKey })), 201);
     }
     if (segments[0] === "kyc-cases" && segments.length === 1) {
       const body = await readJsonObject(request);

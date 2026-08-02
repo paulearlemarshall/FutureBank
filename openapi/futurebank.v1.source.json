@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.2.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.3.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, direct debits, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -54,6 +54,10 @@
     {
       "name": "Payment instructions",
       "description": "Future-dated payments, standing orders and idempotent due-instruction processing."
+    },
+    {
+      "name": "Direct debits",
+      "description": "Customer mandates and idempotent creditor collection processing."
     },
     {
       "name": "KYC",
@@ -1359,6 +1363,42 @@
         },
         "operationId": "runPaymentInstructions",
         "description": "Claims due occurrences, rechecks live payment controls and uses a stable occurrence idempotency key before booking through the existing payment and ledger service."
+      }
+    },
+    "/direct-debits": {
+      "get": {
+        "tags": ["Direct debits"], "summary": "List direct debit mandates",
+        "responses": {"200": {"description": "Mandate register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/DirectDebitMandate"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "listDirectDebitMandates", "description": "Lists active and terminal mandates with collection history."
+      },
+      "post": {
+        "tags": ["Direct debits"], "summary": "Register a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitMandateWrite"}}}},
+        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "createDirectDebitMandate", "description": "Registers customer authority after account, ownership, KYC and currency checks; no funds are reserved."
+      }
+    },
+    "/direct-debits/{mandateReference}": {
+      "get": {
+        "tags": ["Direct debits"], "summary": "Get a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}],
+        "responses": {"200": {"description": "Mandate and collection history.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/DirectDebitMandate"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "getDirectDebitMandate", "description": "Returns mandate limits, lifecycle state and linked payment outcomes."
+      }
+    },
+    "/direct-debits/{mandateReference}/cancellation": {
+      "post": {
+        "tags": ["Direct debits"], "summary": "Cancel a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitMandateCancellation"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "cancelDirectDebitMandate", "description": "Cancels with an expected version and rejects cancellation while a collection is processing."
+      }
+    },
+    "/direct-debits/{mandateReference}/collections": {
+      "post": {
+        "tags": ["Direct debits"], "summary": "Submit a creditor collection", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}, {"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitCollectionWrite"}}}},
+        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "submitDirectDebitCollection", "description": "Claims an idempotent occurrence, applies mandate limits and delegates live booking, holds and approvals to the external-payment service."
       }
     },
     "/kyc-cases": {
@@ -3081,6 +3121,9 @@
         "required": true,
         "schema": {"type": "string", "pattern": "^PIN-"}
       },
+      "DirectDebitMandateReference": {
+        "name": "mandateReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^DDM-"}
+      },
       "CaseReference": {
         "name": "caseReference",
         "in": "path",
@@ -3569,6 +3612,18 @@
         "required": ["businessDate"],
         "additionalProperties": false,
         "properties": {"businessDate": {"type": "string", "format": "date"}}
+      },
+      "DirectDebitMandateWrite": {
+        "type": "object", "description": "Customer authority granted to an owned active beneficiary creditor.", "required": ["sourceAccountNumber", "creditorBeneficiaryId", "creditorMandateReference", "maximumSingleAmount", "validFrom"], "additionalProperties": false,
+        "properties": {"sourceAccountNumber": {"type": "string"}, "creditorBeneficiaryId": {"type": "string", "format": "uuid"}, "creditorMandateReference": {"type": "string", "minLength": 3, "maxLength": 80}, "maximumSingleAmount": {"$ref": "#/components/schemas/Money"}, "validFrom": {"type": "string", "format": "date"}, "validTo": {"type": "string", "format": "date", "nullable": true}}
+      },
+      "DirectDebitMandateCancellation": {
+        "type": "object", "description": "Optimistic mandate cancellation.", "required": ["expectedVersion", "reason"], "additionalProperties": false,
+        "properties": {"expectedVersion": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 5, "maxLength": 300}}
+      },
+      "DirectDebitCollectionWrite": {
+        "type": "object", "description": "One immediate collection request; the idempotency key is supplied as a header.", "required": ["amount", "collectionDate"], "additionalProperties": false,
+        "properties": {"amount": {"$ref": "#/components/schemas/Money"}, "collectionDate": {"type": "string", "format": "date"}}
       },
       "DocumentSlot": {
         "type": "string",
@@ -4511,6 +4566,14 @@
           "completedAt": {"type": "string", "format": "date-time", "nullable": true},
           "errorMessage": {"type": "string", "nullable": true}
         }
+      },
+      "DirectDebitCollection": {
+        "type": "object", "description": "A creditor collection and its linked payment outcome.", "required": ["reference", "status", "amount", "currency", "collectionDate", "paymentReference", "failureCode", "failureMessage", "createdAt", "completedAt"], "additionalProperties": false,
+        "properties": {"reference": {"type": "string"}, "status": {"type": "string", "enum": ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]}, "amount": {"$ref": "#/components/schemas/Money"}, "currency": {"type": "string"}, "collectionDate": {"type": "string", "format": "date"}, "paymentReference": {"type": "string", "nullable": true}, "failureCode": {"type": "string", "nullable": true}, "failureMessage": {"type": "string", "nullable": true}, "createdAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time", "nullable": true}}
+      },
+      "DirectDebitMandate": {
+        "type": "object", "description": "Direct debit authority, limit, lifecycle and collection history.", "required": ["reference", "status", "sourceAccountNumber", "customerNumber", "customerName", "creditorBeneficiaryId", "creditorName", "creditorAccountNumber", "creditorMandateReference", "maximumSingleAmount", "currency", "validFrom", "validTo", "cancellationReason", "version", "collections"], "additionalProperties": false,
+        "properties": {"reference": {"type": "string"}, "status": {"type": "string", "enum": ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]}, "sourceAccountNumber": {"type": "string"}, "customerNumber": {"type": "string"}, "customerName": {"type": "string"}, "creditorBeneficiaryId": {"type": "string"}, "creditorName": {"type": "string"}, "creditorAccountNumber": {"type": "string"}, "creditorMandateReference": {"type": "string"}, "maximumSingleAmount": {"$ref": "#/components/schemas/Money"}, "currency": {"type": "string"}, "validFrom": {"type": "string", "format": "date"}, "validTo": {"type": "string", "format": "date", "nullable": true}, "cancellationReason": {"type": "string", "nullable": true}, "version": {"type": "integer", "minimum": 1}, "collections": {"type": "array", "items": {"$ref": "#/components/schemas/DirectDebitCollection"}}}
       },
       "KycCaseSummary": {
         "type": "object",

@@ -22,6 +22,9 @@ describe("role boundaries", () => {
     expect(hasPermission("OPERATOR", "PAYMENT_SCHEDULE_EXECUTE")).toBe(false);
     expect(hasPermission("SUPERVISOR", "PAYMENT_SCHEDULE_EXECUTE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(false);
+    expect(hasPermission("OPERATOR", "DIRECT_DEBIT_MAINTAIN")).toBe(true);
+    expect(hasPermission("OPERATOR", "DIRECT_DEBIT_COLLECT")).toBe(true);
+    expect(hasPermission("SUPERVISOR", "DIRECT_DEBIT_COLLECT")).toBe(false);
     expect(hasPermission("SUPERVISOR", "OVERDRAFT_DECIDE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "KYC_DECIDE")).toBe(false);
     expect(hasPermission("COMPLIANCE", "KYC_DECIDE")).toBe(true);

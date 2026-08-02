@@ -101,6 +101,26 @@ curl "https://future-bank-demo.vercel.app/api/v1/accounts/1000000001/statement?f
   --output statement.csv
 ```
 
+## Direct debits
+
+Direct debit mandates and collections are available at:
+
+- `GET|POST /direct-debits`
+- `GET /direct-debits/{mandateReference}`
+- `POST /direct-debits/{mandateReference}/cancellation`
+- `POST /direct-debits/{mandateReference}/collections`
+
+Mandate creation requires an active source account and an active creditor beneficiary owned by the same customer and using the same currency. A mandate reserves no funds. Collection submission requires `Idempotency-Key`, enforces the mandate dates and maximum single amount, and delegates the actual debit to the existing external-payment service. The resulting collection is booked, pending independent approval with a hold, or rejected with a durable failure reason.
+
+```bash
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/direct-debits/DDM-000001/collections" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.operator" \
+  -H "Idempotency-Key: creditor-run-20260802-001" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":"25.00","collectionDate":"2026-08-02"}'
+```
+
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.
 
 ## Customer document examples

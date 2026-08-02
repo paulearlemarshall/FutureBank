@@ -35,6 +35,6 @@ describe("OpenAPI customer document contract", () => {
     expect(specification.paths["/customers/{customerNumber}/documents/{slot}/content"].get).toBeDefined();
     expect(specification.components.schemas.DocumentMeta).toBeDefined();
     expect(specification.components.schemas.DocumentSlot.enum).toEqual(["PASSPORT", "NATIONAL_ID"]);
-    expect(operationIds.size).toBe(56);
+    expect(operationIds.size).toBe(61);
   });
 });

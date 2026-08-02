@@ -4,11 +4,13 @@ import { resetBaseline } from "../src/db/seed";
 import { seedDemoStaff } from "../src/db/seed-auth";
 import { stableUuid } from "../src/db/seed-manifest";
 import { runDuePaymentInstructions } from "../src/modules/services/payment-instructions";
+import { submitDirectDebitCollection } from "../src/modules/services/direct-debits";
 import { approvePendingPayment } from "../src/modules/services/payments";
 
 async function main() {
   const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin" };
   const supervisor = { id: stableUuid("auth-user-supervisor"), username: "bp.supervisor", name: "Blue Prism Supervisor", role: "SUPERVISOR" as const };
+  const operator = { id: stableUuid("auth-user-operator"), username: "bp.operator", name: "Blue Prism Operator", role: "OPERATOR" as const };
   if (process.env.SKIP_DEMO_STAFF_SEED !== "true") await seedDemoStaff(db);
   await resetBaseline(db, admin);
   try {
@@ -49,7 +51,20 @@ async function main() {
       if (Number(instructionRow[label]) !== 1) throw new Error(`${label}: expected 1, received ${instructionRow[label]}`);
     }
     if (Number(instructionRow.ledger_entries) !== 2) throw new Error(`ledger_entries: expected 2, received ${instructionRow.ledger_entries}`);
-    console.info("Workflow integration verification passed: locking prevented double approval, and a due instruction booked exactly once through the balanced ledger path.");
+    const mandateDateResult = await db.execute(sql`select valid_from::text as value from direct_debit_mandates where reference = 'DDM-000001'`);
+    const collectionDate = String((mandateDateResult.rows[0] as { value: string }).value);
+    const collectionKey = "VERIFY-DIRECT-DEBIT-EXACTLY-ONCE";
+    const firstCollection = await submitDirectDebitCollection({ mandateReference: "DDM-000001", amount: "3.21", collectionDate, idempotencyKey: collectionKey, today: collectionDate }, operator);
+    const duplicateCollection = await submitDirectDebitCollection({ mandateReference: "DDM-000001", amount: "3.21", collectionDate, idempotencyKey: collectionKey, today: collectionDate }, operator);
+    if (firstCollection.status !== "BOOKED" || duplicateCollection.reference !== firstCollection.reference || !duplicateCollection.duplicate) throw new Error("Direct debit idempotency did not return the original booked collection");
+    const collectionResult = await db.execute(sql`
+      select
+        (select count(*)::int from direct_debit_collections where idempotency_key = ${collectionKey} and status = 'BOOKED') as collections,
+        (select count(*)::int from payment_orders where idempotency_key like 'direct-debit:%' and status = 'BOOKED') as payments,
+        (select count(*)::int from ledger_transactions l join payment_orders p on p.id = l.payment_order_id where p.idempotency_key like 'direct-debit:%') as ledger_transactions
+    `);
+    for (const [label, value] of Object.entries(collectionResult.rows[0] as unknown as Record<string, number>)) if (Number(value) !== 1) throw new Error(`direct debit ${label}: expected 1, received ${value}`);
+    console.info("Workflow integration verification passed: locking prevented double approval, and scheduled and direct-debit payments booked exactly once through the balanced ledger path.");
   } finally {
     await resetBaseline(db, admin);
   }

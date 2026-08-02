@@ -33,6 +33,8 @@ export const paymentInstructionStatusEnum = pgEnum("payment_instruction_status",
 export const paymentInstructionFrequencyEnum = pgEnum("payment_instruction_frequency", ["ONCE", "WEEKLY", "MONTHLY"]);
 export const paymentInstructionExecutionStatusEnum = pgEnum("payment_instruction_execution_status", ["PROCESSING", "BOOKED", "PENDING", "FAILED"]);
 export const processingRunStatusEnum = pgEnum("processing_run_status", ["RUNNING", "COMPLETED", "FAILED"]);
+export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
+export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
 export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
 export const workItemStatusEnum = pgEnum("work_item_status", ["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
@@ -380,6 +382,29 @@ export const beneficiaries = pgTable("beneficiaries", {
   ...timestamps,
 }, (table) => [index("beneficiaries_customer_idx").on(table.customerId)]);
 
+export const directDebitMandates = pgTable("direct_debit_mandates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  sourceAccountId: uuid("source_account_id").notNull().references(() => bankAccounts.id, { onDelete: "restrict" }),
+  creditorBeneficiaryId: uuid("creditor_beneficiary_id").notNull().references(() => beneficiaries.id, { onDelete: "restrict" }),
+  creditorMandateReference: text("creditor_mandate_reference").notNull(),
+  status: directDebitMandateStatusEnum("status").notNull().default("ACTIVE"),
+  maximumSingleAmount: numeric("maximum_single_amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  validFrom: date("valid_from").notNull(),
+  validTo: date("valid_to"),
+  createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+  cancellationReason: text("cancellation_reason"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("direct_debit_creditor_reference_idx").on(table.creditorBeneficiaryId, table.creditorMandateReference),
+  index("direct_debit_mandates_source_idx").on(table.sourceAccountId),
+  index("direct_debit_mandates_status_idx").on(table.status),
+]);
+
 export const paymentOrders = pgTable("payment_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   reference: text("reference").notNull().unique(),
@@ -462,6 +487,25 @@ export const paymentInstructionExecutions = pgTable("payment_instruction_executi
 }, (table) => [
   uniqueIndex("payment_instruction_execution_occurrence_idx").on(table.instructionId, table.scheduledFor),
   index("payment_instruction_execution_run_idx").on(table.processingRunId),
+]);
+
+export const directDebitCollections = pgTable("direct_debit_collections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  mandateId: uuid("mandate_id").notNull().references(() => directDebitMandates.id, { onDelete: "restrict" }),
+  paymentOrderId: uuid("payment_order_id").references(() => paymentOrders.id, { onDelete: "set null" }),
+  status: directDebitCollectionStatusEnum("status").notNull().default("PROCESSING"),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  collectionDate: date("collection_date").notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  failureCode: text("failure_code"),
+  failureMessage: text("failure_message"),
+  submittedBy: text("submitted_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  index("direct_debit_collections_mandate_idx").on(table.mandateId, table.collectionDate),
 ]);
 
 export const ledgerTransactions = pgTable("ledger_transactions", {

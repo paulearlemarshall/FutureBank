@@ -11,6 +11,8 @@ import {
   customerDocumentFiles,
   customerRelationships,
   customers,
+  directDebitCollections,
+  directDebitMandates,
   identityDocuments,
   ledgerEntries,
   ledgerTransactions,
@@ -45,6 +47,8 @@ describe("database model contract", () => {
       bankAccounts,
       beneficiaries,
       paymentOrders,
+      directDebitMandates,
+      directDebitCollections,
       paymentInstructions,
       paymentInstructionExecutions,
       processingRuns,
@@ -65,6 +69,8 @@ describe("database model contract", () => {
       "customer_document_files",
       "bank_accounts",
       "payment_orders",
+      "direct_debit_mandates",
+      "direct_debit_collections",
       "payment_instructions",
       "payment_instruction_executions",
       "processing_runs",
@@ -83,6 +89,8 @@ describe("database model contract", () => {
       overdraftFacilities.approvedLimit,
       paymentOrders.amount,
       paymentInstructions.amount,
+      directDebitMandates.maximumSingleAmount,
+      directDebitCollections.amount,
       ledgerTransactions.amount,
       ledgerEntries.amount,
       ledgerEntries.balanceAfter,
@@ -109,6 +117,9 @@ describe("database model contract", () => {
     expect(paymentInstructions.reference.isUnique).toBe(true);
     expect(paymentInstructionExecutions.idempotencyKey.isUnique).toBe(true);
     expect(processingRuns.reference.isUnique).toBe(true);
+    expect(directDebitMandates.reference.isUnique).toBe(true);
+    expect(directDebitCollections.reference.isUnique).toBe(true);
+    expect(directDebitCollections.idempotencyKey.isUnique).toBe(true);
     expect(ledgerTransactions.reference.isUnique).toBe(true);
   });
 

@@ -18,6 +18,7 @@ const navGroups = [
       ["Accounts", "/accounts", "nav-accounts"],
       ["Beneficiaries", "/beneficiaries", "nav-beneficiaries"],
       ["Payments & transfers", "/payments", "nav-payments"],
+      ["Direct debits", "/direct-debits", "nav-direct-debits"],
       ["Arranged overdrafts", "/overdrafts", "nav-overdrafts"],
       ["Product catalogue", "/products", "nav-products"],
     ],

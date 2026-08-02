@@ -99,6 +99,12 @@ export const baselinePaymentInstructions = [
   },
 ] as const;
 
+export const baselineDirectDebitMandates = [
+  { reference: "DDM-000001", status: "ACTIVE" as const, sourceAccountNumber: "1000000002", beneficiaryKey: "beneficiary-1", creditorMandateReference: "UTILITY-C1-001", maximumSingleAmount: "500.00", currency: "GBP", validFromOffset: 0, validToOffset: 365 },
+  { reference: "DDM-000002", status: "SUSPENDED" as const, sourceAccountNumber: "1000000004", beneficiaryKey: "beneficiary-2", creditorMandateReference: "SERVICE-C2-002", maximumSingleAmount: "2500.00", currency: "AED", validFromOffset: -30, validToOffset: 335 },
+  { reference: "DDM-000003", status: "CANCELLED" as const, sourceAccountNumber: "1000000009", beneficiaryKey: "beneficiary-9", creditorMandateReference: "SUPPLIER-C4-003", maximumSingleAmount: "1500.00", currency: "GBP", validFromOffset: -60, validToOffset: null },
+] as const;
+
 const transactionDescriptions = ["Salary credit", "Card purchase", "Utility payment", "Online transfer", "Account fee", "Interest payment", "Standing order", "Cash withdrawal", "Supplier payment", "Insurance premium"];
 
 export type BaselineTransaction = {
@@ -176,5 +182,6 @@ export function validateBaselineSeed(): string[] {
   if (new Set(ids).size !== ids.length) errors.push("Baseline identifiers must be unique");
   if (baselineBeneficiaries.length < 12) errors.push("Expected at least twelve beneficiaries");
   if (baselinePaymentInstructions.length !== 3) errors.push("Expected three payment instruction scenarios");
+  if (baselineDirectDebitMandates.length !== 3) errors.push("Expected three direct debit mandate scenarios");
   return errors;
 }

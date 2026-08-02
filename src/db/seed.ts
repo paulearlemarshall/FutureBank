@@ -9,6 +9,7 @@ import {
   baselineCustomers,
   baselineProducts,
   baselinePaymentInstructions,
+  baselineDirectDebitMandates,
   baselineTransactions,
   stableUuid,
   validateBaselineSeed,
@@ -36,8 +37,10 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.ledgerEntries);
   await tx.delete(tables.ledgerTransactions);
   await tx.delete(tables.paymentInstructionExecutions);
+  await tx.delete(tables.directDebitCollections);
   await tx.delete(tables.processingRuns);
   await tx.delete(tables.paymentInstructions);
+  await tx.delete(tables.directDebitMandates);
   await tx.delete(tables.paymentOrders);
   await tx.delete(tables.overdraftAlerts);
   await tx.delete(tables.overdraftUsageSnapshots);
@@ -281,6 +284,26 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   await tx.insert(tables.beneficiaries).values(baselineBeneficiaries.map((item) => ({
     ...item, customerId: customerId(item.customerNumber), status: item.status,
   })));
+
+  await tx.insert(tables.directDebitMandates).values(baselineDirectDebitMandates.map((item) => ({
+    id: stableUuid(`direct-debit-mandate-${item.reference}`), reference: item.reference,
+    sourceAccountId: bankAccountId(item.sourceAccountNumber), creditorBeneficiaryId: stableUuid(item.beneficiaryKey),
+    creditorMandateReference: item.creditorMandateReference, status: item.status,
+    maximumSingleAmount: item.maximumSingleAmount, currency: item.currency,
+    validFrom: timeline.date(item.validFromOffset), validTo: item.validToOffset === null ? null : timeline.date(item.validToOffset),
+    createdBy: staffId("operator"), cancelledBy: item.status === "CANCELLED" ? staffId("operator") : null,
+    cancellationReason: item.status === "CANCELLED" ? "Customer withdrew the fictional mandate" : null,
+    cancelledAt: item.status === "CANCELLED" ? timeline.instant(-2, 14) : null,
+    version: item.status === "CANCELLED" ? 2 : 1,
+  })));
+
+  await tx.insert(tables.directDebitCollections).values({
+    id: stableUuid("direct-debit-collection-DDC-000001"), reference: "DDC-000001",
+    mandateId: stableUuid("direct-debit-mandate-DDM-000001"), status: "REJECTED",
+    amount: "75.00", currency: "GBP", collectionDate: timeline.date(-1), idempotencyKey: "SEED-DDC-REJECTED-0001",
+    failureCode: "FICTIONAL_CREDITOR_RECALL", failureMessage: "The fictional creditor recalled the collection before booking.",
+    submittedBy: staffId("operator"), completedAt: timeline.instant(-1, 10), createdAt: timeline.instant(-1, 10), updatedAt: timeline.instant(-1, 10),
+  });
 
   await tx.insert(tables.paymentInstructions).values(baselinePaymentInstructions.map((item) => {
     const startDate = timeline.date(item.startOffsetDays);

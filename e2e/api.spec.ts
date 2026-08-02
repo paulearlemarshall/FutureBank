@@ -10,6 +10,7 @@ test("serves the OpenAPI 3 artifact without authentication", async ({ request })
   expect(document.paths["/payments"].post).toBeDefined();
   expect(document.paths["/payment-instructions"].post).toBeDefined();
   expect(document.paths["/payment-instructions/processing-runs"].post).toBeDefined();
+  expect(document.paths["/direct-debits/{mandateReference}/collections"].post).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
@@ -104,13 +105,24 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.2.0", resources: expect.arrayContaining(["payment-instructions"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.3.0", resources: expect.arrayContaining(["payment-instructions", "direct-debits"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
     expect.objectContaining({ reference: "PIN-000001", type: "SCHEDULED", status: "ACTIVE", frequency: "ONCE" }),
     expect.objectContaining({ reference: "PIN-000002", type: "STANDING_ORDER", status: "ACTIVE", frequency: "MONTHLY" }),
     expect.objectContaining({ reference: "PIN-000003", status: "CANCELLED" }),
+  ]));
+});
+
+test("discovers deterministic direct debit mandate lifecycles", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const response = await request.get("/api/v1/direct-debits", { headers: { "X-API-Key": apiKey! } });
+  expect(response.ok()).toBe(true);
+  expect((await response.json()).data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ reference: "DDM-000001", status: "ACTIVE", maximumSingleAmount: "500.00" }),
+    expect.objectContaining({ reference: "DDM-000002", status: "SUSPENDED" }),
+    expect.objectContaining({ reference: "DDM-000003", status: "CANCELLED" }),
   ]));
 });
 

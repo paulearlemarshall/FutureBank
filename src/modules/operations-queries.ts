@@ -3,13 +3,13 @@ import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers,
+  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
   paymentInstructionExecutions, paymentInstructions, paymentOrders, processingRuns, screeningChecks, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, ProcessingRunView,
+  DirectDebitMandateView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, ProcessingRunView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -247,4 +247,34 @@ export async function listPaymentInstructionRuns(limit = 10): Promise<Processing
     completedAt: run.completedAt ? iso(run.completedAt) : null,
     errorMessage: run.errorMessage,
   }));
+}
+
+export async function getDirectDebitMandate(reference: string): Promise<DirectDebitMandateView | null> {
+  await requireUser();
+  const [row] = await db.select({ mandate: directDebitMandates, account: bankAccounts, customer: customers, creditor: beneficiaries })
+    .from(directDebitMandates).innerJoin(bankAccounts, eq(directDebitMandates.sourceAccountId, bankAccounts.id))
+    .innerJoin(customers, eq(bankAccounts.customerId, customers.id)).innerJoin(beneficiaries, eq(directDebitMandates.creditorBeneficiaryId, beneficiaries.id))
+    .where(eq(directDebitMandates.reference, reference)).limit(1);
+  if (!row) return null;
+  const collections = await db.select({ collection: directDebitCollections, paymentReference: paymentOrders.reference }).from(directDebitCollections)
+    .leftJoin(paymentOrders, eq(directDebitCollections.paymentOrderId, paymentOrders.id))
+    .where(eq(directDebitCollections.mandateId, row.mandate.id)).orderBy(desc(directDebitCollections.createdAt));
+  return {
+    reference: row.mandate.reference, status: row.mandate.status, sourceAccountNumber: row.account.accountNumber,
+    customerNumber: row.customer.customerNumber, customerName: displayName(row.customer), creditorBeneficiaryId: row.creditor.id,
+    creditorName: row.creditor.name, creditorAccountNumber: row.creditor.accountNumber,
+    creditorMandateReference: row.mandate.creditorMandateReference, maximumSingleAmount: row.mandate.maximumSingleAmount,
+    currency: row.mandate.currency, validFrom: row.mandate.validFrom, validTo: row.mandate.validTo,
+    cancellationReason: row.mandate.cancellationReason, version: row.mandate.version,
+    collections: collections.map(({ collection, paymentReference }) => ({ reference: collection.reference, status: collection.status,
+      amount: collection.amount, currency: collection.currency, collectionDate: collection.collectionDate, paymentReference,
+      failureCode: collection.failureCode, failureMessage: collection.failureMessage, createdAt: iso(collection.createdAt), completedAt: collection.completedAt ? iso(collection.completedAt) : null })),
+  };
+}
+
+export async function listDirectDebitMandates(): Promise<DirectDebitMandateView[]> {
+  await requireUser();
+  const rows = await db.select({ reference: directDebitMandates.reference }).from(directDebitMandates).orderBy(asc(directDebitMandates.reference));
+  const details = await Promise.all(rows.map((row) => getDirectDebitMandate(row.reference)));
+  return details.filter((item): item is DirectDebitMandateView => item !== null);
 }

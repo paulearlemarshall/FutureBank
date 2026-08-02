@@ -1,6 +1,6 @@
 # FutureBank Core
 
-FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, future-dated payment, standing-order, customer, account, CSV statement, and audit workflows.
+FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, future-dated payment, standing-order, direct-debit, customer, account, CSV statement, and audit workflows.
 
 All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 
@@ -12,7 +12,7 @@ An administrative reset restores nine customers and nineteen accounts. The origi
 
 The baseline includes two Arabic-language UAE records without changing identifier counts: retail customer `C000002` and SME customer `C000005`. Arabic-script names and addresses, Latin short-name transliterations, authenticated API search/write, and RTL-aware native form controls are covered by reset, database and browser verification.
 
-Useful starting records include `KYC-000007` for an unresolved fictional match, `KYC-000008` for Compliance approval, `1000000017` for a blocked account, `1000000018` for a closed account, `ODF-000006` for a pending limit change, `PAY-000002`–`PAY-000004` for terminal payment and hold outcomes, and `PIN-000001`–`PIN-000003` for future-dated, recurring and cancelled payment instructions.
+Useful starting records include `KYC-000007` for an unresolved fictional match, `KYC-000008` for Compliance approval, `1000000017` for a blocked account, `1000000018` for a closed account, `ODF-000006` for a pending limit change, `PAY-000002`–`PAY-000004` for terminal payment and hold outcomes, `PIN-000001`–`PIN-000003` for payment instructions, and `DDM-000001`–`DDM-000003` for direct-debit mandate lifecycles.
 
 ## Live demonstration
 

@@ -32,6 +32,7 @@ REST handlers are adapters over the same application services used by the UI. Th
 | Ledger, payments, and holds | payment services and transfer policy | balance invariants and payment journeys |
 | Future-dated payments and standing orders | payment-instruction service and processing-run tables | schedule policy tests and exactly-once workflow verification |
 | Account statement export | statement service over ledger entries | date/CSV policy tests and authenticated download journey |
+| Direct debit mandates and collections | direct-debit service and mandate/collection tables | mandate policy tests and payment/ledger journey |
 | Arranged overdrafts | overdraft policy/services and facility tables | overdraft tests and approval/alert journeys |
 | Customer-document files | document policy/service plus private Blob adapter | feature specification and real-Blob journey |
 | Public API | `openapi/futurebank.v1.source.json` and API adapter | generated artifact, drift check and API contract tests |
@@ -54,6 +55,7 @@ Consequential decisions use work items, optimistic versions, row/advisory locks,
 - Ledger postings remain balanced, idempotent, and atomically reflected in account projections.
 - Pending payments create holds without ledger entries. Approval rechecks current controls and books once; rejection or expiry releases the hold without booking.
 - A payment instruction owns future intent only and never reserves funds. Each due occurrence has one stable idempotency key, rechecks live controls, and delegates the actual booking to the existing payment service and ledger owner.
+- A direct debit mandate records customer authority and a maximum single amount but reserves no funds. Every collection is idempotently claimed, checked against the live mandate, then delegated to the external-payment service for current KYC, balance, hold, approval and ledger controls.
 - Available balance reconciles ledger balance, the active arranged overdraft limit, and active holds.
 - Only eligible current accounts with acceptable KYC and restrictions may receive or increase an overdraft facility.
 - Limit reductions cannot strand utilization plus holds, and suspension prevents further drawing while preserving debt.

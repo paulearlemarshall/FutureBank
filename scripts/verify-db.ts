@@ -50,6 +50,14 @@ async function main() {
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
   expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);
+  expectEqual("direct debit mandates", await scalar(sql`select count(*)::int as value from direct_debit_mandates`), 3);
+  expectEqual("direct debit mandate status coverage", await scalar(sql`select count(distinct status)::int as value from direct_debit_mandates`), 3);
+  expectEqual("direct debit collection scenarios", await scalar(sql`select count(*)::int as value from direct_debit_collections`), 1);
+  expectEqual("invalid direct debit ownership", await scalar(sql`
+    select count(*)::int as value from direct_debit_mandates m
+    join bank_accounts a on a.id = m.source_account_id join beneficiaries b on b.id = m.creditor_beneficiary_id
+    where a.customer_id <> b.customer_id or a.currency <> m.currency or b.currency <> m.currency
+  `), 0);
   expectEqual("active payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions where status = 'ACTIVE'`), 2);
   expectEqual("cancelled payment instruction scenarios", await scalar(sql`select count(*)::int as value from payment_instructions where status = 'CANCELLED' and cancellation_reason is not null and version = 2`), 1);
   expectEqual("invalid payment instruction targets", await scalar(sql`

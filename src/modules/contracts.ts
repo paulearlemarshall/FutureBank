@@ -422,6 +422,38 @@ export type ProcessingRunView = {
   errorMessage: string | null;
 };
 
+export type DirectDebitCollectionView = {
+  reference: string;
+  status: "PROCESSING" | "BOOKED" | "PENDING" | "REJECTED";
+  amount: string;
+  currency: string;
+  collectionDate: string;
+  paymentReference: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export type DirectDebitMandateView = {
+  reference: string;
+  status: "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
+  sourceAccountNumber: string;
+  customerNumber: string;
+  customerName: string;
+  creditorBeneficiaryId: string;
+  creditorName: string;
+  creditorAccountNumber: string;
+  creditorMandateReference: string;
+  maximumSingleAmount: string;
+  currency: string;
+  validFrom: string;
+  validTo: string | null;
+  cancellationReason: string | null;
+  version: number;
+  collections: DirectDebitCollectionView[];
+};
+
 export type LoanView = {
   originalPrincipal: string;
   outstandingPrincipal: string;
