@@ -34,6 +34,9 @@ export const paymentInstructionStatusEnum = pgEnum("payment_instruction_status",
 export const paymentInstructionFrequencyEnum = pgEnum("payment_instruction_frequency", ["ONCE", "WEEKLY", "MONTHLY"]);
 export const paymentInstructionExecutionStatusEnum = pgEnum("payment_instruction_execution_status", ["PROCESSING", "BOOKED", "PENDING", "FAILED"]);
 export const processingRunStatusEnum = pgEnum("processing_run_status", ["RUNNING", "COMPLETED", "FAILED"]);
+export const chargeTypeEnum = pgEnum("charge_type", ["DAILY_OVERDRAFT_USAGE"]);
+export const endOfDayPostingTypeEnum = pgEnum("end_of_day_posting_type", ["CHARGE", "INTEREST"]);
+export const endOfDayPostingStatusEnum = pgEnum("end_of_day_posting_status", ["PROCESSING", "BOOKED", "FAILED"]);
 export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
 export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
@@ -125,6 +128,19 @@ export const products = pgTable("products", {
   active: boolean("active").notNull().default(true),
   ...timestamps,
 });
+
+export const productChargeRules = pgTable("product_charge_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
+  type: chargeTypeEnum("type").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  active: boolean("active").notNull().default(true),
+  effectiveFrom: date("effective_from").notNull(),
+  effectiveTo: date("effective_to"),
+  ...timestamps,
+}, (table) => [uniqueIndex("product_charge_rule_product_type_idx").on(table.productId, table.type)]);
 
 export const customers = pgTable("customers", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -473,6 +489,14 @@ export const processingRuns = pgTable("processing_runs", {
   errorMessage: text("error_message"),
 }, (table) => [index("processing_runs_type_date_idx").on(table.type, table.businessDate)]);
 
+export const endOfDayRuns = pgTable("end_of_day_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  processingRunId: uuid("processing_run_id").notNull().unique().references(() => processingRuns.id, { onDelete: "restrict" }),
+  businessDate: date("business_date").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const paymentInstructionExecutions = pgTable("payment_instruction_executions", {
   id: uuid("id").primaryKey().defaultRandom(),
   instructionId: uuid("instruction_id").notNull().references(() => paymentInstructions.id, { onDelete: "restrict" }),
@@ -552,6 +576,29 @@ export const clearingEntries = pgTable("clearing_entries", {
   balanceAfter: numeric("balance_after", { precision: 18, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("clearing_entries_transaction_idx").on(table.transactionId)]);
+
+export const endOfDayPostings = pgTable("end_of_day_postings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  endOfDayRunId: uuid("end_of_day_run_id").notNull().references(() => endOfDayRuns.id, { onDelete: "restrict" }),
+  accountId: uuid("account_id").notNull().references(() => bankAccounts.id, { onDelete: "restrict" }),
+  businessDate: date("business_date").notNull(),
+  type: endOfDayPostingTypeEnum("type").notNull(),
+  status: endOfDayPostingStatusEnum("status").notNull().default("PROCESSING"),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  annualRate: numeric("annual_rate", { precision: 7, scale: 4 }),
+  chargeRuleId: uuid("charge_rule_id").references(() => productChargeRules.id, { onDelete: "restrict" }),
+  ledgerTransactionId: uuid("ledger_transaction_id").unique().references(() => ledgerTransactions.id, { onDelete: "restrict" }),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  failureCode: text("failure_code"),
+  failureMessage: text("failure_message"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("end_of_day_posting_occurrence_idx").on(table.accountId, table.businessDate, table.type),
+  index("end_of_day_postings_run_idx").on(table.endOfDayRunId),
+]);
 
 export const paymentReversals = pgTable("payment_reversals", {
   id: uuid("id").primaryKey().defaultRandom(),

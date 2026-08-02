@@ -8,6 +8,7 @@ import {
   baselineCustomerAddressOverrides,
   baselineCustomers,
   baselineProducts,
+  baselineProductChargeRules,
   baselinePaymentInstructions,
   baselineDirectDebitMandates,
   baselineTransactions,
@@ -35,10 +36,12 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.accountHolds);
   await tx.delete(tables.clearingEntries);
   await tx.delete(tables.ledgerEntries);
+  await tx.delete(tables.endOfDayPostings);
   await tx.delete(tables.paymentReversals);
   await tx.delete(tables.ledgerTransactions);
   await tx.delete(tables.paymentInstructionExecutions);
   await tx.delete(tables.directDebitCollections);
+  await tx.delete(tables.endOfDayRuns);
   await tx.delete(tables.processingRuns);
   await tx.delete(tables.paymentInstructions);
   await tx.delete(tables.directDebitMandates);
@@ -67,6 +70,7 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.addresses);
   await tx.delete(tables.auditEvents);
   await tx.delete(tables.customers);
+  await tx.delete(tables.productChargeRules);
   await tx.delete(tables.products);
   await tx.delete(tables.branches);
 }
@@ -79,6 +83,10 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
 
   await tx.insert(tables.branches).values(baselineBranches.map((item) => ({ id: branchId(item.code), ...item })));
   await tx.insert(tables.products).values(baselineProducts.map((item) => ({ id: productId(item.code), ...item })));
+  await tx.insert(tables.productChargeRules).values(baselineProductChargeRules.map((item) => ({
+    id: stableUuid(`product-charge-rule-${item.reference}`), reference: item.reference, productId: productId(item.productCode),
+    type: item.type, amount: item.amount, currency: item.currency, effectiveFrom: item.effectiveFrom,
+  })));
   await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, ...item, kycReviewDate: timeline.date(reviewOffsets[item.customerNumber]) })));
 
   if (preparedDocuments.length) {
@@ -304,6 +312,17 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     amount: "75.00", currency: "GBP", collectionDate: timeline.date(-1), idempotencyKey: "SEED-DDC-REJECTED-0001",
     failureCode: "FICTIONAL_CREDITOR_RECALL", failureMessage: "The fictional creditor recalled the collection before booking.",
     submittedBy: staffId("operator"), completedAt: timeline.instant(-1, 10), createdAt: timeline.instant(-1, 10), updatedAt: timeline.instant(-1, 10),
+  });
+
+  const failedEndOfDayRunId = stableUuid("processing-end-of-day-failed");
+  await tx.insert(tables.processingRuns).values({
+    id: failedEndOfDayRunId, reference: "EOD-000001", type: "END_OF_DAY", businessDate: timeline.date(-10), status: "FAILED",
+    requestedBy: staffId("supervisor"), attempted: 0, booked: 0, failed: 1, startedAt: timeline.instant(-10, 18),
+    completedAt: timeline.instant(-10, 18, 5), errorMessage: "Fictional clearing control unavailable during seeded historical run.",
+  });
+  await tx.insert(tables.endOfDayRuns).values({
+    id: stableUuid("end-of-day-run-failed"), reference: "EOD-000001", processingRunId: failedEndOfDayRunId,
+    businessDate: timeline.date(-10), createdAt: timeline.instant(-10, 18),
   });
 
   await tx.insert(tables.paymentInstructions).values(baselinePaymentInstructions.map((item) => {

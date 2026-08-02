@@ -22,6 +22,8 @@ const authenticatedRoutes = [
   ["/direct-debits/DDM-000001", "direct-debit-detail"],
   ["/payment-reversals", "payment-reversals"],
   ["/payment-reversals/REV-000001", "payment-reversal-detail"],
+  ["/end-of-day", "end-of-day"],
+  ["/end-of-day/EOD-000001", "end-of-day-detail"],
   ["/work-queue", "work-queue"],
   ["/work-queue/WRK-000001", "work-item-detail"],
   ["/kyc", "kyc-register"],

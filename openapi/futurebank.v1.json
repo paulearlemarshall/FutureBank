@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.4.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.5.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -62,6 +62,10 @@
     {
       "name": "Direct debits",
       "description": "Customer mandates and idempotent creditor collection processing."
+    },
+    {
+      "name": "End of day",
+      "description": "Once-per-business-date product charge and deposit-interest posting."
     },
     {
       "name": "KYC",
@@ -2015,6 +2019,140 @@
         "description": "Claims an idempotent occurrence, applies mandate limits and delegates live booking, holds and approvals to the external-payment service."
       }
     },
+    "/end-of-day-runs": {
+      "get": {
+        "tags": [
+          "End of day"
+        ],
+        "summary": "List recent end-of-day runs",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "End-of-day run history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EndOfDayRun"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listEndOfDayRuns",
+        "description": "Lists batch state, counts and account-level posting outcomes for recent business dates."
+      },
+      "post": {
+        "tags": [
+          "End of day"
+        ],
+        "summary": "Run end-of-day posting",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/StaffActor"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndOfDayRunWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "runEndOfDay",
+        "description": "Claims one run for the business date, then books configured daily overdraft charges and exact product-rate daily interest through balanced customer and currency-clearing ledger legs."
+      }
+    },
+    "/end-of-day-runs/{runReference}": {
+      "get": {
+        "tags": [
+          "End of day"
+        ],
+        "summary": "Get an end-of-day run",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EndOfDayRunReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "End-of-day run and postings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EndOfDayRun"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getEndOfDayRun",
+        "description": "Returns the processing summary and immutable booked or failed account-level posting records."
+      }
+    },
     "/kyc-cases": {
       "get": {
         "tags": [
@@ -3754,6 +3892,15 @@
         "schema": {
           "type": "string",
           "pattern": "^DDM-"
+        }
+      },
+      "EndOfDayRunReference": {
+        "name": "runReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^EOD-"
         }
       },
       "CaseReference": {
@@ -5920,6 +6067,178 @@
             "description": "Review date.",
             "format": "date",
             "nullable": true
+          }
+        }
+      },
+      "EndOfDayRunWrite": {
+        "type": "object",
+        "required": [
+          "businessDate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Non-future business date claimed at most once."
+          }
+        }
+      },
+      "EndOfDayPosting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "accountNumber",
+          "customerNumber",
+          "customerName",
+          "businessDate",
+          "type",
+          "status",
+          "amount",
+          "currency",
+          "annualRate",
+          "chargeRuleReference",
+          "transactionReference",
+          "failureCode",
+          "failureMessage",
+          "completedAt"
+        ],
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "CHARGE",
+              "INTEREST"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "BOOKED",
+              "FAILED"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "annualRate": {
+            "type": "string",
+            "nullable": true
+          },
+          "chargeRuleReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "transactionReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "EndOfDayRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "businessDate",
+          "status",
+          "attempted",
+          "booked",
+          "failed",
+          "chargeCount",
+          "interestCount",
+          "requestedBy",
+          "startedAt",
+          "completedAt",
+          "errorMessage",
+          "postings"
+        ],
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attempted": {
+            "type": "integer"
+          },
+          "booked": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "chargeCount": {
+            "type": "integer"
+          },
+          "interestCount": {
+            "type": "integer"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "postings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EndOfDayPosting"
+            }
           }
         }
       },

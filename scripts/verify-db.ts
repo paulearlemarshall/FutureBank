@@ -47,6 +47,12 @@ async function main() {
     )
   `), 2);
   expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 19);
+  expectEqual("product charge rules", await scalar(sql`select count(*)::int as value from product_charge_rules where active`), 2);
+  expectEqual("failed end-of-day scenarios", await scalar(sql`
+    select count(*)::int as value from end_of_day_runs r join processing_runs p on p.id = r.processing_run_id
+    where r.reference = 'EOD-000001' and p.type = 'END_OF_DAY' and p.status = 'FAILED' and p.failed = 1
+  `), 1);
+  expectEqual("seeded end-of-day postings", await scalar(sql`select count(*)::int as value from end_of_day_postings`), 0);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
   expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);

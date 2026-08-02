@@ -13,6 +13,8 @@ import {
   customers,
   directDebitCollections,
   directDebitMandates,
+  endOfDayPostings,
+  endOfDayRuns,
   identityDocuments,
   ledgerEntries,
   ledgerTransactions,
@@ -24,6 +26,7 @@ import {
   paymentOrders,
   paymentReversals,
   processingRuns,
+  productChargeRules,
   products,
   session,
   staffProfiles,
@@ -54,6 +57,9 @@ describe("database model contract", () => {
       paymentInstructions,
       paymentInstructionExecutions,
       processingRuns,
+      endOfDayRuns,
+      endOfDayPostings,
+      productChargeRules,
       ledgerTransactions,
       ledgerEntries,
       clearingAccounts,
@@ -77,6 +83,9 @@ describe("database model contract", () => {
       "payment_instructions",
       "payment_instruction_executions",
       "processing_runs",
+      "end_of_day_runs",
+      "end_of_day_postings",
+      "product_charge_rules",
       "ledger_transactions",
       "ledger_entries",
       "clearing_entries",
@@ -95,6 +104,8 @@ describe("database model contract", () => {
       paymentInstructions.amount,
       directDebitMandates.maximumSingleAmount,
       directDebitCollections.amount,
+      productChargeRules.amount,
+      endOfDayPostings.amount,
       ledgerTransactions.amount,
       ledgerEntries.amount,
       ledgerEntries.balanceAfter,
@@ -123,6 +134,11 @@ describe("database model contract", () => {
     expect(paymentInstructions.reference.isUnique).toBe(true);
     expect(paymentInstructionExecutions.idempotencyKey.isUnique).toBe(true);
     expect(processingRuns.reference.isUnique).toBe(true);
+    expect(endOfDayRuns.reference.isUnique).toBe(true);
+    expect(endOfDayRuns.businessDate.isUnique).toBe(true);
+    expect(productChargeRules.reference.isUnique).toBe(true);
+    expect(endOfDayPostings.reference.isUnique).toBe(true);
+    expect(endOfDayPostings.idempotencyKey.isUnique).toBe(true);
     expect(directDebitMandates.reference.isUnique).toBe(true);
     expect(directDebitCollections.reference.isUnique).toBe(true);
     expect(directDebitCollections.idempotencyKey.isUnique).toBe(true);

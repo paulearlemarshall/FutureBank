@@ -444,6 +444,40 @@ export type ProcessingRunView = {
   errorMessage: string | null;
 };
 
+export type EndOfDayPostingView = {
+  reference: string;
+  accountNumber: string;
+  customerNumber: string;
+  customerName: string;
+  businessDate: string;
+  type: "CHARGE" | "INTEREST";
+  status: "PROCESSING" | "BOOKED" | "FAILED";
+  amount: string;
+  currency: string;
+  annualRate: string | null;
+  chargeRuleReference: string | null;
+  transactionReference: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  completedAt: string | null;
+};
+
+export type EndOfDayRunView = {
+  reference: string;
+  businessDate: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  attempted: number;
+  booked: number;
+  failed: number;
+  chargeCount: number;
+  interestCount: number;
+  requestedBy: string;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+  postings: EndOfDayPostingView[];
+};
+
 export type DirectDebitCollectionView = {
   reference: string;
   status: "PROCESSING" | "BOOKED" | "PENDING" | "REJECTED";

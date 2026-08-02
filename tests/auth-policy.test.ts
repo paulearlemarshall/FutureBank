@@ -24,6 +24,8 @@ describe("role boundaries", () => {
     expect(hasPermission("OPERATOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(true);
     expect(hasPermission("OPERATOR", "PAYMENT_SCHEDULE_EXECUTE")).toBe(false);
     expect(hasPermission("SUPERVISOR", "PAYMENT_SCHEDULE_EXECUTE")).toBe(true);
+    expect(hasPermission("OPERATOR", "END_OF_DAY_EXECUTE")).toBe(false);
+    expect(hasPermission("SUPERVISOR", "END_OF_DAY_EXECUTE")).toBe(true);
     expect(hasPermission("SUPERVISOR", "PAYMENT_INSTRUCTION_MAINTAIN")).toBe(false);
     expect(hasPermission("OPERATOR", "DIRECT_DEBIT_MAINTAIN")).toBe(true);
     expect(hasPermission("OPERATOR", "DIRECT_DEBIT_COLLECT")).toBe(true);
@@ -33,5 +35,6 @@ describe("role boundaries", () => {
     expect(hasPermission("COMPLIANCE", "KYC_DECIDE")).toBe(true);
     expect(hasPermission("COMPLIANCE", "PAYMENT_DECIDE")).toBe(false);
     expect(hasPermission("ADMIN", "DEMO_RESET")).toBe(true);
+    expect(hasPermission("ADMIN", "END_OF_DAY_EXECUTE")).toBe(true);
   });
 });

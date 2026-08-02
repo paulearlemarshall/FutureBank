@@ -3,13 +3,13 @@ import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, ledgerTransactions,
+  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, ledgerTransactions,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
-  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, screeningChecks, user, workItemEvents, workItems,
+  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, screeningChecks, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  DirectDebitMandateView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView,
+  DirectDebitMandateView, EndOfDayRunView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -282,6 +282,44 @@ export async function listPaymentInstructionRuns(limit = 10): Promise<Processing
     completedAt: run.completedAt ? iso(run.completedAt) : null,
     errorMessage: run.errorMessage,
   }));
+}
+
+export async function getEndOfDayRun(reference: string): Promise<EndOfDayRunView | null> {
+  await requireUser();
+  const [row] = await db.select({ run: endOfDayRuns, processing: processingRuns, requester: user })
+    .from(endOfDayRuns).innerJoin(processingRuns, eq(endOfDayRuns.processingRunId, processingRuns.id))
+    .innerJoin(user, eq(processingRuns.requestedBy, user.id)).where(eq(endOfDayRuns.reference, reference)).limit(1);
+  if (!row) return null;
+  const postings = await db.select({ posting: endOfDayPostings, account: bankAccounts, customer: customers, ruleReference: productChargeRules.reference, transactionReference: ledgerTransactions.reference })
+    .from(endOfDayPostings).innerJoin(bankAccounts, eq(endOfDayPostings.accountId, bankAccounts.id))
+    .innerJoin(customers, eq(bankAccounts.customerId, customers.id))
+    .leftJoin(productChargeRules, eq(endOfDayPostings.chargeRuleId, productChargeRules.id))
+    .leftJoin(ledgerTransactions, eq(endOfDayPostings.ledgerTransactionId, ledgerTransactions.id))
+    .where(eq(endOfDayPostings.endOfDayRunId, row.run.id)).orderBy(asc(bankAccounts.accountNumber), asc(endOfDayPostings.type));
+  const mappedPostings = postings.map(({ posting, account, customer, ruleReference, transactionReference }) => ({
+    reference: posting.reference, accountNumber: account.accountNumber, customerNumber: customer.customerNumber,
+    customerName: displayName(customer), businessDate: posting.businessDate, type: posting.type, status: posting.status,
+    amount: posting.amount, currency: posting.currency, annualRate: posting.annualRate, chargeRuleReference: ruleReference,
+    transactionReference, failureCode: posting.failureCode, failureMessage: posting.failureMessage,
+    completedAt: posting.completedAt ? iso(posting.completedAt) : null,
+  }));
+  return {
+    reference: row.run.reference, businessDate: row.run.businessDate, status: row.processing.status,
+    attempted: row.processing.attempted, booked: row.processing.booked, failed: row.processing.failed,
+    chargeCount: mappedPostings.filter((posting) => posting.type === "CHARGE" && posting.status === "BOOKED").length,
+    interestCount: mappedPostings.filter((posting) => posting.type === "INTEREST" && posting.status === "BOOKED").length,
+    requestedBy: row.requester.username ?? row.requester.email, startedAt: iso(row.processing.startedAt),
+    completedAt: row.processing.completedAt ? iso(row.processing.completedAt) : null, errorMessage: row.processing.errorMessage,
+    postings: mappedPostings,
+  };
+}
+
+export async function listEndOfDayRuns(limit = 10): Promise<EndOfDayRunView[]> {
+  await requireUser();
+  const rows = await db.select({ reference: endOfDayRuns.reference }).from(endOfDayRuns)
+    .orderBy(desc(endOfDayRuns.businessDate), desc(endOfDayRuns.createdAt)).limit(limit);
+  const details = await Promise.all(rows.map((row) => getEndOfDayRun(row.reference)));
+  return details.filter((item): item is EndOfDayRunView => item !== null);
 }
 
 export async function getDirectDebitMandate(reference: string): Promise<DirectDebitMandateView | null> {

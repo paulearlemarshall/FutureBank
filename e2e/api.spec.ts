@@ -13,6 +13,8 @@ test("serves the OpenAPI 3 artifact without authentication", async ({ request })
   expect(document.paths["/direct-debits/{mandateReference}/collections"].post).toBeDefined();
   expect(document.paths["/payments/{paymentReference}/reversals"].post).toBeDefined();
   expect(document.paths["/payment-reversals/{reversalReference}/decision"].post).toBeDefined();
+  expect(document.paths["/end-of-day-runs"].post).toBeDefined();
+  expect(document.paths["/end-of-day-runs/{runReference}"].get).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
@@ -107,7 +109,7 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.4.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.5.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
@@ -115,6 +117,19 @@ test("discovers seeded payment instructions through the authenticated API", asyn
     expect.objectContaining({ reference: "PIN-000002", type: "STANDING_ORDER", status: "ACTIVE", frequency: "MONTHLY" }),
     expect.objectContaining({ reference: "PIN-000003", status: "CANCELLED" }),
   ]));
+});
+
+test("discovers the deterministic failed end-of-day run", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const headers = { "X-API-Key": apiKey! };
+  const response = await request.get("/api/v1/end-of-day-runs", { headers });
+  expect(response.ok()).toBe(true);
+  expect((await response.json()).data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ reference: "EOD-000001", status: "FAILED", attempted: 0, booked: 0, failed: 1, postings: [] }),
+  ]));
+  const detail = await request.get("/api/v1/end-of-day-runs/EOD-000001", { headers });
+  expect(detail.ok()).toBe(true);
+  expect((await detail.json()).data.errorMessage).toContain("Fictional clearing control unavailable");
 });
 
 test("discovers deterministic direct debit mandate lifecycles", async ({ request }) => {

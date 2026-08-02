@@ -7,6 +7,7 @@ import { runDuePaymentInstructions } from "../src/modules/services/payment-instr
 import { submitDirectDebitCollection } from "../src/modules/services/direct-debits";
 import { approvePendingPayment } from "../src/modules/services/payments";
 import { decidePaymentReversal } from "../src/modules/services/payment-reversals";
+import { runEndOfDay } from "../src/modules/services/end-of-day";
 
 async function main() {
   const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin" };
@@ -82,7 +83,36 @@ async function main() {
         (select count(*)::int from work_items where reference = 'WRK-000010' and status = 'APPROVED' and version = 2) as approved_work_items
     `);
     for (const [label, value] of Object.entries(reversalResult.rows[0] as unknown as Record<string, number>)) if (Number(value) !== 1) throw new Error(`payment reversal ${label}: expected 1, received ${value}`);
-    console.info("Workflow integration verification passed: locking prevented double approval, and scheduled, direct-debit, and reversal postings booked exactly once through balanced ledger paths.");
+
+    const dateResult = await db.execute(sql`select current_date::text as value`);
+    const endOfDayDate = String((dateResult.rows[0] as { value: string }).value);
+    const endOfDayAttempts = await Promise.all([
+      runEndOfDay({ businessDate: endOfDayDate }, supervisor),
+      runEndOfDay({ businessDate: endOfDayDate }, supervisor),
+    ]);
+    if (new Set(endOfDayAttempts.map((attempt) => attempt.reference)).size !== 1 || endOfDayAttempts.filter((attempt) => attempt.duplicate).length !== 1) {
+      throw new Error("End-of-day race did not return one original and one duplicate run");
+    }
+    const endOfDayResult = await db.execute(sql`
+      with eod_transactions as (
+        select p.ledger_transaction_id as id from end_of_day_postings p join end_of_day_runs r on r.id = p.end_of_day_run_id where r.business_date = ${endOfDayDate}
+      ), legs as (
+        select e.transaction_id, case when e.direction = 'CREDIT' then e.amount else -e.amount end as signed from ledger_entries e join eod_transactions t on t.id = e.transaction_id
+        union all
+        select e.transaction_id, case when e.direction = 'CREDIT' then e.amount else -e.amount end as signed from clearing_entries e join eod_transactions t on t.id = e.transaction_id
+      )
+      select
+        (select count(*)::int from end_of_day_runs where business_date = ${endOfDayDate}) as runs,
+        (select count(*)::int from processing_runs where type = 'END_OF_DAY' and business_date = ${endOfDayDate} and status = 'COMPLETED' and attempted = 9 and booked = 9 and failed = 0) as completed_runs,
+        (select count(*)::int from end_of_day_postings where business_date = ${endOfDayDate} and type = 'CHARGE' and status = 'BOOKED') as charges,
+        (select count(*)::int from end_of_day_postings where business_date = ${endOfDayDate} and type = 'INTEREST' and status = 'BOOKED') as interests,
+        (select count(*)::int from eod_transactions where id is not null) as ledger_transactions,
+        (select count(*)::int from (select transaction_id from legs group by transaction_id having sum(signed) <> 0) unbalanced) as unbalanced
+    `);
+    const endOfDayRow = endOfDayResult.rows[0] as unknown as Record<string, number>;
+    const expectedEndOfDay = { runs: 1, completed_runs: 1, charges: 2, interests: 7, ledger_transactions: 9, unbalanced: 0 };
+    for (const [label, expected] of Object.entries(expectedEndOfDay)) if (Number(endOfDayRow[label]) !== expected) throw new Error(`end of day ${label}: expected ${expected}, received ${endOfDayRow[label]}`);
+    console.info("Workflow integration verification passed: locking prevented double approval, and scheduled, direct-debit, reversal, charge, and interest postings booked exactly once through balanced ledger paths.");
   } finally {
     await resetBaseline(db, admin);
   }

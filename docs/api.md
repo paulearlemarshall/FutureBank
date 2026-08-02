@@ -1,6 +1,6 @@
 # FutureBank REST API
 
-The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, KYC, overdrafts and work items.
+The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, KYC, overdrafts and work items.
 
 ## External discovery and accessibility
 
@@ -26,6 +26,8 @@ For mutations, `X-Staff-Username` selects an active seeded staff actor. If omitt
 The selected actor is passed through the normal application control layer. Operator, Supervisor, Compliance and Admin permissions, maker-checker separation, optimistic versions, account locks, idempotency, KYC restrictions, payment holds, double-entry posting and audit events are still enforced.
 
 Payment-instruction permissions are separated: Operator maintains instructions and Supervisor executes due-instruction runs. Admin can do both. An occurrence is initiated under the instruction creator's identity, so an external payment that becomes pending still requires an independent payment checker.
+
+End-of-day execution is restricted to Supervisor and Admin. Product charge rules and product interest rates are read from the database; callers cannot supply a rate or amount in the run request.
 
 ## Read example
 
@@ -128,6 +130,24 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/direct-debits/DDM-00000
 - `POST /payment-reversals/{reversalReference}/decision` requires a distinct supervisor, expected work-item version and decision comment.
 
 The original payment and ledger transaction remain immutable. Approval locks the request and original posting and creates a linked equal-and-opposite ledger transaction exactly once; rejection creates no accounting movement. Internal reversals additionally require sufficient available funds at the original destination account.
+
+## End-of-day posting
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/end-of-day-runs` | List recent batch summaries and posting outcomes |
+| `POST` | `/end-of-day-runs` | Run charges and daily deposit interest for one business date |
+| `GET` | `/end-of-day-runs/{runReference}` | Read one run and its account-level postings |
+
+```bash
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/end-of-day-runs" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.supervisor" \
+  -H "Content-Type: application/json" \
+  -d '{"businessDate":"2026-08-02"}'
+```
+
+Only one run is claimed for a business date. Each eligible account/type occurrence also has a stable idempotency key. Interest uses the product annual rate, a 365-day basis and exact half-up cent rounding; overdraft charges use active effective-dated product rules. Each booked customer leg is paired with an equal-and-opposite currency-clearing leg and updates both balance projections atomically. Failed account postings remain visible with durable failure codes and messages.
 
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.
 
