@@ -31,6 +31,7 @@ REST handlers are adapters over the same application services used by the UI. Th
 | Maker-checker state | workflow service inside locked transactions | workflow policy tests and `scripts/verify-workflows.ts` |
 | Ledger, payments, and holds | payment services and transfer policy | balance invariants and payment journeys |
 | Future-dated payments and standing orders | payment-instruction service and processing-run tables | schedule policy tests and exactly-once workflow verification |
+| Account statement export | statement service over ledger entries | date/CSV policy tests and authenticated download journey |
 | Arranged overdrafts | overdraft policy/services and facility tables | overdraft tests and approval/alert journeys |
 | Customer-document files | document policy/service plus private Blob adapter | feature specification and real-Blob journey |
 | Public API | `openapi/futurebank.v1.source.json` and API adapter | generated artifact, drift check and API contract tests |

@@ -20,6 +20,7 @@ describe("FutureBank API contract", () => {
     }));
     expect(specification.paths["/customers"].get).toBeDefined();
     expect(specification.paths["/customers"].post).toBeDefined();
+    expect(specification.paths["/accounts/{accountNumber}/statement"].get.responses["200"].content["text/csv"]).toBeDefined();
     expect(specification.paths["/payments"].post).toBeDefined();
     expect(specification.paths["/payment-instructions"].get).toBeDefined();
     expect(specification.paths["/payment-instructions"].post).toBeDefined();

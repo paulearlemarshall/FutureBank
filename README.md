@@ -1,6 +1,6 @@
 # FutureBank Core
 
-FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, future-dated payment, standing-order, customer, account, statement, and audit workflows.
+FutureBank Core is a fictional core-banking application for Blue Prism demonstrations. It provides a deliberately conventional, desktop-first interface, stable automation selectors, persistent Neon Postgres data, and realistic KYC, maker-checker, arranged-overdraft, payment-hold, future-dated payment, standing-order, customer, account, CSV statement, and audit workflows.
 
 All people, businesses, identifiers, balances, and transactions in the seeded dataset are fictional.
 

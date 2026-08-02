@@ -745,6 +745,84 @@
         "description": "Returns statement transactions in deterministic order."
       }
     },
+    "/accounts/{accountNumber}/statement": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Download an account statement as UTF-8 CSV",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountNumber"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Inclusive statement start date. Defaults to 89 days before today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Inclusive statement end date. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV statement with metadata, exact opening/closing balances and ordered ledger entries.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Download filename containing account number and period.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Statements are never cached.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "downloadAccountStatement",
+        "description": "Exports at most 366 inclusive days. Values remain decimal strings, narratives are CSV/formula safe, and the route requires normal API authentication."
+      }
+    },
     "/accounts/{accountNumber}/status": {
       "patch": {
         "tags": [

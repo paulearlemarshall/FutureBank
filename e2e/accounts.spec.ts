@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { bp, demo, expectReady, login } from "./helpers";
 
 test.beforeEach(async ({ page }) => login(page));
@@ -27,6 +28,20 @@ test("shows a populated statement for a seeded account", async ({ page }) => {
   await page.goto(`/accounts/${demo.accountNumber}`);
   await expectReady(page, "account-detail");
   expect(await page.getByRole("table").locator("tbody tr").count()).toBeGreaterThanOrEqual(25);
+});
+
+test("downloads the default CSV statement through the authenticated account UI", async ({ page }) => {
+  await page.goto(`/accounts/${demo.accountNumber}`);
+  await expectReady(page, "account-detail");
+  const downloadPromise = page.waitForEvent("download");
+  await bp(page, "account-statement-download").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^FutureBank-1000000001-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/);
+  const path = await download.path();
+  expect(path).toBeTruthy();
+  const csv = await readFile(path!, "utf8");
+  expect(csv).toContain('"Opening balance"');
+  expect(csv).toContain('"Value date","Booked at","Reference"');
 });
 
 test("blocks and restores an eligible deposit account", async ({ page }) => {

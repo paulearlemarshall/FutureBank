@@ -89,6 +89,18 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/payment-instructions/pr
 
 Each occurrence uses an idempotency key derived from the instruction and scheduled date. Processing rechecks the live account, KYC, restriction, beneficiary, currency and available-balance controls, then delegates to the existing payment service. It either books a balanced ledger transaction, creates a pending payment plus hold, or records a failed occurrence.
 
+## Account statement export
+
+`GET /accounts/{accountNumber}/statement?from=YYYY-MM-DD&to=YYYY-MM-DD` returns an authenticated UTF-8 CSV download. Both dates are inclusive and the period is limited to 366 days. When omitted, the API returns the most recent 90-day period.
+
+The statement derives opening and closing balances from the ordered ledger entries, preserves money as exact decimal strings, separates debit and credit columns, applies `Cache-Control: no-store`, and protects user-entered narrative cells from spreadsheet formula execution.
+
+```bash
+curl "https://future-bank-demo.vercel.app/api/v1/accounts/1000000001/statement?from=2026-01-01&to=2026-12-31" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  --output statement.csv
+```
+
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.
 
 ## Customer document examples

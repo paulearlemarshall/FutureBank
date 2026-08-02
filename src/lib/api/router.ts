@@ -5,6 +5,8 @@ import { initialActionState } from "@/modules/contracts";
 import { requirePermission } from "@/lib/auth/session";
 import { isDocumentSlot } from "@/modules/domain/document-policy";
 import { BankingError } from "@/modules/services/errors";
+import { defaultStatementPeriod, renderAccountStatementCsv } from "@/modules/domain/statement-policy";
+import { getAccountStatement } from "@/modules/services/statements";
 import { deleteCustomerDocument, getCustomerDocumentContent, uploadCustomerDocument } from "@/modules/services/documents";
 import {
   createBeneficiaryAction, createCustomerAction, openAccountAction, submitPaymentAction,
@@ -122,6 +124,24 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       const item = await getAccount(segments[1]);
       if (!item) notFound("Account");
       return jsonResponse(item.transactions);
+    }
+    if (segments[0] === "accounts" && segments.length === 3 && segments[2] === "statement") {
+      const defaults = defaultStatementPeriod();
+      try {
+        const statement = await getAccountStatement({
+          accountNumber: segments[1],
+          fromDate: url.searchParams.get("from") ?? defaults.fromDate,
+          toDate: url.searchParams.get("to") ?? defaults.toDate,
+        });
+        return new Response(renderAccountStatementCsv(statement), { headers: {
+          "Cache-Control": "no-store",
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="FutureBank-${statement.accountNumber}-${statement.fromDate}-${statement.toDate}.csv"`,
+        } });
+      } catch (error) {
+        if (error instanceof BankingError) throw new ApiError(error.code === "ACCOUNT_NOT_FOUND" ? 404 : 400, error.code, error.message);
+        throw error;
+      }
     }
     if (segments[0] === "products" && segments.length === 1) return jsonResponse(await listProducts());
     if (segments[0] === "beneficiaries" && segments.length === 1) return jsonResponse(await listBeneficiaries({

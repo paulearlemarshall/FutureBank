@@ -114,6 +114,19 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   ]));
 });
 
+test("downloads an authenticated exact-value CSV account statement", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const response = await request.get("/api/v1/accounts/1000000001/statement?from=2026-01-01&to=2026-12-31", { headers: { "X-API-Key": apiKey! } });
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("text/csv");
+  expect(response.headers()["content-disposition"]).toContain("FutureBank-1000000001-2026-01-01-2026-12-31.csv");
+  expect(response.headers()["cache-control"]).toBe("no-store");
+  const csv = (await response.body()).toString("utf8");
+  expect(csv).toContain('"Opening balance"');
+  expect(csv).toContain('"Value date","Booked at","Reference"');
+  expect(csv).toContain('"GBP"');
+});
+
 test("round-trips Arabic customer text through authenticated API reads and writes", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
   const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.operator" };

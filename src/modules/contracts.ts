@@ -177,6 +177,20 @@ export type TransactionView = {
   status: "BOOKED" | "PENDING" | "REJECTED" | "EXPIRED";
 };
 
+export type AccountStatement = {
+  accountNumber: string;
+  customerNumber: string;
+  customerName: string;
+  productName: string;
+  currency: string;
+  fromDate: string;
+  toDate: string;
+  openingBalance: string;
+  closingBalance: string;
+  generatedAt: string;
+  entries: TransactionView[];
+};
+
 export type AccountDetail = AccountListItem & {
   branchCode: string;
   nickname: string | null;
