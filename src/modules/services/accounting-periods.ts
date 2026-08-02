@@ -58,7 +58,19 @@ async function assertCloseGates(tx: Pick<Database, "execute">, period: LockedPer
             where run.business_date = ${period.end_date} and item.clearing_entry_id = entry.id
           )) as unreconciled_clearing_entries,
       (select count(*)::int from processing_runs where business_date between ${period.start_date} and ${period.end_date} and status = 'RUNNING') as running_processes,
-      (select count(*)::int from (select transaction_id from legs group by transaction_id having sum(signed) <> 0) u) as unbalanced
+      (select count(*)::int from (select transaction_id from legs group by transaction_id having sum(signed) <> 0) u) as unbalanced,
+      (select count(*)::int from general_ledger_journals where value_date between ${period.start_date} and ${period.end_date} and status = 'PENDING_APPROVAL') as pending_general_ledger_journals,
+      (select count(*)::int from ledger_transactions ledger_transaction
+        left join general_ledger_journals journal on journal.source_ledger_transaction_id = ledger_transaction.id and journal.status = 'POSTED'
+        where ledger_transaction.value_date between ${period.start_date} and ${period.end_date} and journal.id is null) as missing_general_ledger_projections,
+      (select count(*)::int from (
+        select journal.id from general_ledger_journals journal join general_ledger_lines line on line.journal_id = journal.id
+        where journal.value_date between ${period.start_date} and ${period.end_date} and journal.status = 'POSTED'
+        group by journal.id
+        having sum(case when line.direction = 'DEBIT' then line.amount else 0 end) <> sum(case when line.direction = 'CREDIT' then line.amount else 0 end)
+          or max(journal.total_debit) <> sum(case when line.direction = 'DEBIT' then line.amount else 0 end)
+          or max(journal.total_credit) <> sum(case when line.direction = 'CREDIT' then line.amount else 0 end)
+      ) unbalanced_general_ledger) as unbalanced_general_ledger
   `);
   const gates = result.rows[0] as unknown as Record<string, number>;
   if (Number(gates.completed_eod) !== 1) throw new BankingError("END_OF_DAY_INCOMPLETE", "A completed end-of-day run is required for the period end date.");
@@ -68,6 +80,9 @@ async function assertCloseGates(tx: Pick<Database, "execute">, period: LockedPer
   if (Number(gates.unreconciled_clearing_entries) !== 0) throw new BankingError("CLEARING_ENTRIES_UNRECONCILED", "Reconcile every period-end clearing entry before requesting close.");
   if (Number(gates.running_processes) !== 0) throw new BankingError("PROCESSING_STILL_RUNNING", "A processing run is still active in the period.");
   if (Number(gates.unbalanced) !== 0) throw new BankingError("LEDGER_UNBALANCED", "The period contains an unbalanced ledger transaction.");
+  if (Number(gates.pending_general_ledger_journals) !== 0) throw new BankingError("GENERAL_LEDGER_JOURNALS_PENDING", "Decide every pending manual journal in the period before requesting close.");
+  if (Number(gates.missing_general_ledger_projections) !== 0) throw new BankingError("GENERAL_LEDGER_PROJECTION_INCOMPLETE", "Every subledger transaction in the period must have a posted general-ledger journal.");
+  if (Number(gates.unbalanced_general_ledger) !== 0) throw new BankingError("GENERAL_LEDGER_UNBALANCED", "The period contains an unbalanced or inconsistent general-ledger journal.");
 }
 
 export async function requestAccountingPeriodClose(input: { periodReference: string; expectedVersion: number; comment: string }, actor: SessionUser) {

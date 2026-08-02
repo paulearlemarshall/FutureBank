@@ -12,6 +12,7 @@ import { minorUnitsToMoney, moneyToMinorUnits, signedMoneyToMinorUnits } from "@
 import { BankingError } from "./errors";
 import { createApprovalWorkItem, decideWorkItem, lockApprovalWorkItem } from "./workflow";
 import { assertPostingDateOpen } from "./accounting-periods";
+import { postSubledgerToGeneralLedger } from "./general-ledger";
 
 function reference(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -119,6 +120,7 @@ export async function decidePaymentReversal(input: DecisionInput & { decision: "
       await tx.update(bankAccounts).set({ balance: sourceAfter, availableBalance: sourceAvailableAfter, updatedAt: now }).where(eq(bankAccounts.id, source.id));
       await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: now }).where(eq(clearingAccounts.id, clearing.id));
     }
+    await postSubledgerToGeneralLedger(tx, transaction.id);
     await tx.update(paymentReversals).set({ status: "BOOKED", reversalTransactionId: transaction.id, decidedBy: actor.id, decisionComment: comment, decidedAt: now, version: reversal.version + 1, updatedAt: now }).where(eq(paymentReversals.id, reversal.id));
     await decideWorkItem(tx, item, "APPROVED", comment, actor);
     await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "PAYMENT_REVERSAL_BOOKED", entityType: "PAYMENT_REVERSAL", entityReference: input.reversalReference, correlationId: crypto.randomUUID(), before: { status: "PENDING_APPROVAL" }, after: { status: "BOOKED", paymentReference: payment.reference, transactionReference, amount: reversal.amount, currency: reversal.currency } });

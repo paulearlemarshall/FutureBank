@@ -11,6 +11,7 @@ import { calculateDailyInterest, validateDailyOverdraftCharge, validateEndOfDayD
 import { minorUnitsToMoney, moneyToMinorUnits, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 import { BankingError } from "./errors";
 import { assertPostingDateOpen } from "./accounting-periods";
+import { postSubledgerToGeneralLedger } from "./general-ledger";
 
 function reference(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -86,6 +87,7 @@ async function postCharge(input: { runId: string; candidate: Candidate; business
       const [transaction] = await tx.insert(ledgerTransactions).values({ reference: reference("EODC"), bookedAt: now, valueDate: input.businessDate, description: `Daily overdraft usage charge ${rule.reference}`, type: "ACCOUNT_CHARGE", status: "BOOKED", currency: account.currency, amount: rule.amount, counterparty: rule.reference }).returning();
       await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: account.id, direction: "DEBIT", amount: rule.amount, balanceAfter: accountAfter });
       await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "CREDIT", amount: rule.amount, balanceAfter: clearingAfter });
+      await postSubledgerToGeneralLedger(tx, transaction.id);
       await tx.update(bankAccounts).set({ balance: accountAfter, availableBalance: availableAfter, updatedAt: now }).where(eq(bankAccounts.id, account.id));
       await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: now }).where(eq(clearingAccounts.id, clearing.id));
       await tx.insert(endOfDayPostings).values({ reference: reference("EOP"), endOfDayRunId: input.runId, accountId: account.id, businessDate: input.businessDate, type: "CHARGE", status: "BOOKED", amount: rule.amount, currency: account.currency, chargeRuleId: rule.id, ledgerTransactionId: transaction.id, idempotencyKey, completedAt: now });
@@ -122,6 +124,7 @@ async function postInterest(input: { runId: string; candidate: Candidate; busine
       const [transaction] = await tx.insert(ledgerTransactions).values({ reference: reference("EODI"), bookedAt: now, valueDate: input.businessDate, description: `Daily deposit interest at ${account.interest_rate}%`, type: "DEPOSIT_INTEREST", status: "BOOKED", currency: account.currency, amount: amountText, counterparty: "Interest expense clearing" }).returning();
       await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: account.id, direction: "CREDIT", amount: amountText, balanceAfter: accountAfter });
       await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "DEBIT", amount: amountText, balanceAfter: clearingAfter });
+      await postSubledgerToGeneralLedger(tx, transaction.id);
       await tx.update(bankAccounts).set({ balance: accountAfter, availableBalance: availableAfter, updatedAt: now }).where(eq(bankAccounts.id, account.id));
       await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: now }).where(eq(clearingAccounts.id, clearing.id));
       await tx.insert(endOfDayPostings).values({ reference: reference("EOP"), endOfDayRunId: input.runId, accountId: account.id, businessDate: input.businessDate, type: "INTEREST", status: "BOOKED", amount: amountText, currency: account.currency, annualRate: account.interest_rate, ledgerTransactionId: transaction.id, idempotencyKey, completedAt: now });

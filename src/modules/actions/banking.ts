@@ -14,6 +14,7 @@ import type { ActionState } from "@/modules/contracts";
 import { moneyToMinorUnits, minorUnitsToMoney, signedMoneyToMinorUnits } from "@/modules/domain/transfer-policy";
 import { BankingError, bookExternalPayment, bookInternalTransfer } from "@/modules/services/payments";
 import { assertPostingDateOpen } from "@/modules/services/accounting-periods";
+import { postSubledgerToGeneralLedger } from "@/modules/services/general-ledger";
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "").trim();
 const optionalText = (formData: FormData, key: string) => text(formData, key) || null;
@@ -177,6 +178,7 @@ export async function openAccountAction(_previous: ActionState, formData: FormDa
         const [transaction] = await tx.insert(ledgerTransactions).values({ reference: `OPEN-${next}`, bookedAt: new Date(), valueDate, description: "Opening deposit", type: "OPENING_DEPOSIT", status: "BOOKED", currency: product.currency, amount: parsed.data.initialDeposit, counterparty: "Opening Deposit Clearing" }).returning();
         await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: created.id, direction: "CREDIT", amount: parsed.data.initialDeposit, balanceAfter: parsed.data.initialDeposit });
         await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "DEBIT", amount: parsed.data.initialDeposit, balanceAfter: clearingAfter });
+        await postSubledgerToGeneralLedger(tx, transaction.id);
         await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: new Date() }).where(eq(clearingAccounts.id, clearing.id));
       }
       await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "ACCOUNT_OPENED", entityType: "ACCOUNT", entityReference: next, correlationId: crypto.randomUUID(), before: null, after: { customerNumber: customer.customerNumber, productCode: product.code, balance: parsed.data.initialDeposit } });

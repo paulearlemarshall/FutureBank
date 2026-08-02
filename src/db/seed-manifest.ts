@@ -104,6 +104,13 @@ export const baselineProductChargeRules = [
   { reference: "PCR-000002", productCode: "CUR-AED", type: "DAILY_OVERDRAFT_USAGE" as const, amount: "3.00", currency: "AED", effectiveFrom: "2026-01-01" },
 ] as const;
 
+export const baselineGeneralLedgerAccounts = ["GBP", "AED", "USD", "EUR"].flatMap((currency) => [
+  { code: `1100-${currency}`, name: `${currency} settlement clearing`, type: "ASSET" as const, currency, systemControlled: true },
+  { code: `2100-${currency}`, name: `${currency} customer deposit control`, type: "LIABILITY" as const, currency, systemControlled: true },
+  { code: `4100-${currency}`, name: `${currency} fee income`, type: "INCOME" as const, currency, systemControlled: false },
+  { code: `5100-${currency}`, name: `${currency} deposit interest expense`, type: "EXPENSE" as const, currency, systemControlled: false },
+]);
+
 export const baselineDirectDebitMandates = [
   { reference: "DDM-000001", status: "ACTIVE" as const, sourceAccountNumber: "1000000002", beneficiaryKey: "beneficiary-1", creditorMandateReference: "UTILITY-C1-001", maximumSingleAmount: "500.00", currency: "GBP", validFromOffset: 0, validToOffset: 365 },
   { reference: "DDM-000002", status: "SUSPENDED" as const, sourceAccountNumber: "1000000004", beneficiaryKey: "beneficiary-2", creditorMandateReference: "SERVICE-C2-002", maximumSingleAmount: "2500.00", currency: "AED", validFromOffset: -30, validToOffset: 335 },
@@ -189,6 +196,7 @@ export function validateBaselineSeed(): string[] {
   if (baselinePaymentInstructions.length !== 3) errors.push("Expected three payment instruction scenarios");
   if (baselineDirectDebitMandates.length !== 3) errors.push("Expected three direct debit mandate scenarios");
   if (baselineProductChargeRules.length !== 2) errors.push("Expected two daily overdraft charge rules");
+  if (baselineGeneralLedgerAccounts.length !== 16) errors.push("Expected sixteen currency general-ledger accounts");
   if (baselineTransactions.filter((item) => item.valueDate === "2026-07-18").length !== 18) errors.push("Expected eighteen internal clearing entries for the reconciliation scenario");
   return errors;
 }

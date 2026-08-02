@@ -9,6 +9,7 @@ import {
   baselineCustomers,
   baselineProducts,
   baselineProductChargeRules,
+  baselineGeneralLedgerAccounts,
   baselinePaymentInstructions,
   baselineDirectDebitMandates,
   baselineTransactions,
@@ -29,11 +30,14 @@ function branchId(code: string) { return stableUuid(`branch-${code}`); }
 function staffId(key: "operator" | "supervisor" | "compliance" | "admin") { return stableUuid(`auth-user-${key}`); }
 function kycCaseId(customerNumber: string) { return stableUuid(`kyc-case-${customerNumber}`); }
 function facilityId(reference: string) { return stableUuid(`overdraft-${reference}`); }
+function generalLedgerAccountId(code: string) { return stableUuid(`general-ledger-account-${code}`); }
 
 export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.workItemEvents);
   await tx.delete(tables.workItems);
   await tx.delete(tables.accountHolds);
+  await tx.delete(tables.generalLedgerLines);
+  await tx.delete(tables.generalLedgerJournals);
   await tx.delete(tables.reconciliationItems);
   await tx.delete(tables.settlementRecords);
   await tx.delete(tables.clearingEntries);
@@ -59,6 +63,7 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.beneficiaries);
   await tx.delete(tables.bankAccounts);
   await tx.delete(tables.clearingAccounts);
+  await tx.delete(tables.generalLedgerAccounts);
   await tx.delete(tables.customerRelationships);
   await tx.delete(tables.customerRestrictions);
   await tx.delete(tables.screeningChecks);
@@ -100,6 +105,21 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: stableUuid("accounting-period-control-july"), reference: "ACP-000001", code: "2026-07-CONTROL", startDate: "2026-07-01", endDate: "2026-07-18", status: "OPEN", version: 1 },
     { id: stableUuid("accounting-period-current"), reference: "ACP-000002", code: `${currentYear}-${(currentMonth + 1).toString().padStart(2, "0")}`, startDate: currentStart, endDate: currentEnd, status: "OPEN", version: 1 },
     { id: stableUuid("accounting-period-closed"), reference: "ACP-000003", code: "2026-06", startDate: "2026-06-01", endDate: "2026-06-30", status: "CLOSED", closedBy: staffId("admin"), closeDecisionComment: "Seeded historical period closed after fictional control completion.", closedAt: new Date("2026-07-01T09:00:00.000Z"), version: 3 },
+  ]);
+  await tx.insert(tables.generalLedgerAccounts).values(baselineGeneralLedgerAccounts.map((account) => ({
+    id: generalLedgerAccountId(account.code), ...account, postingAllowed: true, active: true, version: 1,
+  })));
+  const pendingGeneralLedgerJournalId = stableUuid("general-ledger-journal-pending");
+  await tx.insert(tables.generalLedgerJournals).values({
+    id: pendingGeneralLedgerJournalId, reference: "GLJ-000001", source: "MANUAL", idempotencyKey: "SEED-GLJ-PENDING-0001",
+    valueDate: timeline.date(0), status: "PENDING_APPROVAL", currency: "GBP", description: "Fictional deposit-interest accrual correction",
+    totalDebit: "125.00", totalCredit: "125.00", createdBy: staffId("supervisor"),
+    submittedComment: "Review the fictional accrual evidence before posting this manual journal.", submittedAt: timeline.instant(0, 11), version: 1,
+    createdAt: timeline.instant(0, 11), updatedAt: timeline.instant(0, 11),
+  });
+  await tx.insert(tables.generalLedgerLines).values([
+    { id: stableUuid("general-ledger-line-pending-debit"), journalId: pendingGeneralLedgerJournalId, accountId: generalLedgerAccountId("5100-GBP"), lineNumber: 1, direction: "DEBIT", amount: "125.00", narrative: "Fictional deposit-interest accrual correction", createdAt: timeline.instant(0, 11) },
+    { id: stableUuid("general-ledger-line-pending-credit"), journalId: pendingGeneralLedgerJournalId, accountId: generalLedgerAccountId("1100-GBP"), lineNumber: 2, direction: "CREDIT", amount: "125.00", narrative: "Fictional deposit-interest accrual correction", createdAt: timeline.instant(0, 11) },
   ]);
   await tx.insert(tables.customers).values(baselineCustomers.map((item) => ({ id: customerId(item.customerNumber), rimNumber: `RIM${item.customerNumber.slice(1)}`, ...item, kycReviewDate: timeline.date(reviewOffsets[item.customerNumber]) })));
 
@@ -402,14 +422,16 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: stableUuid("work-payment-expired"), reference: "WRK-000008", type: "PAYMENT_APPROVAL" as const, status: "CANCELLED" as const, priority: "NORMAL" as const, entityType: "PAYMENT", entityReference: "PAY-000004", title: "Expired payment approval", description: "Approval expired and the hold was released without ledger movement.", requiredRole: "SUPERVISOR" as const, decisionComment: "Approval window expired after 24 hours.", completedAt: new Date("2026-07-19T08:05:00.000Z"), dueAt: new Date("2026-07-19T08:00:00.000Z") },
     { id: stableUuid("work-alert-resolved"), reference: "WRK-000009", type: "OVERDRAFT_ALERT" as const, status: "COMPLETED" as const, priority: "HIGH" as const, entityType: "OVERDRAFT_ALERT", entityReference: "ODA-000003", title: "Resolved high-utilization alert", description: "Historical intervention and resolution example.", requiredRole: "SUPERVISOR" as const, assignedTo: staffId("supervisor"), decisionComment: "Customer reduced utilization and supplied a cash-flow forecast.", completedAt: new Date("2026-07-04T10:00:00.000Z"), dueAt: new Date("2026-07-03T17:00:00.000Z") },
     { id: stableUuid("work-payment-reversal"), reference: "WRK-000010", type: "PAYMENT_REVERSAL" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "PAYMENT_REVERSAL", entityReference: "REV-000001", title: "Approve payment reversal REV-000001", description: "Review the duplicate supplier settlement and post an equal-and-opposite correction.", requiredRole: "SUPERVISOR" as const, dueAt: timeline.instant(1, 10) },
+    { id: stableUuid("work-general-ledger-journal"), reference: "WRK-000011", type: "GENERAL_LEDGER_JOURNAL" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "GENERAL_LEDGER_JOURNAL", entityReference: "GLJ-000001", title: "Approve manual journal GLJ-000001", description: "Review the fictional accrual evidence before posting this manual journal.", requiredRole: "ADMIN" as const, dueAt: timeline.instant(1, 11) },
   ];
-  await tx.insert(tables.workItems).values(seededWorkItems.map((item) => ({ ...item, createdBy: staffId("operator") })));
+  await tx.insert(tables.workItems).values(seededWorkItems.map((item) => ({ ...item, createdBy: staffId(item.type === "GENERAL_LEDGER_JOURNAL" ? "supervisor" : "operator") })));
   const seededWorkItemEvents: Array<typeof tables.workItemEvents.$inferInsert> = [];
   for (const item of seededWorkItems) {
+    const creatorKey = item.type === "GENERAL_LEDGER_JOURNAL" ? "supervisor" as const : "operator" as const;
     const createdAt = ["OPEN", "ASSIGNED"].includes(item.status)
       ? timeline.instant(-1, 9)
       : new Date(item.reference === "WRK-000009" ? "2026-06-30T09:00:00.000Z" : "2026-07-18T09:00:00.000Z");
-    seededWorkItemEvents.push({ id: stableUuid(`event-created-${item.reference}`), workItemId: item.id, eventType: "CREATED", fromStatus: null, toStatus: "OPEN", actorUserId: staffId("operator"), actorUsername: "bp.operator", comment: "Seeded demonstration work item.", occurredAt: createdAt });
+    seededWorkItemEvents.push({ id: stableUuid(`event-created-${item.reference}`), workItemId: item.id, eventType: "CREATED", fromStatus: null, toStatus: "OPEN", actorUserId: staffId(creatorKey), actorUsername: `bp.${creatorKey}`, comment: "Seeded demonstration work item.", occurredAt: createdAt });
     if (item.status === "OPEN") continue;
     if (item.status === "ASSIGNED") {
       const assigneeKey = item.requiredRole === "COMPLIANCE" ? "compliance" : "supervisor";
@@ -456,6 +478,22 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   }
   for (const [currency, balance] of clearingBalances) {
     await tx.update(tables.clearingAccounts).set({ balance: minorUnitsToMoney(balance) }).where(eq(tables.clearingAccounts.id, stableUuid(`clearing-${currency}`)));
+  }
+
+  for (let offset = 0; offset < baselineTransactions.length; offset += 100) {
+    await tx.insert(tables.generalLedgerJournals).values(baselineTransactions.slice(offset, offset + 100).map((item) => ({
+      id: stableUuid(`general-ledger-journal-${item.reference}`), reference: `GL-${item.reference}`, source: "SUBLEDGER" as const,
+      sourceLedgerTransactionId: item.id, valueDate: item.valueDate, status: "POSTED" as const, currency: item.currency,
+      description: item.description, totalDebit: item.amount, totalCredit: item.amount, postedAt: new Date(item.bookedAt),
+      createdAt: new Date(item.bookedAt), updatedAt: new Date(item.bookedAt),
+    })));
+  }
+  const generalLedgerLineRows = baselineTransactions.flatMap((item) => [
+    { id: stableUuid(`general-ledger-line-${item.reference}-account`), journalId: stableUuid(`general-ledger-journal-${item.reference}`), accountId: generalLedgerAccountId(`2100-${item.currency}`), lineNumber: 1, direction: item.direction, amount: item.amount, narrative: `${item.reference} · ${item.description}`, createdAt: new Date(item.bookedAt) },
+    { id: stableUuid(`general-ledger-line-${item.reference}-clearing`), journalId: stableUuid(`general-ledger-journal-${item.reference}`), accountId: generalLedgerAccountId(`1100-${item.currency}`), lineNumber: 2, direction: item.direction === "DEBIT" ? "CREDIT" as const : "DEBIT" as const, amount: item.amount, narrative: `${item.reference} · ${item.description}`, createdAt: new Date(item.bookedAt) },
+  ]);
+  for (let offset = 0; offset < generalLedgerLineRows.length; offset += 100) {
+    await tx.insert(tables.generalLedgerLines).values(generalLedgerLineRows.slice(offset, offset + 100));
   }
 
   const settlementTransactions = baselineTransactions.filter((item) => item.valueDate === "2026-07-18");

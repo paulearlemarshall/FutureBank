@@ -201,7 +201,7 @@ export type AccountDetail = AccountListItem & {
 };
 
 export type WorkItemStatus = "OPEN" | "ASSIGNED" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
-export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT" | "ACCOUNTING_PERIOD_CLOSE";
+export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT" | "ACCOUNTING_PERIOD_CLOSE" | "GENERAL_LEDGER_JOURNAL";
 export type WorkItemPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
 export type WorkQueueItem = {
@@ -524,6 +524,65 @@ export type AccountingPeriodView = {
   closeDecisionComment: string | null;
   closedAt: string | null;
   workItem: WorkQueueItem | null;
+};
+
+export type GeneralLedgerAccountView = {
+  code: string;
+  name: string;
+  type: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+  currency: string;
+  systemControlled: boolean;
+  postingAllowed: boolean;
+  active: boolean;
+  version: number;
+};
+
+export type GeneralLedgerLineView = {
+  lineNumber: number;
+  accountCode: string;
+  accountName: string;
+  accountType: GeneralLedgerAccountView["type"];
+  direction: "DEBIT" | "CREDIT";
+  amount: string;
+  narrative: string;
+};
+
+export type GeneralLedgerJournalView = {
+  reference: string;
+  source: "SUBLEDGER" | "MANUAL";
+  sourceTransactionReference: string | null;
+  valueDate: string;
+  status: "PENDING_APPROVAL" | "POSTED" | "REJECTED";
+  currency: string;
+  description: string;
+  totalDebit: string;
+  totalCredit: string;
+  createdBy: string | null;
+  submittedComment: string | null;
+  submittedAt: string | null;
+  decidedBy: string | null;
+  decisionComment: string | null;
+  decidedAt: string | null;
+  postedAt: string | null;
+  version: number;
+  lines: GeneralLedgerLineView[];
+  workItem: WorkQueueItem | null;
+};
+
+export type TrialBalanceLineView = GeneralLedgerAccountView & {
+  debit: string;
+  credit: string;
+  balance: string;
+};
+
+export type TrialBalanceView = {
+  fromDate: string | null;
+  toDate: string;
+  currency: string | null;
+  totalDebit: string;
+  totalCredit: string;
+  balanced: boolean;
+  lines: TrialBalanceLineView[];
 };
 
 export type DirectDebitCollectionView = {

@@ -23,6 +23,7 @@ const navGroups = [
       ["End of day", "/end-of-day", "nav-end-of-day"],
       ["Reconciliation", "/reconciliation", "nav-reconciliation"],
       ["Accounting periods", "/accounting-periods", "nav-accounting-periods"],
+      ["General ledger", "/general-ledger", "nav-general-ledger"],
       ["Arranged overdrafts", "/overdrafts", "nav-overdrafts"],
       ["Product catalogue", "/products", "nav-products"],
     ],

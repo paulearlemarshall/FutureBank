@@ -56,7 +56,10 @@ The Playwright suite treats these workflows as the compatibility baseline:
 11. View Amelia Hart's seeded Passport and National ID, replace or delete a slot, and verify reset restores the original files.
 12. Run one end-of-day business date, observe persistent posting feedback, and inspect the fixed-column charge and interest tables.
 13. Inspect the accounting-period register, request close as Supervisor, and apply the independent Admin decision through persistent versioned forms.
-13. Reconcile one settlement date, inspect fixed-column exact and exception outcomes, and resolve an exception with persistent versioned feedback.
+14. Reconcile one settlement date, inspect fixed-column exact and exception outcomes, and resolve an exception with persistent versioned feedback.
+15. Inspect the fixed-column chart, trial balance and journal register; submit a manual journal as Supervisor and apply the independent Admin decision.
+
+General-ledger automation waits for `general-ledger` or `general-ledger-journal-detail` readiness. Stable controls are `general-ledger-value-date`, `general-ledger-currency`, `general-ledger-debit-account`, `general-ledger-credit-account`, `general-ledger-amount`, `general-ledger-description`, `general-ledger-submission-comment`, `general-ledger-journal-submit`, `general-ledger-journal-decision`, `general-ledger-journal-decision-comment`, and `general-ledger-journal-decision-submit`. The trial-balance, journal-register and journal-line tables retain their declared column order.
 
 Customer document controls retain these selectors for each `passport` / `national-id` slot: `document-slot-*`, `document-file-*`, `document-upload-*`, `document-view-*`, `document-delete-confirm-*`, `document-delete-*`, and `status-document-*`.
 

@@ -40,10 +40,13 @@ export const endOfDayPostingStatusEnum = pgEnum("end_of_day_posting_status", ["P
 export const reconciliationItemTypeEnum = pgEnum("reconciliation_item_type", ["MATCHED", "AMOUNT_MISMATCH", "DIRECTION_MISMATCH", "CURRENCY_MISMATCH", "MISSING_INTERNAL", "MISSING_EXTERNAL"]);
 export const reconciliationItemStatusEnum = pgEnum("reconciliation_item_status", ["MATCHED", "OPEN", "RESOLVED"]);
 export const accountingPeriodStatusEnum = pgEnum("accounting_period_status", ["OPEN", "CLOSING", "CLOSED"]);
+export const generalLedgerAccountTypeEnum = pgEnum("general_ledger_account_type", ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]);
+export const generalLedgerJournalSourceEnum = pgEnum("general_ledger_journal_source", ["SUBLEDGER", "MANUAL"]);
+export const generalLedgerJournalStatusEnum = pgEnum("general_ledger_journal_status", ["PENDING_APPROVAL", "POSTED", "REJECTED"]);
 export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
 export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
-export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE"]);
+export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE", "GENERAL_LEDGER_JOURNAL"]);
 export const workItemStatusEnum = pgEnum("work_item_status", ["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
 export const workItemPriorityEnum = pgEnum("work_item_priority", ["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 export const kycCaseTypeEnum = pgEnum("kyc_case_type", ["ONBOARDING", "PERIODIC_REVIEW", "TRIGGER_EVENT", "REMEDIATION"]);
@@ -525,6 +528,19 @@ export const accountingPeriods = pgTable("accounting_periods", {
   ...timestamps,
 }, (table) => [index("accounting_period_dates_idx").on(table.startDate, table.endDate, table.status)]);
 
+export const generalLedgerAccounts = pgTable("general_ledger_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  type: generalLedgerAccountTypeEnum("type").notNull(),
+  currency: text("currency").notNull(),
+  systemControlled: boolean("system_controlled").notNull().default(true),
+  postingAllowed: boolean("posting_allowed").notNull().default(true),
+  active: boolean("active").notNull().default(true),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [index("general_ledger_accounts_type_currency_idx").on(table.type, table.currency, table.active)]);
+
 export const paymentInstructionExecutions = pgTable("payment_instruction_executions", {
   id: uuid("id").primaryKey().defaultRandom(),
   instructionId: uuid("instruction_id").notNull().references(() => paymentInstructions.id, { onDelete: "restrict" }),
@@ -575,6 +591,46 @@ export const ledgerTransactions = pgTable("ledger_transactions", {
   paymentOrderId: uuid("payment_order_id").references(() => paymentOrders.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const generalLedgerJournals = pgTable("general_ledger_journals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  source: generalLedgerJournalSourceEnum("source").notNull(),
+  sourceLedgerTransactionId: uuid("source_ledger_transaction_id").unique().references(() => ledgerTransactions.id, { onDelete: "restrict" }),
+  idempotencyKey: text("idempotency_key").unique(),
+  valueDate: date("value_date").notNull(),
+  status: generalLedgerJournalStatusEnum("status").notNull(),
+  currency: text("currency").notNull(),
+  description: text("description").notNull(),
+  totalDebit: numeric("total_debit", { precision: 18, scale: 2 }).notNull(),
+  totalCredit: numeric("total_credit", { precision: 18, scale: 2 }).notNull(),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  submittedComment: text("submitted_comment"),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+  decisionComment: text("decision_comment"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  postedAt: timestamp("posted_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [
+  index("general_ledger_journals_date_status_idx").on(table.valueDate, table.status),
+  index("general_ledger_journals_source_idx").on(table.source, table.status),
+]);
+
+export const generalLedgerLines = pgTable("general_ledger_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  journalId: uuid("journal_id").notNull().references(() => generalLedgerJournals.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").notNull().references(() => generalLedgerAccounts.id, { onDelete: "restrict" }),
+  lineNumber: integer("line_number").notNull(),
+  direction: entryDirectionEnum("direction").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  narrative: text("narrative").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("general_ledger_lines_journal_line_idx").on(table.journalId, table.lineNumber),
+  index("general_ledger_lines_account_idx").on(table.accountId),
+]);
 
 export const ledgerEntries = pgTable("ledger_entries", {
   id: uuid("id").primaryKey().defaultRandom(),

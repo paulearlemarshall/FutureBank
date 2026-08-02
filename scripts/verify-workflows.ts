@@ -10,6 +10,7 @@ import { decidePaymentReversal } from "../src/modules/services/payment-reversals
 import { runEndOfDay } from "../src/modules/services/end-of-day";
 import { resolveReconciliationItem, runClearingReconciliation } from "../src/modules/services/reconciliation";
 import { assertPostingDateOpen, decideAccountingPeriodClose, requestAccountingPeriodClose } from "../src/modules/services/accounting-periods";
+import { decideManualGeneralLedgerJournal } from "../src/modules/services/general-ledger";
 import { BankingError } from "../src/modules/services/errors";
 
 async function main() {
@@ -25,7 +26,10 @@ async function main() {
     ]);
     const fulfilled = attempts.filter((item) => item.status === "fulfilled").length;
     const rejected = attempts.filter((item) => item.status === "rejected").length;
-    if (fulfilled !== 1 || rejected !== 1) throw new Error(`Maker-checker race: expected one success and one rejection, received ${fulfilled}/${rejected}`);
+    if (fulfilled !== 1 || rejected !== 1) {
+      const outcomes = attempts.map((item) => item.status === "fulfilled" ? "fulfilled" : `rejected:${item.reason instanceof Error ? item.reason.message : String(item.reason)}`).join(", ");
+      throw new Error(`Maker-checker race: expected one success and one rejection, received ${fulfilled}/${rejected} (${outcomes})`);
+    }
     const result = await db.execute(sql`
       select
         (select count(*)::int from payment_orders where reference = 'PAY-000001' and status = 'BOOKED') as booked,
@@ -36,6 +40,22 @@ async function main() {
     `);
     const row = result.rows[0] as unknown as Record<string, number>;
     for (const [label, value] of Object.entries(row)) if (Number(value) !== 1) throw new Error(`${label}: expected 1, received ${value}`);
+
+    const journalAttempts = await Promise.allSettled([
+      decideManualGeneralLedgerJournal({ journalReference: "GLJ-000001", workItemReference: "WRK-000011", expectedVersion: 1, decision: "APPROVE", comment: "Concurrent independent general-ledger approval A." }, admin),
+      decideManualGeneralLedgerJournal({ journalReference: "GLJ-000001", workItemReference: "WRK-000011", expectedVersion: 1, decision: "APPROVE", comment: "Concurrent independent general-ledger approval B." }, admin),
+    ]);
+    if (journalAttempts.filter((item) => item.status === "fulfilled").length !== 1 || journalAttempts.filter((item) => item.status === "rejected").length !== 1) {
+      throw new Error("General-ledger maker-checker race did not produce exactly one successful posting");
+    }
+    const journalResult = await db.execute(sql`
+      select
+        (select count(*)::int from general_ledger_journals where reference = 'GLJ-000001' and status = 'POSTED' and version = 2 and decided_by = ${admin.id}) as journals,
+        (select count(*)::int from general_ledger_lines line join general_ledger_journals journal on journal.id = line.journal_id where journal.reference = 'GLJ-000001') as lines,
+        (select count(*)::int from work_items where reference = 'WRK-000011' and status = 'APPROVED' and version = 2) as approved_work_items
+    `);
+    const journalRow = journalResult.rows[0] as unknown as Record<string, number>;
+    if (Number(journalRow.journals) !== 1 || Number(journalRow.lines) !== 2 || Number(journalRow.approved_work_items) !== 1) throw new Error("Approved manual journal did not retain balanced maker-checker evidence");
 
     const scheduleDateResult = await db.execute(sql`select next_execution_date::text as value from payment_instructions where reference = 'PIN-000001'`);
     const businessDate = String((scheduleDateResult.rows[0] as { value: string }).value);
@@ -141,6 +161,21 @@ async function main() {
     const resolutionResult = await db.execute(sql`select count(*)::int as value from reconciliation_items where status = 'RESOLVED' and version = 2 and resolution_comment is not null`);
     if (Number((resolutionResult.rows[0] as { value: number }).value) !== 11) throw new Error("Reconciliation exceptions were not persisted with version evidence");
 
+    const generalLedgerResult = await db.execute(sql`
+      with journal_totals as (
+        select journal.id, journal.total_debit, journal.total_credit,
+          coalesce(sum(line.amount) filter (where line.direction = 'DEBIT'), 0) as line_debit,
+          coalesce(sum(line.amount) filter (where line.direction = 'CREDIT'), 0) as line_credit
+        from general_ledger_journals journal left join general_ledger_lines line on line.journal_id = journal.id
+        where journal.status = 'POSTED' group by journal.id
+      )
+      select
+        (select count(*)::int from ledger_transactions source left join general_ledger_journals journal on journal.source_ledger_transaction_id = source.id and journal.status = 'POSTED' where journal.id is null) as missing_projections,
+        (select count(*)::int from journal_totals where total_debit <> total_credit or total_debit <> line_debit or total_credit <> line_credit) as unbalanced_journals
+    `);
+    const generalLedgerRow = generalLedgerResult.rows[0] as unknown as Record<string, number>;
+    if (Number(generalLedgerRow.missing_projections) !== 0 || Number(generalLedgerRow.unbalanced_journals) !== 0) throw new Error("Runtime subledger activity did not remain completely and exactly balanced in the general ledger");
+
     const workItemReference = await requestAccountingPeriodClose({ periodReference: "ACP-000001", expectedVersion: 1, comment: "Period-end processing, reconciliation, and exception evidence are complete." }, supervisor);
     const workItemResult = await db.execute(sql`select version from work_items where reference = ${workItemReference}`);
     const workItemVersion = Number((workItemResult.rows[0] as { version: number }).version);
@@ -153,7 +188,7 @@ async function main() {
     } catch (error) {
       if (!(error instanceof BankingError) || error.code !== "ACCOUNTING_PERIOD_CLOSED") throw error;
     }
-    console.info("Workflow integration verification passed: locking prevented duplicate decisions; scheduled, direct-debit, reversal, charge, and interest postings booked exactly once; clearing evidence was fully resolved; and independent period close froze the value date.");
+    console.info("Workflow integration verification passed: locking prevented duplicate decisions; scheduled, direct-debit, reversal, charge, and interest postings projected exactly once into balanced general-ledger journals; clearing evidence was fully resolved; and independent period close froze the value date.");
   } finally {
     await resetBaseline(db, admin);
   }

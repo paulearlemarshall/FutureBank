@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.7.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, maker-checker accounting-period close, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.8.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -74,6 +74,10 @@
     {
       "name": "Accounting periods",
       "description": "Period-end evidence, independent close approval and authoritative posting-date gates."
+    },
+    {
+      "name": "General ledger",
+      "description": "Multi-currency chart of accounts, exact subledger projection, controlled manual journals and posted trial balances."
     },
     {
       "name": "KYC",
@@ -1526,6 +1530,49 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AccountingPeriodCloseDecisionWrite"}}}},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "decideAccountingPeriodClose", "description": "A distinct Admin rechecks all close gates under locks and either closes the period or returns it to OPEN. CLOSING and CLOSED dates reject every runtime ledger writer."
+      }
+    },
+    "/general-ledger/accounts": {
+      "get": {
+        "tags": ["General ledger"], "summary": "List general-ledger accounts",
+        "responses": {"200": {"description": "Active and inactive chart-of-account records.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/GeneralLedgerAccount"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "listGeneralLedgerAccounts", "description": "Returns the currency-specific settlement, customer-control, income and expense accounts used by automated and manual journals."
+      }
+    },
+    "/general-ledger/trial-balance": {
+      "get": {
+        "tags": ["General ledger"], "summary": "Get a posted trial balance",
+        "parameters": [{"name": "fromDate", "in": "query", "schema": {"type": "string", "format": "date"}}, {"name": "toDate", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}}, {"name": "currency", "in": "query", "schema": {"type": "string", "pattern": "^[A-Z]{3}$"}}],
+        "responses": {"200": {"description": "Posted general-ledger trial balance.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/TrialBalance"}}}}}}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "getTrialBalance", "description": "Aggregates posted journal lines only, optionally within an inclusive date range and currency, and reports exact debit, credit and natural balances."
+      }
+    },
+    "/general-ledger/journals": {
+      "get": {
+        "tags": ["General ledger"], "summary": "List general-ledger journals", "parameters": [{"$ref": "#/components/parameters/Limit"}],
+        "responses": {"200": {"description": "General-ledger journal register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/GeneralLedgerJournal"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "listGeneralLedgerJournals", "description": "Lists automated subledger projections and pending, posted or rejected manual journals with their balanced lines."
+      },
+      "post": {
+        "tags": ["General ledger"], "summary": "Submit a manual general-ledger journal", "parameters": [{"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ManualGeneralLedgerJournalWrite"}}}},
+        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "createManualGeneralLedgerJournal", "description": "A Supervisor submits one exact two-line, same-currency journal into pending state; no trial-balance movement occurs until a distinct Admin approves it."
+      }
+    },
+    "/general-ledger/journals/{journalReference}": {
+      "get": {
+        "tags": ["General ledger"], "summary": "Get a general-ledger journal", "parameters": [{"$ref": "#/components/parameters/GeneralLedgerJournalReference"}],
+        "responses": {"200": {"description": "Journal, lines, actor evidence and latest work item.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/GeneralLedgerJournal"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "getGeneralLedgerJournal", "description": "Returns a journal's immutable accounting lines, source transaction, submission and decision evidence, version and maker-checker work item."
+      }
+    },
+    "/general-ledger/journals/{journalReference}/decision": {
+      "post": {
+        "tags": ["General ledger"], "summary": "Approve or reject a manual journal", "parameters": [{"$ref": "#/components/parameters/GeneralLedgerJournalReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GeneralLedgerJournalDecisionWrite"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "decideManualGeneralLedgerJournal", "description": "A distinct Admin locks the work item and journal, rechecks the open accounting period, account availability, currency and exact balance, then posts once or rejects without movement."
       }
     },
     "/kyc-cases": {
@@ -3269,6 +3316,9 @@
       "AccountingPeriodReference": {
         "name": "periodReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^ACP-"}
       },
+      "GeneralLedgerJournalReference": {
+        "name": "journalReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^(GL-|GLJ-)"}
+      },
       "CaseReference": {
         "name": "caseReference",
         "in": "path",
@@ -4442,7 +4492,9 @@
               "PAYMENT_REVERSAL",
               "OVERDRAFT_APPROVAL",
               "OVERDRAFT_CHANGE",
-              "OVERDRAFT_ALERT"
+              "OVERDRAFT_ALERT",
+              "ACCOUNTING_PERIOD_CLOSE",
+              "GENERAL_LEDGER_JOURNAL"
             ]
           },
           "status": {
@@ -4973,6 +5025,64 @@
           "closedBy": {"type": "string", "nullable": true}, "closeDecisionComment": {"type": "string", "nullable": true}, "closedAt": {"type": "string", "format": "date-time", "nullable": true},
           "workItem": {"allOf": [{"$ref": "#/components/schemas/WorkQueueItem"}], "nullable": true}
         }
+      },
+      "GeneralLedgerAccount": {
+        "type": "object", "additionalProperties": false,
+        "required": ["code", "name", "type", "currency", "systemControlled", "postingAllowed", "active", "version"],
+        "properties": {
+          "code": {"type": "string", "pattern": "^[0-9]{4}-[A-Z]{3}$"}, "name": {"type": "string"},
+          "type": {"type": "string", "enum": ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]},
+          "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "systemControlled": {"type": "boolean"}, "postingAllowed": {"type": "boolean"}, "active": {"type": "boolean"}, "version": {"type": "integer", "minimum": 1}
+        }
+      },
+      "GeneralLedgerLine": {
+        "type": "object", "additionalProperties": false,
+        "required": ["lineNumber", "accountCode", "accountName", "accountType", "direction", "amount", "narrative"],
+        "properties": {
+          "lineNumber": {"type": "integer", "minimum": 1}, "accountCode": {"type": "string"}, "accountName": {"type": "string"},
+          "accountType": {"type": "string", "enum": ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]},
+          "direction": {"type": "string", "enum": ["DEBIT", "CREDIT"]}, "amount": {"$ref": "#/components/schemas/Money"}, "narrative": {"type": "string"}
+        }
+      },
+      "GeneralLedgerJournal": {
+        "type": "object", "additionalProperties": false,
+        "required": ["reference", "source", "sourceTransactionReference", "valueDate", "status", "currency", "description", "totalDebit", "totalCredit", "createdBy", "submittedComment", "submittedAt", "decidedBy", "decisionComment", "decidedAt", "postedAt", "version", "lines", "workItem"],
+        "properties": {
+          "reference": {"type": "string"}, "source": {"type": "string", "enum": ["SUBLEDGER", "MANUAL"]}, "sourceTransactionReference": {"type": "string", "nullable": true},
+          "valueDate": {"type": "string", "format": "date"}, "status": {"type": "string", "enum": ["PENDING_APPROVAL", "POSTED", "REJECTED"]}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "description": {"type": "string"},
+          "totalDebit": {"$ref": "#/components/schemas/Money"}, "totalCredit": {"$ref": "#/components/schemas/Money"},
+          "createdBy": {"type": "string", "nullable": true}, "submittedComment": {"type": "string", "nullable": true}, "submittedAt": {"type": "string", "format": "date-time", "nullable": true},
+          "decidedBy": {"type": "string", "nullable": true}, "decisionComment": {"type": "string", "nullable": true}, "decidedAt": {"type": "string", "format": "date-time", "nullable": true}, "postedAt": {"type": "string", "format": "date-time", "nullable": true},
+          "version": {"type": "integer", "minimum": 1}, "lines": {"type": "array", "minItems": 2, "items": {"$ref": "#/components/schemas/GeneralLedgerLine"}}, "workItem": {"allOf": [{"$ref": "#/components/schemas/WorkQueueItem"}], "nullable": true}
+        }
+      },
+      "TrialBalanceLine": {
+        "type": "object", "additionalProperties": false,
+        "required": ["code", "name", "type", "currency", "systemControlled", "postingAllowed", "active", "version", "debit", "credit", "balance"],
+        "properties": {
+          "code": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string", "enum": ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]}, "currency": {"type": "string"},
+          "systemControlled": {"type": "boolean"}, "postingAllowed": {"type": "boolean"}, "active": {"type": "boolean"}, "version": {"type": "integer", "minimum": 1},
+          "debit": {"$ref": "#/components/schemas/Money"}, "credit": {"$ref": "#/components/schemas/Money"}, "balance": {"type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$"}
+        }
+      },
+      "TrialBalance": {
+        "type": "object", "additionalProperties": false,
+        "required": ["fromDate", "toDate", "currency", "totalDebit", "totalCredit", "balanced", "lines"],
+        "properties": {
+          "fromDate": {"type": "string", "format": "date", "nullable": true}, "toDate": {"type": "string", "format": "date"}, "currency": {"type": "string", "nullable": true},
+          "totalDebit": {"$ref": "#/components/schemas/Money"}, "totalCredit": {"$ref": "#/components/schemas/Money"}, "balanced": {"type": "boolean"}, "lines": {"type": "array", "items": {"$ref": "#/components/schemas/TrialBalanceLine"}}
+        }
+      },
+      "ManualGeneralLedgerJournalWrite": {
+        "type": "object", "additionalProperties": false, "required": ["valueDate", "currency", "debitAccountCode", "creditAccountCode", "amount", "description", "comment"],
+        "properties": {
+          "valueDate": {"type": "string", "format": "date"}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "debitAccountCode": {"type": "string"}, "creditAccountCode": {"type": "string"},
+          "amount": {"$ref": "#/components/schemas/Money"}, "description": {"type": "string", "minLength": 5, "maxLength": 200}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}
+        }
+      },
+      "GeneralLedgerJournalDecisionWrite": {
+        "type": "object", "additionalProperties": false, "required": ["workItemReference", "expectedVersion", "decision", "comment"],
+        "properties": {"workItemReference": {"type": "string", "pattern": "^WRK-"}, "expectedVersion": {"type": "integer", "minimum": 1}, "decision": {"type": "string", "enum": ["APPROVE", "REJECT"]}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
       },
       "AuditEvent": {
         "type": "object",

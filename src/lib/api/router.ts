@@ -26,6 +26,7 @@ import { decidePaymentReversalAction, requestPaymentReversalAction } from "@/mod
 import { runEndOfDayAction } from "@/modules/actions/end-of-day";
 import { resolveReconciliationItemAction, runReconciliationAction } from "@/modules/actions/reconciliation";
 import { decideAccountingPeriodCloseAction, requestAccountingPeriodCloseAction } from "@/modules/actions/accounting-periods";
+import { createManualGeneralLedgerJournalAction, decideManualGeneralLedgerJournalAction } from "@/modules/actions/general-ledger";
 import { cancelPaymentInstructionAction, createPaymentInstructionAction, runPaymentInstructionsAction } from "@/modules/actions/payment-instructions";
 import { cancelDirectDebitMandateAction, createDirectDebitMandateAction, submitDirectDebitCollectionAction } from "@/modules/actions/direct-debits";
 import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/workflow";
@@ -34,7 +35,7 @@ import {
   listCustomers, listProducts,
 } from "@/modules/queries";
 import {
-  getAccountingPeriod, getDirectDebitMandate, getEndOfDayRun, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getReconciliationRun, getWorkItem, listAccountingPeriods, listDirectDebitMandates, listEndOfDayRuns, listKycCases, listReconciliationRuns,
+  getAccountingPeriod, getDirectDebitMandate, getEndOfDayRun, getGeneralLedgerJournal, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getReconciliationRun, getTrialBalance, getWorkItem, listAccountingPeriods, listDirectDebitMandates, listEndOfDayRuns, listGeneralLedgerAccounts, listGeneralLedgerJournals, listKycCases, listReconciliationRuns,
   listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPaymentReversals, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
@@ -44,7 +45,7 @@ import {
 const paymentStatuses = new Set<PaymentApprovalDetail["status"]>(["BOOKED", "PENDING", "REJECTED", "EXPIRED"]);
 const paymentReversalStatuses = new Set<PaymentReversalView["status"]>(["PENDING_APPROVAL", "BOOKED", "REJECTED"]);
 const workStatuses = new Set<WorkItemStatus>(["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
-const workTypes = new Set<WorkItemType>(["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE"]);
+const workTypes = new Set<WorkItemType>(["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT", "ACCOUNTING_PERIOD_CLOSE", "GENERAL_LEDGER_JOURNAL"]);
 const priorities = new Set<WorkItemPriority>(["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 
 function notFound(resource = "API route"): never {
@@ -72,6 +73,20 @@ function enumQuery<T extends string>(url: URL, name: string, values: Set<T>): T 
   return raw as T;
 }
 
+function dateQuery(url: URL, name: string, required = false): string | undefined {
+  const raw = url.searchParams.get(name)?.trim();
+  if (!raw) {
+    if (required) throw new ApiError(400, "INVALID_QUERY", `${name} is required.`);
+    return undefined;
+  }
+  const [year, month, day] = raw.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new ApiError(400, "INVALID_QUERY", `${name} must be a valid ISO date.`);
+  }
+  return raw;
+}
+
 async function bodyForm(request: Request, additions: Record<string, unknown> = {}): Promise<FormData> {
   return formDataFromObject({ ...await readJsonObject(request), ...additions });
 }
@@ -82,8 +97,8 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.7.0", openapi: "/api/openapi.json",
-      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      name: "FutureBank API", version: "1.8.0", openapi: "/api/openapi.json",
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -201,6 +216,21 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!item) notFound("Accounting period");
       return jsonResponse(item);
     }
+    if (segments[0] === "general-ledger" && segments.length === 2 && segments[1] === "accounts") return jsonResponse(await listGeneralLedgerAccounts());
+    if (segments[0] === "general-ledger" && segments.length === 2 && segments[1] === "trial-balance") {
+      const fromDate = dateQuery(url, "fromDate");
+      const toDate = dateQuery(url, "toDate", true)!;
+      if (fromDate && fromDate > toDate) throw new ApiError(400, "INVALID_QUERY", "fromDate must not be later than toDate.");
+      const currency = url.searchParams.get("currency")?.trim().toUpperCase() || undefined;
+      if (currency && !/^[A-Z]{3}$/.test(currency)) throw new ApiError(400, "INVALID_QUERY", "currency must be a three-letter code.");
+      return jsonResponse(await getTrialBalance({ fromDate, toDate, currency }));
+    }
+    if (segments[0] === "general-ledger" && segments.length === 2 && segments[1] === "journals") return jsonResponse(await listGeneralLedgerJournals(integerQuery(url, "limit", 50)));
+    if (segments[0] === "general-ledger" && segments.length === 3 && segments[1] === "journals") {
+      const item = await getGeneralLedgerJournal(segments[2]);
+      if (!item) notFound("General-ledger journal");
+      return jsonResponse(item);
+    }
     if (segments[0] === "kyc-cases" && segments.length === 1) return jsonResponse(await listKycCases());
     if (segments[0] === "kyc-cases" && segments.length === 2) {
       const item = await getKycCase(segments[1]);
@@ -290,6 +320,14 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     }
     if (segments[0] === "accounting-periods" && segments.length === 3 && segments[2] === "close-decisions") {
       return responseForAction(await decideAccountingPeriodCloseAction(initialActionState, await bodyForm(request, { periodReference: segments[1] })));
+    }
+    if (segments[0] === "general-ledger" && segments.length === 2 && segments[1] === "journals") {
+      const body = await readJsonObject(request);
+      const idempotencyKey = request.headers.get("idempotency-key")?.trim() || body.idempotencyKey;
+      return responseForAction(await createManualGeneralLedgerJournalAction(initialActionState, formDataFromObject({ ...body, idempotencyKey })), 201);
+    }
+    if (segments[0] === "general-ledger" && segments.length === 4 && segments[1] === "journals" && segments[3] === "decision") {
+      return responseForAction(await decideManualGeneralLedgerJournalAction(initialActionState, await bodyForm(request, { journalReference: segments[2] })));
     }
     if (segments[0] === "kyc-cases" && segments.length === 1) {
       const body = await readJsonObject(request);

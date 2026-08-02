@@ -1,18 +1,20 @@
 import "server-only";
 
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accountHolds, accountingPeriods, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, ledgerTransactions,
+  accountHolds, accountingPeriods, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, generalLedgerAccounts, generalLedgerJournals, generalLedgerLines, ledgerTransactions,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
   paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, reconciliationItems, reconciliationRuns, screeningChecks, settlementRecords, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  AccountingPeriodView, DirectDebitMandateView, EndOfDayRunView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView,
+  AccountingPeriodView, DirectDebitMandateView, EndOfDayRunView, GeneralLedgerAccountView, GeneralLedgerJournalView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView, TrialBalanceView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
+import { naturalBalance } from "./domain/general-ledger-policy";
+import { minorUnitsToMoney, moneyToMinorUnits } from "./domain/transfer-policy";
 
 const iso = (value: Date | string) => value instanceof Date ? value.toISOString() : value;
 const displayName = (row: typeof customers.$inferSelect) => row.legalName ?? ([row.givenName, row.familyName].filter(Boolean).join(" ") || row.shortName);
@@ -387,6 +389,105 @@ export async function listAccountingPeriods(): Promise<AccountingPeriodView[]> {
   const rows = await db.select({ reference: accountingPeriods.reference }).from(accountingPeriods).orderBy(desc(accountingPeriods.endDate));
   const details = await Promise.all(rows.map((row) => getAccountingPeriod(row.reference)));
   return details.filter((item): item is AccountingPeriodView => item !== null);
+}
+
+export async function listGeneralLedgerAccounts(): Promise<GeneralLedgerAccountView[]> {
+  await requireUser();
+  const rows = await db.select().from(generalLedgerAccounts).orderBy(asc(generalLedgerAccounts.code));
+  return rows.map((account) => ({ code: account.code, name: account.name, type: account.type, currency: account.currency,
+    systemControlled: account.systemControlled, postingAllowed: account.postingAllowed, active: account.active, version: account.version }));
+}
+
+export async function getGeneralLedgerJournal(reference: string): Promise<GeneralLedgerJournalView | null> {
+  await requireUser();
+  const [journal] = await db.select({ journal: generalLedgerJournals, sourceTransactionReference: ledgerTransactions.reference })
+    .from(generalLedgerJournals).leftJoin(ledgerTransactions, eq(generalLedgerJournals.sourceLedgerTransactionId, ledgerTransactions.id))
+    .where(eq(generalLedgerJournals.reference, reference)).limit(1);
+  if (!journal) return null;
+  const [creatorRows, deciderRows, lineRows, workRows] = await Promise.all([
+    journal.journal.createdBy ? db.select({ username: user.username, email: user.email }).from(user).where(eq(user.id, journal.journal.createdBy)).limit(1) : Promise.resolve([]),
+    journal.journal.decidedBy ? db.select({ username: user.username, email: user.email }).from(user).where(eq(user.id, journal.journal.decidedBy)).limit(1) : Promise.resolve([]),
+    db.select({ line: generalLedgerLines, account: generalLedgerAccounts }).from(generalLedgerLines)
+      .innerJoin(generalLedgerAccounts, eq(generalLedgerLines.accountId, generalLedgerAccounts.id))
+      .where(eq(generalLedgerLines.journalId, journal.journal.id)).orderBy(asc(generalLedgerLines.lineNumber)),
+    db.select().from(workItems).where(and(eq(workItems.entityType, "GENERAL_LEDGER_JOURNAL"), eq(workItems.entityReference, reference))).orderBy(desc(workItems.createdAt)).limit(1),
+  ]);
+  return {
+    reference: journal.journal.reference, source: journal.journal.source, sourceTransactionReference: journal.sourceTransactionReference,
+    valueDate: journal.journal.valueDate, status: journal.journal.status, currency: journal.journal.currency, description: journal.journal.description,
+    totalDebit: journal.journal.totalDebit, totalCredit: journal.journal.totalCredit,
+    createdBy: creatorRows[0]?.username ?? creatorRows[0]?.email ?? null, submittedComment: journal.journal.submittedComment,
+    submittedAt: journal.journal.submittedAt ? iso(journal.journal.submittedAt) : null,
+    decidedBy: deciderRows[0]?.username ?? deciderRows[0]?.email ?? null, decisionComment: journal.journal.decisionComment,
+    decidedAt: journal.journal.decidedAt ? iso(journal.journal.decidedAt) : null, postedAt: journal.journal.postedAt ? iso(journal.journal.postedAt) : null,
+    version: journal.journal.version, lines: lineRows.map(({ line, account }) => ({ lineNumber: line.lineNumber, accountCode: account.code,
+      accountName: account.name, accountType: account.type, direction: line.direction, amount: line.amount, narrative: line.narrative })),
+    workItem: workRows[0] ? mapWorkItem(workRows[0]) : null,
+  };
+}
+
+export async function listGeneralLedgerJournals(limit = 50): Promise<GeneralLedgerJournalView[]> {
+  await requireUser();
+  const rows = await db.select({ journal: generalLedgerJournals, sourceTransactionReference: ledgerTransactions.reference })
+    .from(generalLedgerJournals).leftJoin(ledgerTransactions, eq(generalLedgerJournals.sourceLedgerTransactionId, ledgerTransactions.id))
+    .orderBy(desc(generalLedgerJournals.valueDate), desc(generalLedgerJournals.createdAt)).limit(Math.min(Math.max(limit, 1), 200));
+  if (!rows.length) return [];
+  const journalIds = rows.map((row) => row.journal.id);
+  const journalReferences = rows.map((row) => row.journal.reference);
+  const actorIds = [...new Set(rows.flatMap((row) => [row.journal.createdBy, row.journal.decidedBy]).filter((id): id is string => Boolean(id)))];
+  const [lineRows, actorRows, workRows] = await Promise.all([
+    db.select({ journalId: generalLedgerLines.journalId, line: generalLedgerLines, account: generalLedgerAccounts }).from(generalLedgerLines)
+      .innerJoin(generalLedgerAccounts, eq(generalLedgerLines.accountId, generalLedgerAccounts.id))
+      .where(inArray(generalLedgerLines.journalId, journalIds)).orderBy(asc(generalLedgerLines.lineNumber)),
+    actorIds.length ? db.select({ id: user.id, username: user.username, email: user.email }).from(user).where(inArray(user.id, actorIds)) : Promise.resolve([]),
+    db.select().from(workItems).where(and(eq(workItems.entityType, "GENERAL_LEDGER_JOURNAL"), inArray(workItems.entityReference, journalReferences))).orderBy(desc(workItems.createdAt)),
+  ]);
+  const actorById = new Map(actorRows.map((actor) => [actor.id, actor.username ?? actor.email]));
+  const workByReference = new Map<string, typeof workItems.$inferSelect>();
+  for (const item of workRows) if (!workByReference.has(item.entityReference)) workByReference.set(item.entityReference, item);
+  const linesByJournal = new Map<string, GeneralLedgerJournalView["lines"]>();
+  for (const { journalId, line, account } of lineRows) {
+    const lines = linesByJournal.get(journalId) ?? [];
+    lines.push({ lineNumber: line.lineNumber, accountCode: account.code, accountName: account.name, accountType: account.type,
+      direction: line.direction, amount: line.amount, narrative: line.narrative });
+    linesByJournal.set(journalId, lines);
+  }
+  return rows.map(({ journal, sourceTransactionReference }) => {
+    const workItem = workByReference.get(journal.reference);
+    return {
+      reference: journal.reference, source: journal.source, sourceTransactionReference, valueDate: journal.valueDate,
+      status: journal.status, currency: journal.currency, description: journal.description, totalDebit: journal.totalDebit, totalCredit: journal.totalCredit,
+      createdBy: journal.createdBy ? actorById.get(journal.createdBy) ?? null : null, submittedComment: journal.submittedComment,
+      submittedAt: journal.submittedAt ? iso(journal.submittedAt) : null, decidedBy: journal.decidedBy ? actorById.get(journal.decidedBy) ?? null : null,
+      decisionComment: journal.decisionComment, decidedAt: journal.decidedAt ? iso(journal.decidedAt) : null,
+      postedAt: journal.postedAt ? iso(journal.postedAt) : null, version: journal.version, lines: linesByJournal.get(journal.id) ?? [],
+      workItem: workItem ? mapWorkItem(workItem) : null,
+    };
+  });
+}
+
+export async function getTrialBalance(input: { fromDate?: string; toDate: string; currency?: string }): Promise<TrialBalanceView> {
+  await requireUser();
+  const fromClause = input.fromDate ? sql`and journal.value_date >= ${input.fromDate}` : sql``;
+  const currencyClause = input.currency ? sql`and account.currency = ${input.currency}` : sql``;
+  const result = await db.execute(sql`
+    select account.code, account.name, account.type::text, account.currency, account.system_controlled, account.posting_allowed, account.active, account.version,
+      coalesce(sum(case when journal.id is not null and line.direction = 'DEBIT' then line.amount else 0 end), 0)::text as debit,
+      coalesce(sum(case when journal.id is not null and line.direction = 'CREDIT' then line.amount else 0 end), 0)::text as credit
+    from general_ledger_accounts account
+    left join general_ledger_lines line on line.account_id = account.id
+    left join general_ledger_journals journal on journal.id = line.journal_id and journal.status = 'POSTED' and journal.value_date <= ${input.toDate} ${fromClause}
+    where account.active ${currencyClause}
+    group by account.id order by account.code
+  `);
+  const rows = result.rows as unknown as Array<{ code: string; name: string; type: GeneralLedgerAccountView["type"]; currency: string; system_controlled: boolean; posting_allowed: boolean; active: boolean; version: number; debit: string; credit: string }>;
+  const lines = rows.map((row) => ({ code: row.code, name: row.name, type: row.type, currency: row.currency, systemControlled: row.system_controlled,
+    postingAllowed: row.posting_allowed, active: row.active, version: row.version, debit: row.debit, credit: row.credit,
+    balance: naturalBalance(row.type, row.debit, row.credit) }));
+  const totalDebitMinor = lines.reduce((sum, line) => sum + moneyToMinorUnits(line.debit), 0n);
+  const totalCreditMinor = lines.reduce((sum, line) => sum + moneyToMinorUnits(line.credit), 0n);
+  return { fromDate: input.fromDate ?? null, toDate: input.toDate, currency: input.currency ?? null,
+    totalDebit: minorUnitsToMoney(totalDebitMinor), totalCredit: minorUnitsToMoney(totalCreditMinor), balanced: totalDebitMinor === totalCreditMinor, lines };
 }
 
 export async function getDirectDebitMandate(reference: string): Promise<DirectDebitMandateView | null> {

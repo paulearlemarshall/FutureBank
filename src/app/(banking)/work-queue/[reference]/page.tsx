@@ -10,7 +10,12 @@ import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/wo
 import { getWorkItem } from "@/modules/operations-queries";
 
 export const metadata: Metadata = { title: "Work item" };
-const entityHref = (type: string, reference: string) => type === "KYC_CASE" ? `/kyc/${reference}` : type === "PAYMENT" ? `/payments/${reference}` : type === "OVERDRAFT" ? `/overdrafts/${reference}` : "/overdrafts";
+const entityHref = (type: string, reference: string) => type === "KYC_CASE" ? `/kyc/${reference}`
+  : type === "PAYMENT" ? `/payments/${reference}`
+    : type === "PAYMENT_REVERSAL" ? `/payment-reversals/${reference}`
+      : type === "ACCOUNTING_PERIOD" ? `/accounting-periods/${reference}`
+        : type === "GENERAL_LEDGER_JOURNAL" ? `/general-ledger/journals/${reference}`
+          : type === "OVERDRAFT" ? `/overdrafts/${reference}` : "/overdrafts";
 
 export default async function WorkItemPage({ params }: { params: Promise<{ reference: string }> }) {
   const { reference } = await params;

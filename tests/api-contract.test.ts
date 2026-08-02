@@ -36,13 +36,18 @@ describe("FutureBank API contract", () => {
     expect(specification.paths["/reconciliation-runs"].post).toBeDefined();
     expect(specification.paths["/reconciliation-runs/{runReference}"].get).toBeDefined();
     expect(specification.paths["/reconciliation-runs/{runReference}/items/{itemReference}/resolution"].post).toBeDefined();
+    expect(specification.paths["/accounting-periods/{periodReference}/close-decisions"].post).toBeDefined();
+    expect(specification.paths["/general-ledger/accounts"].get).toBeDefined();
+    expect(specification.paths["/general-ledger/trial-balance"].get).toBeDefined();
+    expect(specification.paths["/general-ledger/journals"].post).toBeDefined();
+    expect(specification.paths["/general-ledger/journals/{journalReference}/decision"].post).toBeDefined();
     expect(specification.paths["/kyc-cases/{caseReference}/decision"].post).toBeDefined();
     expect(specification.paths["/overdrafts/{facilityReference}/decision"].post).toBeDefined();
   });
 
   it("declares every implemented API router resource", () => {
     const paths = Object.keys(specification.paths);
-    for (const prefix of ["/customers", "/accounts", "/beneficiaries", "/payments", "/payment-instructions", "/payment-reversals", "/direct-debits", "/end-of-day-runs", "/reconciliation-runs", "/kyc-cases", "/overdrafts", "/work-items", "/audit-events"]) {
+    for (const prefix of ["/customers", "/accounts", "/beneficiaries", "/payments", "/payment-instructions", "/payment-reversals", "/direct-debits", "/end-of-day-runs", "/reconciliation-runs", "/accounting-periods", "/general-ledger", "/kyc-cases", "/overdrafts", "/work-items", "/audit-events"]) {
       expect(paths.some((path) => path === prefix || path.startsWith(`${prefix}/`)), prefix).toBe(true);
     }
   });

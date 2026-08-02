@@ -1,6 +1,6 @@
 # FutureBank REST API
 
-The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, accounting-period close, KYC, overdrafts and work items.
+The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, general-ledger journals and trial balances, accounting-period close, KYC, overdrafts and work items.
 
 ## External discovery and accessibility
 
@@ -171,7 +171,7 @@ The control matches fictional external settlement records to immutable clearing 
 - `POST /accounting-periods/{periodReference}/close-requests` lets a Supervisor request close with an expected period version and evidence comment.
 - `POST /accounting-periods/{periodReference}/close-decisions` lets a distinct Admin approve or reject with the work-item reference, expected work-item version and decision comment.
 
-Close is accepted only after a completed end-of-day run at the end date and a later completed reconciliation that covers every period-end clearing entry. All reconciliation exceptions must be resolved, no processing run may remain active in the period, and every ledger transaction must balance. The period is frozen while `CLOSING`; approval makes that boundary permanent as `CLOSED`, while rejection returns it to `OPEN`.
+Close is accepted only after a completed end-of-day run at the end date and a later completed reconciliation that covers every period-end clearing entry. All reconciliation exceptions must be resolved, no processing run may remain active in the period, every ledger transaction must balance and have a posted GL projection, every posted GL journal must reconcile to its lines, and no manual journal may remain pending in the period. The period is frozen while `CLOSING`; approval makes that boundary permanent as `CLOSED`, while rejection returns it to `OPEN`.
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/accounting-periods/ACP-000001/close-requests" \
@@ -179,6 +179,25 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/accounting-periods/ACP-
   -H "X-Staff-Username: bp.supervisor" \
   -H "Content-Type: application/json" \
   -d '{"expectedVersion":1,"comment":"Final processing and reconciliation controls are complete."}'
+```
+
+## General ledger
+
+- `GET /general-ledger/accounts` returns the 16 seeded GBP/AED/USD/EUR settlement, customer-control, fee-income and interest-expense accounts.
+- `GET /general-ledger/journals` and `GET /general-ledger/journals/{journalReference}` expose automated projections and manual-journal evidence.
+- `GET /general-ledger/trial-balance?toDate=YYYY-MM-DD&fromDate=YYYY-MM-DD&currency=GBP` aggregates posted journals only; `toDate` is required.
+- `POST /general-ledger/journals` lets a Supervisor submit a same-currency debit and credit with `Idempotency-Key`.
+- `POST /general-ledger/journals/{journalReference}/decision` lets a distinct Admin approve or reject with the work-item reference, expected version and comment.
+
+Every booked subledger writer creates its posted GL journal and balanced lines in the same database transaction. Manual journals do not affect the trial balance while pending and rejection creates no movement.
+
+```bash
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/general-ledger/journals" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.supervisor" \
+  -H "Idempotency-Key: manual-journal-demo-0001" \
+  -H "Content-Type: application/json" \
+  -d '{"valueDate":"2026-08-02","currency":"GBP","debitAccountCode":"5100-GBP","creditAccountCode":"1100-GBP","amount":"25.00","description":"Fictional accrual correction","comment":"Prepared from fictional period-end evidence."}'
 ```
 
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.

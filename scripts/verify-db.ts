@@ -62,6 +62,22 @@ async function main() {
   expectEqual("seeded reconciliation runs", await scalar(sql`select count(*)::int as value from reconciliation_runs`), 0);
   expectEqual("accounting periods", await scalar(sql`select count(*)::int as value from accounting_periods`), 3);
   expectEqual("closed historical accounting periods", await scalar(sql`select count(*)::int as value from accounting_periods where reference = 'ACP-000003' and status = 'CLOSED' and closed_at is not null`), 1);
+  expectEqual("general ledger accounts", await scalar(sql`select count(*)::int as value from general_ledger_accounts where active and posting_allowed`), 16);
+  expectEqual("pending manual general ledger journals", await scalar(sql`select count(*)::int as value from general_ledger_journals where reference = 'GLJ-000001' and source = 'MANUAL' and status = 'PENDING_APPROVAL' and total_debit = total_credit`), 1);
+  expectEqual("subledger general ledger coverage", await scalar(sql`
+    select count(*)::int as value from ledger_transactions ledger_transaction
+    left join general_ledger_journals journal on journal.source_ledger_transaction_id = ledger_transaction.id and journal.status = 'POSTED'
+    where journal.id is null
+  `), 0);
+  expectEqual("unbalanced posted general ledger journals", await scalar(sql`
+    select count(*)::int as value from (
+      select journal.id from general_ledger_journals journal join general_ledger_lines line on line.journal_id = journal.id
+      where journal.status = 'POSTED' group by journal.id
+      having sum(case when line.direction = 'DEBIT' then line.amount else 0 end) <> sum(case when line.direction = 'CREDIT' then line.amount else 0 end)
+        or max(journal.total_debit) <> sum(case when line.direction = 'DEBIT' then line.amount else 0 end)
+        or max(journal.total_credit) <> sum(case when line.direction = 'CREDIT' then line.amount else 0 end)
+    ) unbalanced
+  `), 0);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
   expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);
@@ -86,7 +102,7 @@ async function main() {
   expectEqual("KYC cases", await scalar(sql`select count(*)::int as value from kyc_cases`), 8);
   expectEqual("overdraft facilities", await scalar(sql`select count(*)::int as value from overdraft_facilities`), 9);
   expectEqual("active payment holds", await scalar(sql`select count(*)::int as value from account_holds where status = 'ACTIVE'`), 1);
-  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 6);
+  expectEqual("open or assigned work items", await scalar(sql`select count(*)::int as value from work_items where status in ('OPEN', 'ASSIGNED')`), 7);
   expectEqual("expired active payment scenarios", await scalar(sql`
     select count(*)::int as value from payment_orders where status = 'PENDING' and expires_at <= now()
   `), 0);

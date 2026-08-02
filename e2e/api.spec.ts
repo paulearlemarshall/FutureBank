@@ -19,6 +19,10 @@ test("serves the OpenAPI 3 artifact without authentication", async ({ request })
   expect(document.paths["/reconciliation-runs/{runReference}/items/{itemReference}/resolution"].post).toBeDefined();
   expect(document.paths["/accounting-periods/{periodReference}/close-requests"].post).toBeDefined();
   expect(document.paths["/accounting-periods/{periodReference}/close-decisions"].post).toBeDefined();
+  expect(document.paths["/general-ledger/accounts"].get).toBeDefined();
+  expect(document.paths["/general-ledger/trial-balance"].get).toBeDefined();
+  expect(document.paths["/general-ledger/journals"].post).toBeDefined();
+  expect(document.paths["/general-ledger/journals/{journalReference}/decision"].post).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
   expect(document.paths["/customers/{customerNumber}/documents/{slot}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
@@ -113,7 +117,7 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.7.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.8.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
@@ -121,6 +125,23 @@ test("discovers seeded payment instructions through the authenticated API", asyn
     expect.objectContaining({ reference: "PIN-000002", type: "STANDING_ORDER", status: "ACTIVE", frequency: "MONTHLY" }),
     expect.objectContaining({ reference: "PIN-000003", status: "CANCELLED" }),
   ]));
+});
+
+test("reads the deterministic chart, journal register and posted trial balance", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const headers = { "X-API-Key": apiKey! };
+  const accounts = await request.get("/api/v1/general-ledger/accounts", { headers });
+  expect(accounts.ok()).toBe(true);
+  expect((await accounts.json()).data).toHaveLength(16);
+  const journals = await request.get("/api/v1/general-ledger/journals", { headers });
+  expect(journals.ok()).toBe(true);
+  expect((await journals.json()).data).toEqual(expect.arrayContaining([expect.objectContaining({ reference: "GLJ-000001", source: "MANUAL", status: "PENDING_APPROVAL" })]));
+  const detail = await request.get("/api/v1/general-ledger/journals/GLJ-000001", { headers });
+  expect(detail.ok()).toBe(true);
+  expect((await detail.json()).data).toMatchObject({ totalDebit: "125.00", totalCredit: "125.00", workItem: { reference: "WRK-000011" } });
+  const trial = await request.get("/api/v1/general-ledger/trial-balance?toDate=2026-08-02", { headers });
+  expect(trial.ok()).toBe(true);
+  expect((await trial.json()).data).toMatchObject({ balanced: true, currency: null });
 });
 
 test("discovers accounting periods and enforces close evidence through the API", async ({ request }) => {

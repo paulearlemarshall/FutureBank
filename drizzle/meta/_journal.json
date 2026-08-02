@@ -78,6 +78,20 @@
       "when": 1785681600546,
       "tag": "0010_seed-accounting-periods",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785682878065,
+      "tag": "0011_lonely_mercury",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785682893213,
+      "tag": "0012_backfill-general-ledger",
+      "breakpoints": true
     }
   ]
 }

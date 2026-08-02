@@ -27,6 +27,8 @@ const authenticatedRoutes = [
   ["/reconciliation", "reconciliation"],
   ["/accounting-periods", "accounting-periods"],
   ["/accounting-periods/ACP-000001", "accounting-period-detail"],
+  ["/general-ledger", "general-ledger"],
+  ["/general-ledger/journals/GLJ-000001", "general-ledger-journal-detail"],
   ["/work-queue", "work-queue"],
   ["/work-queue/WRK-000001", "work-item-detail"],
   ["/kyc", "kyc-register"],

@@ -13,6 +13,7 @@ import { createApprovalWorkItem, decideWorkItem, lockApprovalWorkItem } from "./
 export { BankingError } from "./errors";
 import { BankingError } from "./errors";
 import { assertPostingDateOpen } from "./accounting-periods";
+import { postSubledgerToGeneralLedger } from "./general-ledger";
 
 type LockedAccount = {
   id: string;
@@ -135,6 +136,7 @@ export async function bookInternalTransfer(input: PaymentInput & { destinationAc
       { transactionId: transaction.id, accountId: source.id, direction: "DEBIT", amount: policy.amount, balanceAfter: sourceAfter },
       { transactionId: transaction.id, accountId: destination.id, direction: "CREDIT", amount: policy.amount, balanceAfter: destinationAfter },
     ]);
+    await postSubledgerToGeneralLedger(tx, transaction.id);
     await tx.update(bankAccounts).set({ balance: sourceAfter, availableBalance: sourceAvailableAfter, updatedAt: new Date() }).where(eq(bankAccounts.id, source.id));
     await tx.update(bankAccounts).set({ balance: destinationAfter, availableBalance: destinationAvailableAfter, updatedAt: new Date() }).where(eq(bankAccounts.id, destination.id));
     await tx.insert(auditEvents).values({
@@ -234,6 +236,7 @@ export async function bookExternalPayment(input: PaymentInput & { beneficiaryId:
     }).returning();
     await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: source.id, direction: "DEBIT", amount: policy.amount, balanceAfter: sourceAfter });
     await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "CREDIT", amount: policy.amount, balanceAfter: clearingAfter });
+    await postSubledgerToGeneralLedger(tx, transaction.id);
     await tx.update(bankAccounts).set({ balance: sourceAfter, availableBalance: sourceAvailableAfter, updatedAt: new Date() }).where(eq(bankAccounts.id, source.id));
     await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: new Date() }).where(eq(clearingAccounts.id, clearing.id));
     await tx.insert(auditEvents).values({
@@ -293,6 +296,7 @@ export async function approvePendingPayment(input: { paymentReference: string; w
     }).returning();
     await tx.insert(ledgerEntries).values({ transactionId: transaction.id, accountId: source.id, direction: "DEBIT", amount: payment.amount, balanceAfter: sourceAfter });
     await tx.insert(clearingEntries).values({ transactionId: transaction.id, clearingAccountId: clearing.id, direction: "CREDIT", amount: payment.amount, balanceAfter: clearingAfter });
+    await postSubledgerToGeneralLedger(tx, transaction.id);
     await tx.update(bankAccounts).set({ balance: sourceAfter, updatedAt: new Date() }).where(eq(bankAccounts.id, source.id));
     await tx.update(clearingAccounts).set({ balance: clearingAfter, updatedAt: new Date() }).where(eq(clearingAccounts.id, clearing.id));
     await tx.update(accountHolds).set({ status: "CONSUMED", releasedAt: new Date(), releaseReason: "Payment approved and booked", updatedAt: new Date() }).where(eq(accountHolds.id, hold.id));
