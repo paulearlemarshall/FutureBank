@@ -8,6 +8,7 @@ import { submitDirectDebitCollection } from "../src/modules/services/direct-debi
 import { approvePendingPayment } from "../src/modules/services/payments";
 import { decidePaymentReversal } from "../src/modules/services/payment-reversals";
 import { runEndOfDay } from "../src/modules/services/end-of-day";
+import { resolveReconciliationItem, runClearingReconciliation } from "../src/modules/services/reconciliation";
 
 async function main() {
   const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin" };
@@ -112,7 +113,29 @@ async function main() {
     const endOfDayRow = endOfDayResult.rows[0] as unknown as Record<string, number>;
     const expectedEndOfDay = { runs: 1, completed_runs: 1, charges: 2, interests: 7, ledger_transactions: 9, unbalanced: 0 };
     for (const [label, expected] of Object.entries(expectedEndOfDay)) if (Number(endOfDayRow[label]) !== expected) throw new Error(`end of day ${label}: expected ${expected}, received ${endOfDayRow[label]}`);
-    console.info("Workflow integration verification passed: locking prevented double approval, and scheduled, direct-debit, reversal, charge, and interest postings booked exactly once through balanced ledger paths.");
+    const reconciliationAttempts = await Promise.all([
+      runClearingReconciliation({ businessDate: "2026-07-18", today: endOfDayDate }, supervisor),
+      runClearingReconciliation({ businessDate: "2026-07-18", today: endOfDayDate }, supervisor),
+    ]);
+    if (new Set(reconciliationAttempts.map((attempt) => attempt.reference)).size !== 1 || reconciliationAttempts.filter((attempt) => attempt.duplicate).length !== 1) throw new Error("Reconciliation race did not return one original and one duplicate run");
+    const reconciliationResult = await db.execute(sql`
+      select
+        (select count(*)::int from reconciliation_runs where business_date = '2026-07-18') as runs,
+        (select count(*)::int from reconciliation_items where status = 'MATCHED') as matched,
+        (select count(*)::int from reconciliation_items where status = 'OPEN') as open_exceptions,
+        (select count(*)::int from reconciliation_items where type = 'AMOUNT_MISMATCH') as amount_mismatches,
+        (select count(*)::int from reconciliation_items where type = 'MISSING_INTERNAL') as missing_internal,
+        (select count(*)::int from processing_runs where type = 'CLEARING_RECONCILIATION' and business_date = '2026-07-18' and status = 'COMPLETED' and attempted = 19 and booked = 17 and failed = 2) as completed_runs
+    `);
+    const reconciliationRow = reconciliationResult.rows[0] as unknown as Record<string, number>;
+    const expectedReconciliation = { runs: 1, matched: 17, open_exceptions: 2, amount_mismatches: 1, missing_internal: 1, completed_runs: 1 };
+    for (const [label, expected] of Object.entries(expectedReconciliation)) if (Number(reconciliationRow[label]) !== expected) throw new Error(`reconciliation ${label}: expected ${expected}, received ${reconciliationRow[label]}`);
+    const exceptionResult = await db.execute(sql`select reference, version from reconciliation_items where type = 'AMOUNT_MISMATCH' limit 1`);
+    const exception = exceptionResult.rows[0] as unknown as { reference: string; version: number };
+    await resolveReconciliationItem({ itemReference: exception.reference, runReference: reconciliationAttempts[0].reference, expectedVersion: exception.version, comment: "Verified fictional bank statement amount and recorded the control outcome." }, supervisor);
+    const resolutionResult = await db.execute(sql`select count(*)::int as value from reconciliation_items where reference = ${exception.reference} and status = 'RESOLVED' and version = 2 and resolution_comment is not null`);
+    if (Number((resolutionResult.rows[0] as { value: number }).value) !== 1) throw new Error("Reconciliation exception resolution was not persisted with version evidence");
+    console.info("Workflow integration verification passed: locking prevented double approval; scheduled, direct-debit, reversal, charge, and interest postings booked exactly once; and clearing reconciliation produced and resolved durable exceptions without ledger mutation.");
   } finally {
     await resetBaseline(db, admin);
   }

@@ -189,5 +189,6 @@ export function validateBaselineSeed(): string[] {
   if (baselinePaymentInstructions.length !== 3) errors.push("Expected three payment instruction scenarios");
   if (baselineDirectDebitMandates.length !== 3) errors.push("Expected three direct debit mandate scenarios");
   if (baselineProductChargeRules.length !== 2) errors.push("Expected two daily overdraft charge rules");
+  if (baselineTransactions.filter((item) => item.valueDate === "2026-07-18").length !== 18) errors.push("Expected eighteen internal clearing entries for the reconciliation scenario");
   return errors;
 }

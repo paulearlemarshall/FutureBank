@@ -53,6 +53,13 @@ async function main() {
     where r.reference = 'EOD-000001' and p.type = 'END_OF_DAY' and p.status = 'FAILED' and p.failed = 1
   `), 1);
   expectEqual("seeded end-of-day postings", await scalar(sql`select count(*)::int as value from end_of_day_postings`), 0);
+  expectEqual("settlement records", await scalar(sql`select count(*)::int as value from settlement_records`), 19);
+  expectEqual("settlement amount mismatch scenario", await scalar(sql`
+    select count(*)::int as value from settlement_records s join ledger_transactions t on t.reference = s.transaction_reference
+    where s.transaction_reference = 'TX-1000000001-025' and s.amount <> t.amount
+  `), 1);
+  expectEqual("settlement missing-internal scenario", await scalar(sql`select count(*)::int as value from settlement_records where transaction_reference = 'EXT-ONLY-20260718-001'`), 1);
+  expectEqual("seeded reconciliation runs", await scalar(sql`select count(*)::int as value from reconciliation_runs`), 0);
   expectEqual("read-only loans", await scalar(sql`select count(*)::int as value from bank_accounts where read_only`), 2);
   expectEqual("beneficiaries", await scalar(sql`select count(*)::int as value from beneficiaries`), 16);
   expectEqual("payment instructions", await scalar(sql`select count(*)::int as value from payment_instructions`), 3);

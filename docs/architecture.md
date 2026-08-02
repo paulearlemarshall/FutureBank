@@ -35,6 +35,7 @@ REST handlers are adapters over the same application services used by the UI. Th
 | Direct debit mandates and collections | direct-debit service and mandate/collection tables | mandate policy tests and payment/ledger journey |
 | Payment reversals | payment-reversal service, reversal table and existing workflow/ledger owners | maker-checker race and equal-and-opposite ledger verification |
 | Product charges, deposit interest and end of day | end-of-day policy/service, product charge rules, run/posting tables and existing ledger owner | exact calculation tests, once-per-date race and balanced workflow verification |
+| Clearing reconciliation | reconciliation policy/service, imported settlement records and run/item tables | exact/mismatch policy tests, once-per-date race and versioned resolution verification |
 | Arranged overdrafts | overdraft policy/services and facility tables | overdraft tests and approval/alert journeys |
 | Customer-document files | document policy/service plus private Blob adapter | feature specification and real-Blob journey |
 | Public API | `openapi/futurebank.v1.source.json` and API adapter | generated artifact, drift check and API contract tests |
@@ -60,6 +61,7 @@ Consequential decisions use work items, optimistic versions, row/advisory locks,
 - A direct debit mandate records customer authority and a maximum single amount but reserves no funds. Every collection is idempotently claimed, checked against the live mandate, then delegated to the external-payment service for current KYC, balance, hold, approval and ledger controls.
 - A reversal never edits or deletes the original payment or transaction. One full-value request per booked payment requires a distinct supervisor; approval posts a linked equal-and-opposite transaction exactly once, while internal reversals also require available funds at the original destination.
 - One end-of-day run owns each business date. Active effective-dated product rules determine daily overdraft charges, product annual rates determine daily deposit interest on a 365-day basis with exact half-up cent rounding, and each account/type occurrence is idempotent. Booked customer legs have equal-and-opposite currency-clearing legs; failures are durable posting outcomes rather than partial balance mutations.
+- One reconciliation run owns each imported settlement date. It compares evidence with immutable clearing entries by reference, currency, exact amount and direction. Exceptions and their versioned, commented resolutions are durable control records; reconciliation never repairs or mutates the ledger.
 - Available balance reconciles ledger balance, the active arranged overdraft limit, and active holds.
 - Only eligible current accounts with acceptable KYC and restrictions may receive or increase an overdraft facility.
 - Limit reductions cannot strand utilization plus holds, and suspension prevents further drawing while preserving debt.

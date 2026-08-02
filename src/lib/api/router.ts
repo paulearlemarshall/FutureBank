@@ -24,6 +24,7 @@ import {
 import { approvePendingPaymentAction, expirePendingPaymentsAction, rejectPendingPaymentAction } from "@/modules/actions/payments";
 import { decidePaymentReversalAction, requestPaymentReversalAction } from "@/modules/actions/payment-reversals";
 import { runEndOfDayAction } from "@/modules/actions/end-of-day";
+import { resolveReconciliationItemAction, runReconciliationAction } from "@/modules/actions/reconciliation";
 import { cancelPaymentInstructionAction, createPaymentInstructionAction, runPaymentInstructionsAction } from "@/modules/actions/payment-instructions";
 import { cancelDirectDebitMandateAction, createDirectDebitMandateAction, submitDirectDebitCollectionAction } from "@/modules/actions/direct-debits";
 import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/workflow";
@@ -32,7 +33,7 @@ import {
   listCustomers, listProducts,
 } from "@/modules/queries";
 import {
-  getDirectDebitMandate, getEndOfDayRun, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getWorkItem, listDirectDebitMandates, listEndOfDayRuns, listKycCases,
+  getDirectDebitMandate, getEndOfDayRun, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getReconciliationRun, getWorkItem, listDirectDebitMandates, listEndOfDayRuns, listKycCases, listReconciliationRuns,
   listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPaymentReversals, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
@@ -80,8 +81,8 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.5.0", openapi: "/api/openapi.json",
-      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      name: "FutureBank API", version: "1.6.0", openapi: "/api/openapi.json",
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -187,6 +188,12 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!item) notFound("End-of-day run");
       return jsonResponse(item);
     }
+    if (segments[0] === "reconciliation-runs" && segments.length === 1) return jsonResponse(await listReconciliationRuns(integerQuery(url, "limit", 10)));
+    if (segments[0] === "reconciliation-runs" && segments.length === 2) {
+      const item = await getReconciliationRun(segments[1]);
+      if (!item) notFound("Reconciliation run");
+      return jsonResponse(item);
+    }
     if (segments[0] === "kyc-cases" && segments.length === 1) return jsonResponse(await listKycCases());
     if (segments[0] === "kyc-cases" && segments.length === 2) {
       const item = await getKycCase(segments[1]);
@@ -264,6 +271,12 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     }
     if (segments[0] === "end-of-day-runs" && segments.length === 1) {
       return responseForAction(await runEndOfDayAction(initialActionState, await bodyForm(request)), 202);
+    }
+    if (segments[0] === "reconciliation-runs" && segments.length === 1) {
+      return responseForAction(await runReconciliationAction(initialActionState, await bodyForm(request)), 202);
+    }
+    if (segments[0] === "reconciliation-runs" && segments.length === 5 && segments[2] === "items" && segments[4] === "resolution") {
+      return responseForAction(await resolveReconciliationItemAction(initialActionState, await bodyForm(request, { runReference: segments[1], itemReference: segments[3] })));
     }
     if (segments[0] === "kyc-cases" && segments.length === 1) {
       const body = await readJsonObject(request);

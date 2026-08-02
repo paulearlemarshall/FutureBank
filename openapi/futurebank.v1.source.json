@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.5.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.6.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -66,6 +66,10 @@
     {
       "name": "End of day",
       "description": "Once-per-business-date product charge and deposit-interest posting."
+    },
+    {
+      "name": "Reconciliation",
+      "description": "Fictional external settlement matching and durable clearing exceptions."
     },
     {
       "name": "KYC",
@@ -1460,6 +1464,34 @@
         "tags": ["End of day"], "summary": "Get an end-of-day run", "parameters": [{"$ref": "#/components/parameters/EndOfDayRunReference"}],
         "responses": {"200": {"description": "End-of-day run and postings.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/EndOfDayRun"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "getEndOfDayRun", "description": "Returns the processing summary and immutable booked or failed account-level posting records."
+      }
+    },
+    "/reconciliation-runs": {
+      "get": {
+        "tags": ["Reconciliation"], "summary": "List recent clearing reconciliation runs", "parameters": [{"$ref": "#/components/parameters/Limit"}],
+        "responses": {"200": {"description": "Reconciliation run history.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/ReconciliationRun"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "listReconciliationRuns", "description": "Lists settlement dates, exact-match counts, and durable exception counts."
+      },
+      "post": {
+        "tags": ["Reconciliation"], "summary": "Run clearing reconciliation", "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReconciliationRunWrite"}}}},
+        "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "runReconciliation", "description": "Claims one run for a settlement date and compares imported records with immutable internal clearing entries by transaction reference, currency, amount, and direction."
+      }
+    },
+    "/reconciliation-runs/{runReference}": {
+      "get": {
+        "tags": ["Reconciliation"], "summary": "Get a clearing reconciliation run", "parameters": [{"$ref": "#/components/parameters/ReconciliationRunReference"}],
+        "responses": {"200": {"description": "Reconciliation run and comparison items.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/ReconciliationRun"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "getReconciliationRun", "description": "Returns matched records and open or resolved amount, direction, currency, and missing-side exceptions."
+      }
+    },
+    "/reconciliation-runs/{runReference}/items/{itemReference}/resolution": {
+      "post": {
+        "tags": ["Reconciliation"], "summary": "Resolve a reconciliation exception", "parameters": [{"$ref": "#/components/parameters/ReconciliationRunReference"}, {"$ref": "#/components/parameters/ReconciliationItemReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReconciliationResolutionWrite"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "resolveReconciliationItem", "description": "Records a version-checked resolution comment and audit event without modifying settlement records, clearing entries, or ledger transactions."
       }
     },
     "/kyc-cases": {
@@ -3194,6 +3226,12 @@
       "EndOfDayRunReference": {
         "name": "runReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^EOD-"}
       },
+      "ReconciliationRunReference": {
+        "name": "runReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^REC-"}
+      },
+      "ReconciliationItemReference": {
+        "name": "itemReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^RCI-"}
+      },
       "CaseReference": {
         "name": "caseReference",
         "in": "path",
@@ -4846,6 +4884,37 @@
           "attempted": {"type": "integer"}, "booked": {"type": "integer"}, "failed": {"type": "integer"}, "chargeCount": {"type": "integer"}, "interestCount": {"type": "integer"},
           "requestedBy": {"type": "string"}, "startedAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time", "nullable": true},
           "errorMessage": {"type": "string", "nullable": true}, "postings": {"type": "array", "items": {"$ref": "#/components/schemas/EndOfDayPosting"}}
+        }
+      },
+      "ReconciliationRunWrite": {
+        "type": "object", "required": ["businessDate"], "additionalProperties": false,
+        "properties": {"businessDate": {"type": "string", "format": "date", "description": "Non-future settlement date reconciled at most once."}}
+      },
+      "ReconciliationResolutionWrite": {
+        "type": "object", "required": ["expectedVersion", "comment"], "additionalProperties": false,
+        "properties": {"expectedVersion": {"type": "integer", "minimum": 1}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
+      },
+      "ReconciliationItem": {
+        "type": "object", "additionalProperties": false,
+        "required": ["reference", "transactionReference", "type", "status", "internalDirection", "externalDirection", "internalAmount", "externalAmount", "internalCurrency", "externalCurrency", "resolutionComment", "resolvedBy", "resolvedAt", "version"],
+        "properties": {
+          "reference": {"type": "string"}, "transactionReference": {"type": "string"},
+          "type": {"type": "string", "enum": ["MATCHED", "AMOUNT_MISMATCH", "DIRECTION_MISMATCH", "CURRENCY_MISMATCH", "MISSING_INTERNAL", "MISSING_EXTERNAL"]},
+          "status": {"type": "string", "enum": ["MATCHED", "OPEN", "RESOLVED"]},
+          "internalDirection": {"type": "string", "enum": ["DEBIT", "CREDIT"], "nullable": true}, "externalDirection": {"type": "string", "enum": ["DEBIT", "CREDIT"], "nullable": true},
+          "internalAmount": {"allOf": [{"$ref": "#/components/schemas/Money"}], "nullable": true}, "externalAmount": {"allOf": [{"$ref": "#/components/schemas/Money"}], "nullable": true},
+          "internalCurrency": {"type": "string", "nullable": true}, "externalCurrency": {"type": "string", "nullable": true}, "resolutionComment": {"type": "string", "nullable": true},
+          "resolvedBy": {"type": "string", "nullable": true}, "resolvedAt": {"type": "string", "format": "date-time", "nullable": true}, "version": {"type": "integer"}
+        }
+      },
+      "ReconciliationRun": {
+        "type": "object", "additionalProperties": false,
+        "required": ["reference", "businessDate", "status", "attempted", "matched", "exceptions", "openExceptions", "requestedBy", "startedAt", "completedAt", "errorMessage", "items"],
+        "properties": {
+          "reference": {"type": "string"}, "businessDate": {"type": "string", "format": "date"}, "status": {"type": "string", "enum": ["RUNNING", "COMPLETED", "FAILED"]},
+          "attempted": {"type": "integer"}, "matched": {"type": "integer"}, "exceptions": {"type": "integer"}, "openExceptions": {"type": "integer"},
+          "requestedBy": {"type": "string"}, "startedAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time", "nullable": true},
+          "errorMessage": {"type": "string", "nullable": true}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/ReconciliationItem"}}
         }
       },
       "AuditEvent": {

@@ -34,6 +34,8 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.workItemEvents);
   await tx.delete(tables.workItems);
   await tx.delete(tables.accountHolds);
+  await tx.delete(tables.reconciliationItems);
+  await tx.delete(tables.settlementRecords);
   await tx.delete(tables.clearingEntries);
   await tx.delete(tables.ledgerEntries);
   await tx.delete(tables.endOfDayPostings);
@@ -42,6 +44,7 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.paymentInstructionExecutions);
   await tx.delete(tables.directDebitCollections);
   await tx.delete(tables.endOfDayRuns);
+  await tx.delete(tables.reconciliationRuns);
   await tx.delete(tables.processingRuns);
   await tx.delete(tables.paymentInstructions);
   await tx.delete(tables.directDebitMandates);
@@ -443,6 +446,18 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   for (const [currency, balance] of clearingBalances) {
     await tx.update(tables.clearingAccounts).set({ balance: minorUnitsToMoney(balance) }).where(eq(tables.clearingAccounts.id, stableUuid(`clearing-${currency}`)));
   }
+
+  const settlementTransactions = baselineTransactions.filter((item) => item.valueDate === "2026-07-18");
+  await tx.insert(tables.settlementRecords).values([
+    ...settlementTransactions.map((item, index) => ({
+      id: stableUuid(`settlement-${item.reference}`), reference: `STM-${(index + 1).toString().padStart(6, "0")}`,
+      source: "Fictional SWIFT clearing statement", transactionReference: item.reference, businessDate: item.valueDate,
+      direction: item.direction === "DEBIT" ? "CREDIT" as const : "DEBIT" as const,
+      amount: item.reference === "TX-1000000001-025" ? minorUnitsToMoney(moneyToMinorUnits(item.amount) + 1n) : item.amount,
+      currency: item.currency, importedAt: new Date("2026-07-19T05:30:00.000Z"),
+    })),
+    { id: stableUuid("settlement-external-only"), reference: "STM-999999", source: "Fictional SWIFT clearing statement", transactionReference: "EXT-ONLY-20260718-001", businessDate: "2026-07-18", direction: "CREDIT" as const, amount: "99.99", currency: "GBP", importedAt: new Date("2026-07-19T05:30:00.000Z") },
+  ]);
 
   await tx.insert(tables.loanDetails).values([
     { accountId: bankAccountId("1000000011"), originalPrincipal: "90000.00", outstandingPrincipal: "58500.00", interestRate: "6.2500", installmentAmount: "1850.00", nextPaymentDate: "2026-08-15" },

@@ -27,6 +27,9 @@ import {
   paymentReversals,
   processingRuns,
   productChargeRules,
+  reconciliationItems,
+  reconciliationRuns,
+  settlementRecords,
   products,
   session,
   staffProfiles,
@@ -60,6 +63,9 @@ describe("database model contract", () => {
       endOfDayRuns,
       endOfDayPostings,
       productChargeRules,
+      settlementRecords,
+      reconciliationRuns,
+      reconciliationItems,
       ledgerTransactions,
       ledgerEntries,
       clearingAccounts,
@@ -86,6 +92,9 @@ describe("database model contract", () => {
       "end_of_day_runs",
       "end_of_day_postings",
       "product_charge_rules",
+      "settlement_records",
+      "reconciliation_runs",
+      "reconciliation_items",
       "ledger_transactions",
       "ledger_entries",
       "clearing_entries",
@@ -106,6 +115,7 @@ describe("database model contract", () => {
       directDebitCollections.amount,
       productChargeRules.amount,
       endOfDayPostings.amount,
+      settlementRecords.amount,
       ledgerTransactions.amount,
       ledgerEntries.amount,
       ledgerEntries.balanceAfter,
@@ -139,6 +149,11 @@ describe("database model contract", () => {
     expect(productChargeRules.reference.isUnique).toBe(true);
     expect(endOfDayPostings.reference.isUnique).toBe(true);
     expect(endOfDayPostings.idempotencyKey.isUnique).toBe(true);
+    expect(settlementRecords.reference.isUnique).toBe(true);
+    expect(settlementRecords.transactionReference.isUnique).toBe(true);
+    expect(reconciliationRuns.reference.isUnique).toBe(true);
+    expect(reconciliationRuns.businessDate.isUnique).toBe(true);
+    expect(reconciliationItems.reference.isUnique).toBe(true);
     expect(directDebitMandates.reference.isUnique).toBe(true);
     expect(directDebitCollections.reference.isUnique).toBe(true);
     expect(directDebitCollections.idempotencyKey.isUnique).toBe(true);

@@ -21,6 +21,7 @@ const navGroups = [
       ["Payment reversals", "/payment-reversals", "nav-payment-reversals"],
       ["Direct debits", "/direct-debits", "nav-direct-debits"],
       ["End of day", "/end-of-day", "nav-end-of-day"],
+      ["Reconciliation", "/reconciliation", "nav-reconciliation"],
       ["Arranged overdrafts", "/overdrafts", "nav-overdrafts"],
       ["Product catalogue", "/products", "nav-products"],
     ],

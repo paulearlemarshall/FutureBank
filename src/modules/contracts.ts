@@ -478,6 +478,38 @@ export type EndOfDayRunView = {
   postings: EndOfDayPostingView[];
 };
 
+export type ReconciliationItemView = {
+  reference: string;
+  transactionReference: string;
+  type: "MATCHED" | "AMOUNT_MISMATCH" | "DIRECTION_MISMATCH" | "CURRENCY_MISMATCH" | "MISSING_INTERNAL" | "MISSING_EXTERNAL";
+  status: "MATCHED" | "OPEN" | "RESOLVED";
+  internalDirection: "DEBIT" | "CREDIT" | null;
+  externalDirection: "DEBIT" | "CREDIT" | null;
+  internalAmount: string | null;
+  externalAmount: string | null;
+  internalCurrency: string | null;
+  externalCurrency: string | null;
+  resolutionComment: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  version: number;
+};
+
+export type ReconciliationRunView = {
+  reference: string;
+  businessDate: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  attempted: number;
+  matched: number;
+  exceptions: number;
+  openExceptions: number;
+  requestedBy: string;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+  items: ReconciliationItemView[];
+};
+
 export type DirectDebitCollectionView = {
   reference: string;
   status: "PROCESSING" | "BOOKED" | "PENDING" | "REJECTED";

@@ -5,11 +5,11 @@ import { db } from "@/db";
 import {
   accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, endOfDayPostings, endOfDayRuns, ledgerTransactions,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
-  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, screeningChecks, user, workItemEvents, workItems,
+  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, productChargeRules, reconciliationItems, reconciliationRuns, screeningChecks, settlementRecords, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  DirectDebitMandateView, EndOfDayRunView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView,
+  DirectDebitMandateView, EndOfDayRunView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView, ReconciliationRunView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -320,6 +320,48 @@ export async function listEndOfDayRuns(limit = 10): Promise<EndOfDayRunView[]> {
     .orderBy(desc(endOfDayRuns.businessDate), desc(endOfDayRuns.createdAt)).limit(limit);
   const details = await Promise.all(rows.map((row) => getEndOfDayRun(row.reference)));
   return details.filter((item): item is EndOfDayRunView => item !== null);
+}
+
+export async function getReconciliationRun(reference: string): Promise<ReconciliationRunView | null> {
+  await requireUser();
+  const [row] = await db.select({ run: reconciliationRuns, processing: processingRuns, requester: user })
+    .from(reconciliationRuns).innerJoin(processingRuns, eq(reconciliationRuns.processingRunId, processingRuns.id))
+    .innerJoin(user, eq(processingRuns.requestedBy, user.id)).where(eq(reconciliationRuns.reference, reference)).limit(1);
+  if (!row) return null;
+  const items = await db.select({ item: reconciliationItems, resolverUsername: user.username, resolverEmail: user.email })
+    .from(reconciliationItems).leftJoin(user, eq(reconciliationItems.resolvedBy, user.id))
+    .where(eq(reconciliationItems.reconciliationRunId, row.run.id)).orderBy(asc(reconciliationItems.status), asc(reconciliationItems.transactionReference));
+  const mappedItems = items.map(({ item, resolverUsername, resolverEmail }) => ({
+    reference: item.reference, transactionReference: item.transactionReference, type: item.type, status: item.status,
+    internalDirection: item.internalDirection, externalDirection: item.externalDirection,
+    internalAmount: item.internalAmount, externalAmount: item.externalAmount,
+    internalCurrency: item.internalCurrency, externalCurrency: item.externalCurrency,
+    resolutionComment: item.resolutionComment, resolvedBy: resolverUsername ?? resolverEmail,
+    resolvedAt: item.resolvedAt ? iso(item.resolvedAt) : null, version: item.version,
+  }));
+  const matched = mappedItems.filter((item) => item.status === "MATCHED").length;
+  return {
+    reference: row.run.reference, businessDate: row.run.businessDate, status: row.processing.status,
+    attempted: row.processing.attempted, matched, exceptions: mappedItems.length - matched,
+    openExceptions: mappedItems.filter((item) => item.status === "OPEN").length,
+    requestedBy: row.requester.username ?? row.requester.email, startedAt: iso(row.processing.startedAt),
+    completedAt: row.processing.completedAt ? iso(row.processing.completedAt) : null, errorMessage: row.processing.errorMessage,
+    items: mappedItems,
+  };
+}
+
+export async function listReconciliationRuns(limit = 10): Promise<ReconciliationRunView[]> {
+  await requireUser();
+  const rows = await db.select({ reference: reconciliationRuns.reference }).from(reconciliationRuns)
+    .orderBy(desc(reconciliationRuns.businessDate), desc(reconciliationRuns.createdAt)).limit(limit);
+  const details = await Promise.all(rows.map((row) => getReconciliationRun(row.reference)));
+  return details.filter((item): item is ReconciliationRunView => item !== null);
+}
+
+export async function getLatestSettlementBusinessDate(): Promise<string | null> {
+  await requireUser();
+  const [row] = await db.select({ businessDate: settlementRecords.businessDate }).from(settlementRecords).orderBy(desc(settlementRecords.businessDate)).limit(1);
+  return row?.businessDate ?? null;
 }
 
 export async function getDirectDebitMandate(reference: string): Promise<DirectDebitMandateView | null> {

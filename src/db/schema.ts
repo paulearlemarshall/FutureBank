@@ -37,6 +37,8 @@ export const processingRunStatusEnum = pgEnum("processing_run_status", ["RUNNING
 export const chargeTypeEnum = pgEnum("charge_type", ["DAILY_OVERDRAFT_USAGE"]);
 export const endOfDayPostingTypeEnum = pgEnum("end_of_day_posting_type", ["CHARGE", "INTEREST"]);
 export const endOfDayPostingStatusEnum = pgEnum("end_of_day_posting_status", ["PROCESSING", "BOOKED", "FAILED"]);
+export const reconciliationItemTypeEnum = pgEnum("reconciliation_item_type", ["MATCHED", "AMOUNT_MISMATCH", "DIRECTION_MISMATCH", "CURRENCY_MISMATCH", "MISSING_INTERNAL", "MISSING_EXTERNAL"]);
+export const reconciliationItemStatusEnum = pgEnum("reconciliation_item_status", ["MATCHED", "OPEN", "RESOLVED"]);
 export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
 export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
@@ -497,6 +499,14 @@ export const endOfDayRuns = pgTable("end_of_day_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const reconciliationRuns = pgTable("reconciliation_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  processingRunId: uuid("processing_run_id").notNull().unique().references(() => processingRuns.id, { onDelete: "restrict" }),
+  businessDate: date("business_date").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const paymentInstructionExecutions = pgTable("payment_instruction_executions", {
   id: uuid("id").primaryKey().defaultRandom(),
   instructionId: uuid("instruction_id").notNull().references(() => paymentInstructions.id, { onDelete: "restrict" }),
@@ -576,6 +586,44 @@ export const clearingEntries = pgTable("clearing_entries", {
   balanceAfter: numeric("balance_after", { precision: 18, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("clearing_entries_transaction_idx").on(table.transactionId)]);
+
+export const settlementRecords = pgTable("settlement_records", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  source: text("source").notNull(),
+  transactionReference: text("transaction_reference").notNull().unique(),
+  businessDate: date("business_date").notNull(),
+  direction: entryDirectionEnum("direction").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("settlement_records_date_idx").on(table.businessDate)]);
+
+export const reconciliationItems = pgTable("reconciliation_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  reconciliationRunId: uuid("reconciliation_run_id").notNull().references(() => reconciliationRuns.id, { onDelete: "restrict" }),
+  settlementRecordId: uuid("settlement_record_id").references(() => settlementRecords.id, { onDelete: "restrict" }),
+  clearingEntryId: uuid("clearing_entry_id").references(() => clearingEntries.id, { onDelete: "restrict" }),
+  transactionReference: text("transaction_reference").notNull(),
+  type: reconciliationItemTypeEnum("type").notNull(),
+  status: reconciliationItemStatusEnum("status").notNull(),
+  internalDirection: entryDirectionEnum("internal_direction"),
+  externalDirection: entryDirectionEnum("external_direction"),
+  internalAmount: numeric("internal_amount", { precision: 18, scale: 2 }),
+  externalAmount: numeric("external_amount", { precision: 18, scale: 2 }),
+  internalCurrency: text("internal_currency"),
+  externalCurrency: text("external_currency"),
+  resolutionComment: text("resolution_comment"),
+  resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("reconciliation_item_settlement_idx").on(table.reconciliationRunId, table.settlementRecordId),
+  uniqueIndex("reconciliation_item_clearing_idx").on(table.reconciliationRunId, table.clearingEntryId),
+  index("reconciliation_items_run_status_idx").on(table.reconciliationRunId, table.status),
+]);
 
 export const endOfDayPostings = pgTable("end_of_day_postings", {
   id: uuid("id").primaryKey().defaultRandom(),

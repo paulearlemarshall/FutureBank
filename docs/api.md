@@ -1,6 +1,6 @@
 # FutureBank REST API
 
-The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, KYC, overdrafts and work items.
+The FutureBank API is a fictional integration surface for demonstrations and automation. It supports reads and controlled writes across customers, customer documents, accounts, beneficiaries, immediate payments, payment instructions, direct debits, payment reversals, end-of-day posting, clearing reconciliation, KYC, overdrafts and work items.
 
 ## External discovery and accessibility
 
@@ -148,6 +148,22 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/end-of-day-runs" \
 ```
 
 Only one run is claimed for a business date. Each eligible account/type occurrence also has a stable idempotency key. Interest uses the product annual rate, a 365-day basis and exact half-up cent rounding; overdraft charges use active effective-dated product rules. Each booked customer leg is paired with an equal-and-opposite currency-clearing leg and updates both balance projections atomically. Failed account postings remain visible with durable failure codes and messages.
+
+## Clearing reconciliation
+
+- `GET|POST /reconciliation-runs` lists runs or reconciles one imported settlement date.
+- `GET /reconciliation-runs/{runReference}` returns exact matches and durable exceptions.
+- `POST /reconciliation-runs/{runReference}/items/{itemReference}/resolution` resolves an open exception using an expected version and comment.
+
+```bash
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/reconciliation-runs" \
+  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-Staff-Username: bp.supervisor" \
+  -H "Content-Type: application/json" \
+  -d '{"businessDate":"2026-07-18"}'
+```
+
+The control matches fictional external settlement records to immutable clearing entries by transaction reference, currency, exact decimal amount and direction. Missing-side and mismatch outcomes remain open until a Supervisor or Admin records a version-checked resolution comment. Reconciliation and resolution never alter settlement evidence, clearing entries, ledger transactions, or balances.
 
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.
 
