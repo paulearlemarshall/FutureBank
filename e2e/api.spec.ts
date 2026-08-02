@@ -1,6 +1,29 @@
-import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 const apiKey = process.env.FUTUREBANK_API_KEY;
+const requestOrigin = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const issuedKeys = new Map<string, string>();
+
+async function issueActorKey(request: APIRequestContext, role: "supervisor"): Promise<string> {
+  const cached = issuedKeys.get(role);
+  if (cached) return cached;
+  const username = `bp.${role}`;
+  const password = process.env.DEMO_SUPERVISOR_PASSWORD;
+  expect(password, "DEMO_SUPERVISOR_PASSWORD is required to issue a supervisor API key").toBeTruthy();
+  const signIn = await request.post("/api/auth/sign-in/username", {
+    data: { username, password, rememberMe: false },
+  });
+  expect(signIn.ok(), await signIn.text()).toBe(true);
+  const created = await request.post("/api/auth/api-key/create", {
+    headers: { Origin: requestOrigin },
+    data: { name: `e2e-${role}-${randomUUID().slice(0, 8)}` },
+  });
+  expect(created.ok(), await created.text()).toBe(true);
+  const key = (await created.json()).key as string;
+  issuedKeys.set(role, key);
+  return key;
+}
 
 test("serves the OpenAPI 3 artifact without authentication", async ({ request }) => {
   const response = await request.get("/api/openapi.json");
@@ -52,7 +75,7 @@ test("reads Amelia Hart's seeded private document metadata and content", async (
 test("requires multipart form data for customer document uploads", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
   const response = await request.put("/api/v1/customers/C000006/documents/PASSPORT", {
-    headers: { "X-API-Key": apiKey!, "X-Staff-Username": "bp.operator", "Content-Type": "application/json" },
+    headers: { "X-API-Key": apiKey!, "Content-Type": "application/json" },
     data: { file: "not-binary" },
   });
   expect(response.status()).toBe(415);
@@ -63,8 +86,9 @@ test("requires multipart form data for customer document uploads", async ({ requ
 
 test("enforces document write permissions without mutating data", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const supervisorKey = await issueActorKey(request, "supervisor");
   const response = await request.put("/api/v1/customers/C000001/documents/PASSPORT", {
-    headers: { "X-API-Key": apiKey!, "X-Staff-Username": "bp.supervisor" },
+    headers: { "X-API-Key": supervisorKey },
     multipart: { file: { name: "tiny.jpg", mimeType: "image/jpeg", buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]) } },
   });
   expect(response.status()).toBe(403);
@@ -72,7 +96,7 @@ test("enforces document write permissions without mutating data", async ({ reque
 
 test("uploads, reads and deletes a customer document through the REST API", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
-  const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.operator" };
+  const headers = { "X-API-Key": apiKey! };
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x11, 0x22]);
   const upload = await request.put("/api/v1/customers/C000006/documents/NATIONAL_ID", {
     headers,
@@ -95,7 +119,21 @@ test("rejects unauthenticated business API requests", async ({ request }) => {
   const response = await request.get("/api/v1/customers");
   expect(response.status()).toBe(401);
   expect(await response.json()).toEqual({
-    error: { code: "INVALID_API_KEY", message: "A valid FutureBank API key is required." },
+    error: { code: "INVALID_API_KEY", message: "A valid FutureBank actor API key is required." },
+  });
+});
+
+test("rejects the removed caller-selected actor header", async ({ request }) => {
+  expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
+  const response = await request.get("/api/v1/customers", {
+    headers: { "X-API-Key": apiKey!, "X-Staff-Username": "bp.supervisor" },
+  });
+  expect(response.status()).toBe(400);
+  expect(await response.json()).toEqual({
+    error: {
+      code: "ACTOR_HEADER_NOT_SUPPORTED",
+      message: "API keys are bound to one staff actor; X-Staff-Username is not supported.",
+    },
   });
 });
 
@@ -120,7 +158,7 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.9.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.10.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
@@ -173,6 +211,7 @@ test("discovers the deterministic pending loan application and empty pre-booking
 test("discovers accounting periods and enforces close evidence through the API", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
   const readHeaders = { "X-API-Key": apiKey! };
+  const supervisorKey = await issueActorKey(request, "supervisor");
   const list = await request.get("/api/v1/accounting-periods", { headers: readHeaders });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
@@ -184,7 +223,7 @@ test("discovers accounting periods and enforces close evidence through the API",
   expect((await detail.json()).data).toMatchObject({ endDate: "2026-07-18", workItem: null });
 
   const close = await request.post("/api/v1/accounting-periods/ACP-000001/close-requests", {
-    headers: { ...readHeaders, "X-Staff-Username": "bp.supervisor" },
+    headers: { "X-API-Key": supervisorKey },
     data: { expectedVersion: 1, comment: "Attempt close before all final control evidence is available." },
   });
   expect(close.status()).toBe(409);
@@ -206,7 +245,7 @@ test("discovers the deterministic failed end-of-day run", async ({ request }) =>
 
 test("runs and resolves clearing reconciliation through the authenticated API", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
-  const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.supervisor" };
+  const headers = { "X-API-Key": await issueActorKey(request, "supervisor") };
   const runResponse = await request.post("/api/v1/reconciliation-runs", { headers, data: { businessDate: "2026-07-18" } });
   expect(runResponse.status()).toBe(202);
   const runState = (await runResponse.json()).data as { message: string };
@@ -265,7 +304,7 @@ test("downloads an authenticated exact-value CSV account statement", async ({ re
 
 test("round-trips Arabic customer text through authenticated API reads and writes", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
-  const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.operator" };
+  const headers = { "X-API-Key": apiKey! };
   const search = await request.get(`/api/v1/customers?query=${encodeURIComponent("المنصوري")}`, { headers });
   expect(search.ok()).toBe(true);
   expect((await search.json()).data).toEqual([
@@ -314,9 +353,9 @@ test("round-trips Arabic customer text through authenticated API reads and write
   }
 });
 
-test("uses the selected staff actor for controlled work-item writes", async ({ request }) => {
+test("uses the API key owner for controlled work-item writes", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
-  const headers = { "X-API-Key": apiKey!, "X-Staff-Username": "bp.supervisor" };
+  const headers = { "X-API-Key": await issueActorKey(request, "supervisor") };
   const queueResponse = await request.get("/api/v1/work-items?status=OPEN", { headers });
   expect(queueResponse.ok()).toBe(true);
   const queue = (await queueResponse.json()).data as Array<{ reference: string; requiredRole: string; version: number }>;

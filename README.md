@@ -16,7 +16,7 @@ Useful starting records include `KYC-000007` for an unresolved fictional match, 
 
 ## Live demonstration
 
-The production demonstration is available at [future-bank-demo.vercel.app](https://future-bank-demo.vercel.app). Demo usernames are `bp.operator`, `bp.supervisor`, `bp.compliance`, and `bp.admin`; passwords are managed as Vercel environment variables and are intentionally not stored in this public repository.
+The production demonstration is available at [future-bank-demo.vercel.app](https://future-bank-demo.vercel.app). Demo usernames are `bp.operator`, `bp.supervisor`, `bp.compliance`, and `bp.admin`; plaintext passwords are retained outside the runtime and are intentionally not stored in this public repository.
 
 ## Stack
 
@@ -30,7 +30,7 @@ The production demonstration is available at [future-bank-demo.vercel.app](https
 
 ## Local setup
 
-Install dependencies and copy the required environment values into `.env.local`. At minimum the application requires its Neon connection string, authentication secret, four demo credentials (`DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`), `FUTUREBANK_API_KEY`, and a Vercel Blob read-write token (`BLOB_READ_WRITE_TOKEN`) for the customer-documents feature. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
+Install dependencies and copy the required environment values into `.env.local`. At minimum local provisioning and tests require the Neon connection string, authentication secret, four demo credentials (`DEMO_OPERATOR_PASSWORD`, `DEMO_SUPERVISOR_PASSWORD`, `DEMO_COMPLIANCE_PASSWORD`, and `DEMO_ADMIN_PASSWORD`), an operator-owned integration key (`FUTUREBANK_API_OPERATOR_KEY`, with `FUTUREBANK_API_KEY` accepted as a compatibility input), and a Vercel Blob read-write token (`BLOB_READ_WRITE_TOKEN`) for the customer-documents feature. Secrets must not be committed. Use a dedicated Neon branch for development; do not pull production database values over a checked-out branch context.
 
 ```powershell
 npm install
@@ -43,12 +43,11 @@ Open [http://localhost:3000](http://localhost:3000). The four seeded usernames a
 
 ## REST API
 
-The read/write API is rooted at `/api/v1`. Send the configured key in `X-API-Key` or as a bearer token. Mutations may also send `X-Staff-Username` to select an active seeded staff actor; normal role permissions and maker-checker separation remain enforced. The default actor is `bp.operator`.
+The read/write API is rooted at `/api/v1`. Send an actor-owned key in `X-API-Key` or as a bearer token. The key owner determines the actor and permissions; `X-Staff-Username` is rejected. Normal role permissions and maker-checker separation remain enforced.
 
 ```powershell
 $headers = @{
   "X-API-Key" = "<api key>"
-  "X-Staff-Username" = "bp.operator"
 }
 Invoke-RestMethod "http://localhost:3000/api/v1/customers?limit=9" -Headers $headers
 ```
@@ -95,6 +94,7 @@ The application uses native labelled form controls and semantic tables, stable I
 ## Database lifecycle
 
 - `npm run db:generate` generates a migration after schema changes.
+- `npm run auth:provision` rotates the four staff password hashes and provisions any supplied actor-owned API keys as one explicit operation.
 - `npm run db:migrate` applies committed migrations.
 - `npm run db:seed` creates the deterministic demonstration dataset.
 - `npm run db:reset` restores banking-domain data in a controlled development environment.

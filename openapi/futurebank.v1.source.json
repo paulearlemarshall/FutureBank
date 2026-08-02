@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.9.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.10.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -289,10 +289,7 @@
         ],
         "summary": "Create a fully populated customer",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "requestBody": {
           "required": true,
           "content": {
@@ -390,10 +387,7 @@
         ],
         "summary": "Update a customer",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "requestBody": {
           "required": true,
           "description": "Complete replacement values for the mutable CRM fields.",
@@ -435,9 +429,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -500,9 +491,6 @@
           },
           {
             "$ref": "#/components/parameters/RestrictionReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -604,10 +592,7 @@
         ],
         "summary": "Open an account",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "requestBody": {
           "required": true,
           "content": {
@@ -810,9 +795,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AccountNumber"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -924,10 +906,7 @@
         ],
         "summary": "Create a beneficiary",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "requestBody": {
           "required": true,
           "description": "Creates an active external beneficiary owned by the customer.",
@@ -1021,9 +1000,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1134,9 +1110,6 @@
         "summary": "Submit an internal or external payment",
         "parameters": [
           {
-            "$ref": "#/components/parameters/StaffActor"
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -1236,9 +1209,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/PaymentReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1272,10 +1242,7 @@
         ],
         "summary": "Expire stale pending payments and release holds",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
@@ -1297,7 +1264,7 @@
     "/payments/{paymentReference}/reversals": {
       "post": {
         "tags": ["Payment reversals"], "summary": "Request a full payment reversal",
-        "parameters": [{"$ref": "#/components/parameters/PaymentReference"}, {"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "parameters": [{"$ref": "#/components/parameters/PaymentReference"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentReversalRequest"}}}},
         "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "requestPaymentReversal", "description": "Creates one pending full-value reversal and a supervisor work item. The original payment and posting remain immutable."
@@ -1322,7 +1289,7 @@
     "/payment-reversals/{reversalReference}/decision": {
       "post": {
         "tags": ["Payment reversals"], "summary": "Approve or reject a payment reversal",
-        "parameters": [{"$ref": "#/components/parameters/PaymentReversalReference"}, {"$ref": "#/components/parameters/StaffActor"}], "requestBody": {"$ref": "#/components/requestBodies/Decision"},
+        "parameters": [{"$ref": "#/components/parameters/PaymentReversalReference"}], "requestBody": {"$ref": "#/components/requestBodies/Decision"},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "decidePaymentReversal", "description": "A different supervisor approves or rejects using the expected work-item version. Approval posts the equal-and-opposite ledger transaction exactly once."
       }
@@ -1346,7 +1313,7 @@
       "post": {
         "tags": ["Payment instructions"],
         "summary": "Create a future-dated payment or standing order",
-        "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "parameters": [],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentInstructionWrite"}}}},
         "responses": {
           "201": {"$ref": "#/components/responses/ActionSuccess"},
@@ -1379,7 +1346,7 @@
       "post": {
         "tags": ["Payment instructions"],
         "summary": "Cancel an active payment instruction",
-        "parameters": [{"$ref": "#/components/parameters/PaymentInstructionReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "parameters": [{"$ref": "#/components/parameters/PaymentInstructionReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentInstructionCancellation"}}}},
         "responses": {
           "200": {"$ref": "#/components/responses/ActionSuccess"},
@@ -1409,7 +1376,7 @@
       "post": {
         "tags": ["Payment instructions"],
         "summary": "Execute all instructions due on a business date",
-        "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "parameters": [],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentInstructionRunWrite"}}}},
         "responses": {
           "202": {"$ref": "#/components/responses/ActionSuccess"},
@@ -1429,7 +1396,7 @@
         "operationId": "listDirectDebitMandates", "description": "Lists active and terminal mandates with collection history."
       },
       "post": {
-        "tags": ["Direct debits"], "summary": "Register a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Direct debits"], "summary": "Register a direct debit mandate", "parameters": [],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitMandateWrite"}}}},
         "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "createDirectDebitMandate", "description": "Registers customer authority after account, ownership, KYC and currency checks; no funds are reserved."
@@ -1444,7 +1411,7 @@
     },
     "/direct-debits/{mandateReference}/cancellation": {
       "post": {
-        "tags": ["Direct debits"], "summary": "Cancel a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Direct debits"], "summary": "Cancel a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitMandateCancellation"}}}},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "cancelDirectDebitMandate", "description": "Cancels with an expected version and rejects cancellation while a collection is processing."
@@ -1452,7 +1419,7 @@
     },
     "/direct-debits/{mandateReference}/collections": {
       "post": {
-        "tags": ["Direct debits"], "summary": "Submit a creditor collection", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}, {"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "tags": ["Direct debits"], "summary": "Submit a creditor collection", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitCollectionWrite"}}}},
         "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "submitDirectDebitCollection", "description": "Claims an idempotent occurrence, applies mandate limits and delegates live booking, holds and approvals to the external-payment service."
@@ -1465,7 +1432,7 @@
         "operationId": "listEndOfDayRuns", "description": "Lists batch state, counts and account-level posting outcomes for recent business dates."
       },
       "post": {
-        "tags": ["End of day"], "summary": "Run end-of-day posting", "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["End of day"], "summary": "Run end-of-day posting", "parameters": [],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EndOfDayRunWrite"}}}},
         "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "runEndOfDay", "description": "Claims one run for the business date, then books configured daily overdraft charges and exact product-rate daily interest through balanced customer and currency-clearing ledger legs."
@@ -1485,7 +1452,7 @@
         "operationId": "listReconciliationRuns", "description": "Lists settlement dates, exact-match counts, and durable exception counts."
       },
       "post": {
-        "tags": ["Reconciliation"], "summary": "Run clearing reconciliation", "parameters": [{"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Reconciliation"], "summary": "Run clearing reconciliation", "parameters": [],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReconciliationRunWrite"}}}},
         "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "runReconciliation", "description": "Claims one run for a settlement date and compares imported records with immutable internal clearing entries by transaction reference, currency, amount, and direction."
@@ -1500,7 +1467,7 @@
     },
     "/reconciliation-runs/{runReference}/items/{itemReference}/resolution": {
       "post": {
-        "tags": ["Reconciliation"], "summary": "Resolve a reconciliation exception", "parameters": [{"$ref": "#/components/parameters/ReconciliationRunReference"}, {"$ref": "#/components/parameters/ReconciliationItemReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Reconciliation"], "summary": "Resolve a reconciliation exception", "parameters": [{"$ref": "#/components/parameters/ReconciliationRunReference"}, {"$ref": "#/components/parameters/ReconciliationItemReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReconciliationResolutionWrite"}}}},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "resolveReconciliationItem", "description": "Records a version-checked resolution comment and audit event without modifying settlement records, clearing entries, or ledger transactions."
@@ -1522,7 +1489,7 @@
     },
     "/accounting-periods/{periodReference}/close-requests": {
       "post": {
-        "tags": ["Accounting periods"], "summary": "Request accounting-period close", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Accounting periods"], "summary": "Request accounting-period close", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AccountingPeriodCloseRequestWrite"}}}},
         "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "requestAccountingPeriodClose", "description": "A Supervisor locks the period, proves final end-of-day and later reconciliation evidence, zero open exceptions, full clearing coverage, no running process and a balanced ledger, then creates an Admin approval item and freezes the period while closing."
@@ -1530,7 +1497,7 @@
     },
     "/accounting-periods/{periodReference}/close-decisions": {
       "post": {
-        "tags": ["Accounting periods"], "summary": "Approve or reject accounting-period close", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Accounting periods"], "summary": "Approve or reject accounting-period close", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AccountingPeriodCloseDecisionWrite"}}}},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "decideAccountingPeriodClose", "description": "A distinct Admin rechecks all close gates under locks and either closes the period or returns it to OPEN. CLOSING and CLOSED dates reject every runtime ledger writer."
@@ -1558,7 +1525,7 @@
         "operationId": "listGeneralLedgerJournals", "description": "Lists automated subledger projections and pending, posted or rejected manual journals with their balanced lines."
       },
       "post": {
-        "tags": ["General ledger"], "summary": "Submit a manual general-ledger journal", "parameters": [{"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "tags": ["General ledger"], "summary": "Submit a manual general-ledger journal", "parameters": [ {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ManualGeneralLedgerJournalWrite"}}}},
         "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "createManualGeneralLedgerJournal", "description": "A Supervisor submits one exact two-line, same-currency journal into pending state; no trial-balance movement occurs until a distinct Admin approves it."
@@ -1573,7 +1540,7 @@
     },
     "/general-ledger/journals/{journalReference}/decision": {
       "post": {
-        "tags": ["General ledger"], "summary": "Approve or reject a manual journal", "parameters": [{"$ref": "#/components/parameters/GeneralLedgerJournalReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["General ledger"], "summary": "Approve or reject a manual journal", "parameters": [{"$ref": "#/components/parameters/GeneralLedgerJournalReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GeneralLedgerJournalDecisionWrite"}}}},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "decideManualGeneralLedgerJournal", "description": "A distinct Admin locks the work item and journal, rechecks the open accounting period, account availability, currency and exact balance, then posts once or rejects without movement."
@@ -1587,7 +1554,7 @@
         "operationId": "listLoanApplications", "description": "Lists pending, approved or rejected loan proposals with snapshotted terms, affordability ratio and booking references."
       },
       "post": {
-        "tags": ["Loans"], "summary": "Submit a loan application", "parameters": [{"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "tags": ["Loans"], "summary": "Submit a loan application", "parameters": [ {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoanApplicationWrite"}}}},
         "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "submitLoanApplication", "description": "An Operator submits exact fictional affordability data against an active loan product and the customer's own currency-matched deposit account. The proposal is idempotent and creates a Supervisor approval item without ledger movement."
@@ -1602,7 +1569,7 @@
     },
     "/loans/{applicationReference}/decision": {
       "post": {
-        "tags": ["Loans"], "summary": "Approve or reject a loan application", "parameters": [{"$ref": "#/components/parameters/LoanApplicationReference"}, {"$ref": "#/components/parameters/StaffActor"}],
+        "tags": ["Loans"], "summary": "Approve or reject a loan application", "parameters": [{"$ref": "#/components/parameters/LoanApplicationReference"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoanApplicationDecisionWrite"}}}},
         "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
         "operationId": "decideLoanApplication", "description": "A distinct Supervisor or Admin locks and rechecks current KYC, restrictions, affordability, product, destination, posting period and terms. Approval creates one loan account, exact schedule, balanced subledger transaction, general-ledger projection and destination credit atomically; rejection creates no financial movement."
@@ -1657,10 +1624,7 @@
         ],
         "summary": "Open a KYC case",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1777,9 +1741,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1874,9 +1835,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -1955,9 +1913,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2024,9 +1979,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "responses": {
@@ -2056,9 +2008,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2125,9 +2074,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "responses": {
@@ -2160,9 +2106,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/CaseReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2238,10 +2181,7 @@
         ],
         "summary": "Submit an arranged-overdraft application",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/StaffActor"
-          }
-        ],
+          ],
         "requestBody": {
           "required": true,
           "description": "Submits an arranged-overdraft application and creates an approval work item.",
@@ -2382,9 +2322,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/FacilityReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2444,9 +2381,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/FacilityReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2482,9 +2416,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/FacilityReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2554,9 +2485,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2761,9 +2689,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkItemReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -2799,9 +2724,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkItemReference"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3006,9 +2928,6 @@
           },
           {
             "$ref": "#/components/parameters/DocumentSlot"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "requestBody": {
@@ -3106,9 +3025,6 @@
           },
           {
             "$ref": "#/components/parameters/DocumentSlot"
-          },
-          {
-            "$ref": "#/components/parameters/StaffActor"
           }
         ],
         "responses": {
@@ -3250,26 +3166,16 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "The FUTUREBANK_API_KEY supplied in X-API-Key."
+        "description": "An actor-owned FutureBank API key supplied in X-API-Key. The key owner determines permissions and audit identity."
       },
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "API key",
-        "description": "The FUTUREBANK_API_KEY supplied as an HTTP Bearer token. This is an alternative to X-API-Key, not a staff OAuth token."
+        "description": "An actor-owned FutureBank API key supplied as an HTTP Bearer token. This is an alternative to X-API-Key, not a staff OAuth token."
       }
     },
     "parameters": {
-      "StaffActor": {
-        "name": "X-Staff-Username",
-        "in": "header",
-        "required": false,
-        "description": "Active staff username used as the audit actor. Required for writes. Permissions and maker-checker separation are evaluated for this user.",
-        "schema": {
-          "type": "string",
-          "example": "bp.operator"
-        }
-      },
       "Query": {
         "name": "query",
         "in": "query",

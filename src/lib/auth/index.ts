@@ -1,6 +1,7 @@
 import "server-only";
 
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { apiKey } from "@better-auth/api-key";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { username } from "better-auth/plugins";
@@ -15,7 +16,9 @@ const trustedOrigins = [
   baseURL,
   process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null,
   "http://localhost:3000",
+  "http://127.0.0.1:3000",
 ].filter((value): value is string => Boolean(value));
+const usernameAttemptLimit = process.env.VERCEL_ENV === "production" ? 5 : 10_000;
 
 export const auth = betterAuth({
   appName: "FutureBank Core",
@@ -33,6 +36,15 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 8,
     updateAge: 60 * 60,
   },
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/username": { window: 15 * 60, max: usernameAttemptLimit },
+    },
+  },
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
     defaultCookieAttributes: {
@@ -43,6 +55,11 @@ export const auth = betterAuth({
   },
   plugins: [
     username({ minUsernameLength: 3, maxUsernameLength: 30 }),
+    apiKey({
+      defaultPrefix: "fb_",
+      requireName: true,
+      rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 600 },
+    }),
     nextCookies(),
   ],
 });

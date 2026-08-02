@@ -51,7 +51,7 @@ When two representations disagree, repair the downstream representation or finis
 
 The browser uses database-backed Better Auth sessions. Reads must verify an active user near the query or service, and mutations must check the required permission near the write.
 
-The REST API intentionally uses simple demonstration authentication. `FUTUREBANK_API_KEY` authenticates the client, and `X-Staff-Username` selects an active staff actor. Possession of the shared key can therefore select multiple actors; role permissions and self-approval checks still apply, but the key is not a production-grade separation of human identities. Do not describe it as such or weaken the application controls because the outer authentication is simple.
+The REST API uses Better Auth actor-owned API keys. Each stored key belongs to exactly one active staff user, so its owner supplies the audit identity and role; callers cannot select or impersonate another actor. The API adapter still delegates permissions and maker-checker separation to the same application controls as browser sessions.
 
 Consequential decisions use work items, optimistic versions, row/advisory locks, different maker and checker identities, mandatory comments, and audit events. Alternate entry points—including API routes—must preserve those controls.
 

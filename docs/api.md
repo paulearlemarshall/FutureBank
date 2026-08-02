@@ -10,20 +10,20 @@ An external actor can discover the contract without credentials:
 - `GET /api/v1` returns authenticated runtime discovery, including the API version and top-level resources.
 - The production OpenAPI URL is `https://future-bank-demo.vercel.app/api/openapi.json`.
 
-The OpenAPI document is self-describing for paths, methods, request and response schemas, actor headers, permissions and error shapes. It deliberately does not publish an API key. An external caller still needs `FUTUREBANK_API_KEY` from the environment owner before any `/api/v1` business route is accessible.
+The OpenAPI document is self-describing for paths, methods, request and response schemas, permissions and error shapes. It deliberately does not publish an API key. An external caller still needs an actor-owned API key from the environment owner before any `/api/v1` business route is accessible.
 
 ## Authentication and actors
 
-Configure a random `FUTUREBANK_API_KEY` in the local or Vercel environment. Send it using either header:
+Each API key belongs to one active staff user. The key owner determines the audit identity and permissions for every request; callers cannot select another user. Send the issued key using either header:
 
 ```text
-X-API-Key: <key>
-Authorization: Bearer <key>
+X-API-Key: <actor-owned-key>
+Authorization: Bearer <actor-owned-key>
 ```
 
-For mutations, `X-Staff-Username` selects an active seeded staff actor. If omitted, the API uses `FUTUREBANK_API_DEFAULT_USERNAME`, then `bp.operator`. This is deliberately simple demo authentication: possession of the shared API key permits selection of any seeded actor. Do not use it as a production banking-security model.
+`X-Staff-Username` is not supported and is rejected. An environment owner provisions the four demonstration credentials and any initial actor keys in one operation with `npm run auth:provision`. `FUTUREBANK_API_OPERATOR_KEY`, `FUTUREBANK_API_SUPERVISOR_KEY`, `FUTUREBANK_API_COMPLIANCE_KEY`, and `FUTUREBANK_API_ADMIN_KEY` are one-time provisioning inputs; the legacy `FUTUREBANK_API_KEY` name is accepted only as the operator-key input. Runtime verification uses hashed keys in Neon, so plaintext keys and demo passwords are not required in the Vercel runtime environment after provisioning.
 
-The selected actor is passed through the normal application control layer. Operator, Supervisor, Compliance and Admin permissions, maker-checker separation, optimistic versions, account locks, idempotency, KYC restrictions, payment holds, double-entry posting and audit events are still enforced.
+The key owner is passed through the normal application control layer. Operator, Supervisor, Compliance and Admin permissions, maker-checker separation, optimistic versions, account locks, idempotency, KYC restrictions, payment holds, double-entry posting and audit events are still enforced.
 
 Payment-instruction permissions are separated: Operator maintains instructions and Supervisor executes due-instruction runs. Admin can do both. An occurrence is initiated under the instruction creator's identity, so an external payment that becomes pending still requires an independent payment checker.
 
@@ -33,15 +33,14 @@ End-of-day execution is restricted to Supervisor and Admin. Product charge rules
 
 ```bash
 curl "https://future-bank-demo.vercel.app/api/v1/accounts/1000000001" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY"
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 ```
 
 ## Write example
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/payments" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.operator" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Idempotency-Key: demo-payment-0001" \
   -H "Content-Type: application/json" \
   -d '{
@@ -68,8 +67,7 @@ Successful responses use `{ "data": ... }`. Errors use `{ "error": { "code", "me
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/payment-instructions" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.operator" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "STANDING_ORDER",
@@ -83,8 +81,7 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/payment-instructions" \
   }'
 
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/payment-instructions/processing-runs" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.supervisor" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"businessDate":"2026-08-15"}'
 ```
@@ -99,7 +96,7 @@ The statement derives opening and closing balances from the ordered ledger entri
 
 ```bash
 curl "https://future-bank-demo.vercel.app/api/v1/accounts/1000000001/statement?from=2026-01-01&to=2026-12-31" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   --output statement.csv
 ```
 
@@ -116,8 +113,7 @@ Mandate creation requires an active source account and an active creditor benefi
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/direct-debits/DDM-000001/collections" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.operator" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Idempotency-Key: creditor-run-20260802-001" \
   -H "Content-Type: application/json" \
   -d '{"amount":"25.00","collectionDate":"2026-08-02"}'
@@ -141,8 +137,7 @@ The original payment and ledger transaction remain immutable. Approval locks the
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/end-of-day-runs" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.supervisor" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"businessDate":"2026-08-02"}'
 ```
@@ -157,8 +152,7 @@ Only one run is claimed for a business date. Each eligible account/type occurren
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/reconciliation-runs" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.supervisor" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"businessDate":"2026-07-18"}'
 ```
@@ -175,8 +169,7 @@ Close is accepted only after a completed end-of-day run at the end date and a la
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/accounting-periods/ACP-000001/close-requests" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.supervisor" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"expectedVersion":1,"comment":"Final processing and reconciliation controls are complete."}'
 ```
@@ -193,8 +186,7 @@ Every booked subledger writer creates its posted GL journal and balanced lines i
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/general-ledger/journals" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.supervisor" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Idempotency-Key: manual-journal-demo-0001" \
   -H "Content-Type: application/json" \
   -d '{"valueDate":"2026-08-02","currency":"GBP","debitAccountCode":"5100-GBP","creditAccountCode":"1100-GBP","amount":"25.00","description":"Fictional accrual correction","comment":"Prepared from fictional period-end evidence."}'
@@ -210,8 +202,7 @@ Submission requires an active customer with approved KYC, no blocking restrictio
 
 ```bash
 curl -X POST "https://future-bank-demo.vercel.app/api/v1/loans" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.operator" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -H "Idempotency-Key: loan-demo-0001" \
   -H "Content-Type: application/json" \
   -d '{"customerNumber":"C000004","productCode":"LOAN-GBP","destinationAccountNumber":"1000000009","principal":"12000.00","termMonths":12,"firstPaymentDate":"2026-09-01","monthlyIncome":"20000.00","monthlyCommitments":"1000.00","purpose":"Fictional working-capital demonstration evidence.","riskGrade":"B"}'
@@ -224,26 +215,24 @@ Customer names, short names, addresses and descriptive fields accept Unicode, in
 ```bash
 # List Passport and National ID slots
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY"
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 
 # Read safe metadata for one slot (never returns a private Blob URL)
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/NATIONAL_ID" \
-  -H "Authorization: Bearer $FUTUREBANK_API_KEY"
+  -H "Authorization: Bearer $FUTUREBANK_ACTOR_API_KEY"
 
 # Upload or replace the Passport slot (maximum 4 MB)
 curl -X PUT "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.operator" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
   -F "file=@Passport-AmeliaHart.jpg;type=image/jpeg"
 
 # Stream the authenticated file bytes
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT/content" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" --output passport.jpg
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" --output passport.jpg
 
 # Delete a slot (idempotent; reset restores Amelia Hart's seeded originals)
 curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
-  -H "X-API-Key: $FUTUREBANK_API_KEY" \
-  -H "X-Staff-Username: bp.operator"
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 ```
 
 `PUT` accepts one `multipart/form-data` field named `file` and returns `201` for an empty slot or `200` when replacing a file. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. All other document operations use the standard JSON envelope.

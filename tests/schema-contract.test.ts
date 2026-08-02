@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getTableConfig, type AnyPgTable } from "drizzle-orm/pg-core";
 import {
   addresses,
+  apikey,
   auditEvents,
   bankAccounts,
   beneficiaries,
@@ -32,6 +33,7 @@ import {
   reconciliationRuns,
   settlementRecords,
   products,
+  rateLimit,
   session,
   staffProfiles,
   user,
@@ -44,6 +46,8 @@ describe("database model contract", () => {
     const actual = [
       user,
       session,
+      rateLimit,
+      apikey,
       staffProfiles,
       customers,
       addresses,
@@ -80,6 +84,8 @@ describe("database model contract", () => {
     expect(actual).toEqual(expect.arrayContaining([
       "user",
       "session",
+      "rate_limit",
+      "apikey",
       "staff_profiles",
       "customers",
       "customer_document_files",

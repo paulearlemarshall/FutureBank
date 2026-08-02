@@ -3,9 +3,9 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { staffProfiles, user as authUsers } from "@/db/schema";
+import { auth } from "@/lib/auth";
 import { runWithApiUser } from "@/lib/auth/api-context";
 import type { ActionState, SessionUser } from "@/modules/contracts";
-import { apiKeyMatches } from "./api-key";
 
 export class ApiError extends Error {
   constructor(
@@ -26,15 +26,16 @@ function suppliedApiKey(request: Request): string | null {
 }
 
 async function authenticateApiRequest(request: Request): Promise<SessionUser> {
-  const configuredKey = process.env.FUTUREBANK_API_KEY;
-  if (!configuredKey) throw new ApiError(503, "API_NOT_CONFIGURED", "API authentication is not configured.");
-  if (!apiKeyMatches(suppliedApiKey(request), configuredKey)) {
-    throw new ApiError(401, "INVALID_API_KEY", "A valid FutureBank API key is required.");
+  if (request.headers.has("x-staff-username")) {
+    throw new ApiError(400, "ACTOR_HEADER_NOT_SUPPORTED", "API keys are bound to one staff actor; X-Staff-Username is not supported.");
+  }
+  const key = suppliedApiKey(request);
+  if (!key) throw new ApiError(401, "INVALID_API_KEY", "A valid FutureBank actor API key is required.");
+  const verified = await auth.api.verifyApiKey({ body: { key } });
+  if (!verified.valid || !verified.key) {
+    throw new ApiError(401, "INVALID_API_KEY", "A valid FutureBank actor API key is required.");
   }
 
-  const username = request.headers.get("x-staff-username")?.trim()
-    || process.env.FUTUREBANK_API_DEFAULT_USERNAME?.trim()
-    || "bp.operator";
   const [row] = await db.select({
     id: authUsers.id,
     username: authUsers.username,
@@ -43,9 +44,9 @@ async function authenticateApiRequest(request: Request): Promise<SessionUser> {
     role: staffProfiles.role,
   }).from(authUsers)
     .innerJoin(staffProfiles, and(eq(staffProfiles.userId, authUsers.id), eq(staffProfiles.active, true)))
-    .where(eq(authUsers.username, username))
+    .where(eq(authUsers.id, verified.key.referenceId))
     .limit(1);
-  if (!row) throw new ApiError(403, "INVALID_STAFF_ACTOR", "The requested staff actor is not active.");
+  if (!row) throw new ApiError(403, "INACTIVE_API_ACTOR", "The API key owner is not an active staff actor.");
   return { id: row.id, username: row.username ?? row.email, name: row.name, role: row.role };
 }
 
