@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { PaymentApprovalDetail, WorkItemPriority, WorkItemStatus, WorkItemType } from "@/modules/contracts";
+import type { PaymentApprovalDetail, PaymentReversalView, WorkItemPriority, WorkItemStatus, WorkItemType } from "@/modules/contracts";
 import { initialActionState } from "@/modules/contracts";
 import { requirePermission } from "@/lib/auth/session";
 import { isDocumentSlot } from "@/modules/domain/document-policy";
@@ -22,6 +22,7 @@ import {
   resolveOverdraftAlertAction, setOverdraftStatusAction,
 } from "@/modules/actions/overdrafts";
 import { approvePendingPaymentAction, expirePendingPaymentsAction, rejectPendingPaymentAction } from "@/modules/actions/payments";
+import { decidePaymentReversalAction, requestPaymentReversalAction } from "@/modules/actions/payment-reversals";
 import { cancelPaymentInstructionAction, createPaymentInstructionAction, runPaymentInstructionsAction } from "@/modules/actions/payment-instructions";
 import { cancelDirectDebitMandateAction, createDirectDebitMandateAction, submitDirectDebitCollectionAction } from "@/modules/actions/direct-debits";
 import { claimWorkItemAction, releaseWorkItemAction } from "@/modules/actions/workflow";
@@ -30,16 +31,17 @@ import {
   listCustomers, listProducts,
 } from "@/modules/queries";
 import {
-  getDirectDebitMandate, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getWorkItem, listDirectDebitMandates, listKycCases,
-  listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPayments, listWorkQueue,
+  getDirectDebitMandate, getKycCase, getOverdraftFacility, getPaymentApproval, getPaymentInstruction, getPaymentReversal, getWorkItem, listDirectDebitMandates, listKycCases,
+  listOverdraftFacilities, listPaymentInstructionRuns, listPaymentInstructions, listPaymentReversals, listPayments, listWorkQueue,
 } from "@/modules/operations-queries";
 import {
   ApiError, binaryStreamResponse, formDataFromObject, integerQuery, jsonResponse, readJsonObject, responseForAction,
 } from "./http";
 
 const paymentStatuses = new Set<PaymentApprovalDetail["status"]>(["BOOKED", "PENDING", "REJECTED", "EXPIRED"]);
+const paymentReversalStatuses = new Set<PaymentReversalView["status"]>(["PENDING_APPROVAL", "BOOKED", "REJECTED"]);
 const workStatuses = new Set<WorkItemStatus>(["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
-const workTypes = new Set<WorkItemType>(["KYC_APPROVAL", "PAYMENT_APPROVAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
+const workTypes = new Set<WorkItemType>(["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
 const priorities = new Set<WorkItemPriority>(["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 
 function notFound(resource = "API route"): never {
@@ -77,8 +79,8 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.3.0", openapi: "/api/openapi.json",
-      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "direct-debits", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
+      name: "FutureBank API", version: "1.4.0", openapi: "/api/openapi.json",
+      resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
     if (segments[0] === "customers" && segments.length === 1) return jsonResponse(await listCustomers({
@@ -172,6 +174,12 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       if (!item) notFound("Direct debit mandate");
       return jsonResponse(item);
     }
+    if (segments[0] === "payment-reversals" && segments.length === 1) return jsonResponse(await listPaymentReversals({ status: enumQuery(url, "status", paymentReversalStatuses) }));
+    if (segments[0] === "payment-reversals" && segments.length === 2) {
+      const item = await getPaymentReversal(segments[1]);
+      if (!item) notFound("Payment reversal");
+      return jsonResponse(item);
+    }
     if (segments[0] === "kyc-cases" && segments.length === 1) return jsonResponse(await listKycCases());
     if (segments[0] === "kyc-cases" && segments.length === 2) {
       const item = await getKycCase(segments[1]);
@@ -238,6 +246,14 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       const body = await readJsonObject(request);
       const idempotencyKey = request.headers.get("idempotency-key")?.trim() || body.idempotencyKey;
       return responseForAction(await submitDirectDebitCollectionAction(initialActionState, formDataFromObject({ ...body, mandateReference: segments[1], idempotencyKey })), 201);
+    }
+    if (segments[0] === "payments" && segments.length === 3 && segments[2] === "reversals") {
+      const body = await readJsonObject(request);
+      const idempotencyKey = request.headers.get("idempotency-key")?.trim() || body.idempotencyKey;
+      return responseForAction(await requestPaymentReversalAction(initialActionState, formDataFromObject({ ...body, paymentReference: segments[1], idempotencyKey })), 201);
+    }
+    if (segments[0] === "payment-reversals" && segments.length === 3 && segments[2] === "decision") {
+      return responseForAction(await decidePaymentReversalAction(initialActionState, await bodyForm(request, { reversalReference: segments[1] })));
     }
     if (segments[0] === "kyc-cases" && segments.length === 1) {
       const body = await readJsonObject(request);

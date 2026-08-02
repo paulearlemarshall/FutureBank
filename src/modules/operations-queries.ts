@@ -3,13 +3,13 @@ import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates,
+  accountHolds, bankAccounts, beneficiaries, customerDueDiligenceProfiles, customerRestrictions, customers, directDebitCollections, directDebitMandates, ledgerTransactions,
   kycCases, kycEvidence, kycRiskFactors, overdraftAlerts, overdraftFacilities, overdraftLimitHistory,
-  paymentInstructionExecutions, paymentInstructions, paymentOrders, processingRuns, screeningChecks, user, workItemEvents, workItems,
+  paymentInstructionExecutions, paymentInstructions, paymentOrders, paymentReversals, processingRuns, screeningChecks, user, workItemEvents, workItems,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth/session";
 import type {
-  DirectDebitMandateView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, ProcessingRunView,
+  DirectDebitMandateView, KycCaseDetail, KycCaseSummary, OverdraftFacilityDetail, OverdraftFacilitySummary, PaymentApprovalDetail, PaymentInstructionView, PaymentReversalView, ProcessingRunView,
   WorkItemDetail, WorkQueueItem, WorkItemPriority, WorkItemStatus, WorkItemType,
 } from "./contracts";
 import { estimatedDailyInterest, overdraftHeadroom, overdraftUtilization } from "./domain/overdraft-policy";
@@ -139,11 +139,13 @@ export async function getPaymentApproval(reference: string): Promise<PaymentAppr
     .innerJoin(bankAccounts, eq(paymentOrders.sourceAccountId, bankAccounts.id)).innerJoin(customers, eq(bankAccounts.customerId, customers.id))
     .leftJoin(beneficiaries, eq(paymentOrders.beneficiaryId, beneficiaries.id)).where(eq(paymentOrders.reference, reference)).limit(1);
   if (!row) return null;
-  const [holdRows, workRows] = await Promise.all([
+  const [holdRows, workRows, reversalRows] = await Promise.all([
     db.select().from(accountHolds).where(eq(accountHolds.paymentOrderId, row.payment.id)).limit(1),
     db.select().from(workItems).where(and(eq(workItems.entityType, "PAYMENT"), eq(workItems.entityReference, row.payment.reference))).limit(1),
+    db.select({ reference: paymentReversals.reference }).from(paymentReversals).where(eq(paymentReversals.originalPaymentOrderId, row.payment.id)).limit(1),
   ]);
   const hold = holdRows[0];
+  const reversal = reversalRows[0] ? await getPaymentReversal(reversalRows[0].reference) : null;
   return {
     reference: row.payment.reference, type: row.payment.type, status: row.payment.status, sourceAccountNumber: row.account.accountNumber,
     customerNumber: row.customer.customerNumber, customerName: displayName(row.customer),
@@ -152,6 +154,7 @@ export async function getPaymentApproval(reference: string): Promise<PaymentAppr
     createdAt: iso(row.payment.createdAt), expiresAt: row.payment.expiresAt ? iso(row.payment.expiresAt) : null,
     hold: hold ? { reference: hold.reference, accountNumber: row.account.accountNumber, paymentReference: row.payment.reference, amount: hold.amount, currency: hold.currency, status: hold.status, expiresAt: iso(hold.expiresAt) } : null,
     workItem: workRows[0] ? mapWorkItem(workRows[0]) : null,
+    reversal,
   };
 }
 
@@ -166,6 +169,38 @@ export async function listPayments(options: { status?: PaymentApprovalDetail["st
     .orderBy(desc(paymentOrders.createdAt));
   const details = await Promise.all(rows.map((row) => getPaymentApproval(row.reference)));
   return details.filter((item): item is PaymentApprovalDetail => item !== null);
+}
+
+export async function getPaymentReversal(reference: string): Promise<PaymentReversalView | null> {
+  await requireUser();
+  const [row] = await db.select({ reversal: paymentReversals, payment: paymentOrders, account: bankAccounts, customer: customers })
+    .from(paymentReversals).innerJoin(paymentOrders, eq(paymentReversals.originalPaymentOrderId, paymentOrders.id))
+    .innerJoin(bankAccounts, eq(paymentOrders.sourceAccountId, bankAccounts.id)).innerJoin(customers, eq(bankAccounts.customerId, customers.id))
+    .where(eq(paymentReversals.reference, reference)).limit(1);
+  if (!row) return null;
+  const [destinationRows, beneficiaryRows, requesterRows, transactionRows, workRows] = await Promise.all([
+    row.payment.destinationAccountId ? db.select({ accountNumber: bankAccounts.accountNumber }).from(bankAccounts).where(eq(bankAccounts.id, row.payment.destinationAccountId)).limit(1) : Promise.resolve([]),
+    row.payment.beneficiaryId ? db.select({ name: beneficiaries.name }).from(beneficiaries).where(eq(beneficiaries.id, row.payment.beneficiaryId)).limit(1) : Promise.resolve([]),
+    db.select({ username: user.username, email: user.email }).from(user).where(eq(user.id, row.reversal.requestedBy)).limit(1),
+    row.reversal.reversalTransactionId ? db.select({ reference: ledgerTransactions.reference }).from(ledgerTransactions).where(eq(ledgerTransactions.id, row.reversal.reversalTransactionId)).limit(1) : Promise.resolve([]),
+    db.select().from(workItems).where(and(eq(workItems.entityType, "PAYMENT_REVERSAL"), eq(workItems.entityReference, row.reversal.reference))).limit(1),
+  ]);
+  return {
+    reference: row.reversal.reference, status: row.reversal.status, originalPaymentReference: row.payment.reference, paymentType: row.payment.type,
+    sourceAccountNumber: row.account.accountNumber, destinationReference: destinationRows[0]?.accountNumber ?? beneficiaryRows[0]?.name ?? "—",
+    customerNumber: row.customer.customerNumber, customerName: displayName(row.customer), amount: row.reversal.amount, currency: row.reversal.currency,
+    reason: row.reversal.reason, requestedBy: requesterRows[0]?.username ?? requesterRows[0]?.email ?? "Unknown", decisionComment: row.reversal.decisionComment,
+    reversalTransactionReference: transactionRows[0]?.reference ?? null, createdAt: iso(row.reversal.createdAt), decidedAt: row.reversal.decidedAt ? iso(row.reversal.decidedAt) : null,
+    version: row.reversal.version, workItem: workRows[0] ? mapWorkItem(workRows[0]) : null,
+  };
+}
+
+export async function listPaymentReversals(options: { status?: PaymentReversalView["status"] } = {}): Promise<PaymentReversalView[]> {
+  await requireUser();
+  const rows = await db.select({ reference: paymentReversals.reference }).from(paymentReversals)
+    .where(options.status ? eq(paymentReversals.status, options.status) : undefined).orderBy(desc(paymentReversals.createdAt));
+  const details = await Promise.all(rows.map((row) => getPaymentReversal(row.reference)));
+  return details.filter((item): item is PaymentReversalView => item !== null);
 }
 
 export async function getPaymentInstruction(reference: string): Promise<PaymentInstructionView | null> {

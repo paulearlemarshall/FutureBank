@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.3.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, direct debits, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "version": "1.4.0",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, KYC, overdrafts, work queues and audit data. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -50,6 +50,10 @@
     {
       "name": "Payments",
       "description": "Internal and external payment processing."
+    },
+    {
+      "name": "Payment reversals",
+      "description": "Full-value correction requests, independent decisions and immutable counter-postings."
     },
     {
       "name": "Payment instructions",
@@ -1268,6 +1272,39 @@
         },
         "operationId": "postPaymentsExpiryRun",
         "description": "Expire stale pending payments and release holds. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
+      }
+    },
+    "/payments/{paymentReference}/reversals": {
+      "post": {
+        "tags": ["Payment reversals"], "summary": "Request a full payment reversal",
+        "parameters": [{"$ref": "#/components/parameters/PaymentReference"}, {"$ref": "#/components/parameters/StaffActor"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentReversalRequest"}}}},
+        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "requestPaymentReversal", "description": "Creates one pending full-value reversal and a supervisor work item. The original payment and posting remain immutable."
+      }
+    },
+    "/payment-reversals": {
+      "get": {
+        "tags": ["Payment reversals"], "summary": "List payment reversals",
+        "parameters": [{"name": "status", "in": "query", "schema": {"type": "string", "enum": ["PENDING_APPROVAL", "BOOKED", "REJECTED"]}}],
+        "responses": {"200": {"description": "Payment reversal register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/PaymentReversal"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "listPaymentReversals", "description": "Lists reversal requests in pending, booked and rejected states."
+      }
+    },
+    "/payment-reversals/{reversalReference}": {
+      "get": {
+        "tags": ["Payment reversals"], "summary": "Get a payment reversal",
+        "parameters": [{"$ref": "#/components/parameters/PaymentReversalReference"}],
+        "responses": {"200": {"description": "Payment reversal detail.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"$ref": "#/components/schemas/PaymentReversal"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "getPaymentReversal", "description": "Returns the original payment link, request, decision, work item and reversal transaction reference."
+      }
+    },
+    "/payment-reversals/{reversalReference}/decision": {
+      "post": {
+        "tags": ["Payment reversals"], "summary": "Approve or reject a payment reversal",
+        "parameters": [{"$ref": "#/components/parameters/PaymentReversalReference"}, {"$ref": "#/components/parameters/StaffActor"}], "requestBody": {"$ref": "#/components/requestBodies/Decision"},
+        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
+        "operationId": "decidePaymentReversal", "description": "A different supervisor approves or rejects using the expected work-item version. Approval posts the equal-and-opposite ledger transaction exactly once."
       }
     },
     "/payment-instructions": {
@@ -3115,6 +3152,12 @@
           "type": "string"
         }
       },
+      "PaymentReversalReference": {
+        "name": "reversalReference",
+        "in": "path",
+        "required": true,
+        "schema": {"type": "string", "pattern": "^REV-"}
+      },
       "PaymentInstructionReference": {
         "name": "instructionReference",
         "in": "path",
@@ -3577,6 +3620,13 @@
           }
         },
         "description": "PaymentWrite API data contract."
+      },
+      "PaymentReversalRequest": {
+        "type": "object",
+        "description": "Full-value reversal request; the idempotency key is supplied as a header.",
+        "required": ["reason"],
+        "additionalProperties": false,
+        "properties": {"reason": {"type": "string", "minLength": 10, "maxLength": 500}}
       },
       "PaymentInstructionWrite": {
         "type": "object",
@@ -4287,6 +4337,7 @@
             "enum": [
               "KYC_APPROVAL",
               "PAYMENT_APPROVAL",
+              "PAYMENT_REVERSAL",
               "OVERDRAFT_APPROVAL",
               "OVERDRAFT_CHANGE",
               "OVERDRAFT_ALERT"
@@ -4502,7 +4553,25 @@
           "workItem": {
             "$ref": "#/components/schemas/WorkQueueItem",
             "nullable": true
+          },
+          "reversal": {
+            "$ref": "#/components/schemas/PaymentReversal",
+            "nullable": true
           }
+        }
+      },
+      "PaymentReversal": {
+        "type": "object",
+        "description": "Full-value payment correction request and its independent approval outcome.",
+        "required": ["reference", "status", "originalPaymentReference", "paymentType", "sourceAccountNumber", "destinationReference", "customerNumber", "customerName", "amount", "currency", "reason", "requestedBy", "decisionComment", "reversalTransactionReference", "createdAt", "decidedAt", "version", "workItem"],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {"type": "string"}, "status": {"type": "string", "enum": ["PENDING_APPROVAL", "BOOKED", "REJECTED"]}, "originalPaymentReference": {"type": "string"},
+          "paymentType": {"type": "string", "enum": ["INTERNAL", "EXTERNAL"]}, "sourceAccountNumber": {"type": "string"}, "destinationReference": {"type": "string"},
+          "customerNumber": {"type": "string"}, "customerName": {"type": "string"}, "amount": {"$ref": "#/components/schemas/Money"}, "currency": {"type": "string"},
+          "reason": {"type": "string"}, "requestedBy": {"type": "string"}, "decisionComment": {"type": "string", "nullable": true}, "reversalTransactionReference": {"type": "string", "nullable": true},
+          "createdAt": {"type": "string", "format": "date-time"}, "decidedAt": {"type": "string", "format": "date-time", "nullable": true}, "version": {"type": "integer", "minimum": 1},
+          "workItem": {"$ref": "#/components/schemas/WorkQueueItem", "nullable": true}
         }
       },
       "PaymentInstructionExecution": {

@@ -3,6 +3,7 @@ import type { StaffRole, WorkItemStatus, WorkItemType } from "@/modules/contract
 const checkerRoles: Record<WorkItemType, readonly StaffRole[]> = {
   KYC_APPROVAL: ["COMPLIANCE", "ADMIN"],
   PAYMENT_APPROVAL: ["SUPERVISOR", "ADMIN"],
+  PAYMENT_REVERSAL: ["SUPERVISOR", "ADMIN"],
   OVERDRAFT_APPROVAL: ["SUPERVISOR", "ADMIN"],
   OVERDRAFT_CHANGE: ["SUPERVISOR", "ADMIN"],
   OVERDRAFT_ALERT: ["SUPERVISOR", "ADMIN"],

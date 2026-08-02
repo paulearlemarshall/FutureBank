@@ -201,7 +201,7 @@ export type AccountDetail = AccountListItem & {
 };
 
 export type WorkItemStatus = "OPEN" | "ASSIGNED" | "APPROVED" | "REJECTED" | "CANCELLED" | "COMPLETED";
-export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT";
+export type WorkItemType = "KYC_APPROVAL" | "PAYMENT_APPROVAL" | "PAYMENT_REVERSAL" | "OVERDRAFT_APPROVAL" | "OVERDRAFT_CHANGE" | "OVERDRAFT_ALERT";
 export type WorkItemPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
 export type WorkQueueItem = {
@@ -367,6 +367,28 @@ export type PaymentApprovalDetail = {
   createdAt: string;
   expiresAt: string | null;
   hold: AccountHold | null;
+  workItem: WorkQueueItem | null;
+  reversal: PaymentReversalView | null;
+};
+
+export type PaymentReversalView = {
+  reference: string;
+  status: "PENDING_APPROVAL" | "BOOKED" | "REJECTED";
+  originalPaymentReference: string;
+  paymentType: "INTERNAL" | "EXTERNAL";
+  sourceAccountNumber: string;
+  destinationReference: string;
+  customerNumber: string;
+  customerName: string;
+  amount: string;
+  currency: string;
+  reason: string;
+  requestedBy: string;
+  decisionComment: string | null;
+  reversalTransactionReference: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  version: number;
   workItem: WorkQueueItem | null;
 };
 

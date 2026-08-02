@@ -35,6 +35,7 @@ export async function clearBankingData(tx: SeedDb): Promise<void> {
   await tx.delete(tables.accountHolds);
   await tx.delete(tables.clearingEntries);
   await tx.delete(tables.ledgerEntries);
+  await tx.delete(tables.paymentReversals);
   await tx.delete(tables.ledgerTransactions);
   await tx.delete(tables.paymentInstructionExecutions);
   await tx.delete(tables.directDebitCollections);
@@ -345,6 +346,12 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: rejectedPaymentId, reference: "PAY-000003", type: "EXTERNAL", status: "REJECTED", sourceAccountId: bankAccountId("1000000015"), beneficiaryId: stableUuid("beneficiary-14"), amount: "1000.00", currency: "AED", description: "Payment rejected during KYC review", idempotencyKey: "SEED-PAY-REJECTED-0003", initiatedBy: "bp.operator", approvalReason: "KYC review and possible screening match", decidedBy: staffId("supervisor"), decisionComment: "Rejected until Compliance resolves the possible match.", expiresAt: new Date("2026-07-20T10:00:00.000Z"), decidedAt: new Date("2026-07-19T13:00:00.000Z"), createdAt: new Date("2026-07-19T10:00:00.000Z") },
     { id: expiredPaymentId, reference: "PAY-000004", type: "EXTERNAL", status: "EXPIRED", sourceAccountId: bankAccountId("1000000016"), beneficiaryId: stableUuid("beneficiary-15"), amount: "3250.00", currency: "GBP", description: "Approval window expired", idempotencyKey: "SEED-PAY-EXPIRED-0004", initiatedBy: "bp.operator", approvalReason: "KYC pending approval required independent payment approval", decisionComment: "Approval window expired after 24 hours", expiresAt: new Date("2026-07-19T08:00:00.000Z"), decidedAt: new Date("2026-07-19T08:05:00.000Z"), createdAt: new Date("2026-07-18T08:00:00.000Z") },
   ]);
+  await tx.insert(tables.paymentReversals).values({
+    id: stableUuid("payment-reversal-pending"), reference: "REV-000001", originalPaymentOrderId: bookedPaymentId,
+    status: "PENDING_APPROVAL", amount: bookedPaymentTransaction.amount, currency: "GBP",
+    reason: "Duplicate supplier settlement identified during reconciliation", idempotencyKey: "SEED-REVERSAL-PENDING-0001",
+    requestedBy: staffId("operator"), createdAt: timeline.instant(0, 10), updatedAt: timeline.instant(0, 10),
+  });
   await tx.insert(tables.accountHolds).values([
     { id: stableUuid("hold-pending-pep"), reference: "HLD-000001", accountId: bankAccountId("1000000004"), paymentOrderId: pendingPaymentId, amount: "2500.00", currency: "AED", status: "ACTIVE", expiresAt: pendingScenarioExpiry },
     { id: stableUuid("hold-booked-approved"), reference: "HLD-000002", accountId: bankAccountId("1000000016"), paymentOrderId: bookedPaymentId, amount: bookedPaymentTransaction.amount, currency: "GBP", status: "CONSUMED", expiresAt: new Date("2026-07-18T18:00:00.000Z"), releasedAt: new Date("2026-07-18T16:30:00.000Z"), releaseReason: "Consumed when approved payment booked" },
@@ -361,6 +368,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: stableUuid("work-payment-rejected"), reference: "WRK-000007", type: "PAYMENT_APPROVAL" as const, status: "REJECTED" as const, priority: "HIGH" as const, entityType: "PAYMENT", entityReference: "PAY-000003", title: "Rejected external payment", description: "Historical independent rejection example.", requiredRole: "SUPERVISOR" as const, decidedBy: staffId("supervisor"), decisionComment: "Possible screening match remains unresolved.", decidedAt: new Date("2026-07-19T13:00:00.000Z"), completedAt: new Date("2026-07-19T13:00:00.000Z"), dueAt: new Date("2026-07-20T10:00:00.000Z") },
     { id: stableUuid("work-payment-expired"), reference: "WRK-000008", type: "PAYMENT_APPROVAL" as const, status: "CANCELLED" as const, priority: "NORMAL" as const, entityType: "PAYMENT", entityReference: "PAY-000004", title: "Expired payment approval", description: "Approval expired and the hold was released without ledger movement.", requiredRole: "SUPERVISOR" as const, decisionComment: "Approval window expired after 24 hours.", completedAt: new Date("2026-07-19T08:05:00.000Z"), dueAt: new Date("2026-07-19T08:00:00.000Z") },
     { id: stableUuid("work-alert-resolved"), reference: "WRK-000009", type: "OVERDRAFT_ALERT" as const, status: "COMPLETED" as const, priority: "HIGH" as const, entityType: "OVERDRAFT_ALERT", entityReference: "ODA-000003", title: "Resolved high-utilization alert", description: "Historical intervention and resolution example.", requiredRole: "SUPERVISOR" as const, assignedTo: staffId("supervisor"), decisionComment: "Customer reduced utilization and supplied a cash-flow forecast.", completedAt: new Date("2026-07-04T10:00:00.000Z"), dueAt: new Date("2026-07-03T17:00:00.000Z") },
+    { id: stableUuid("work-payment-reversal"), reference: "WRK-000010", type: "PAYMENT_REVERSAL" as const, status: "OPEN" as const, priority: "HIGH" as const, entityType: "PAYMENT_REVERSAL", entityReference: "REV-000001", title: "Approve payment reversal REV-000001", description: "Review the duplicate supplier settlement and post an equal-and-opposite correction.", requiredRole: "SUPERVISOR" as const, dueAt: timeline.instant(1, 10) },
   ];
   await tx.insert(tables.workItems).values(seededWorkItems.map((item) => ({ ...item, createdBy: staffId("operator") })));
   const seededWorkItemEvents: Array<typeof tables.workItemEvents.$inferInsert> = [];

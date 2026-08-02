@@ -121,6 +121,14 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/direct-debits/DDM-00000
   -d '{"amount":"25.00","collectionDate":"2026-08-02"}'
 ```
 
+## Payment reversals
+
+- `POST /payments/{paymentReference}/reversals` creates one idempotent, full-value reversal request.
+- `GET /payment-reversals` and `GET /payment-reversals/{reversalReference}` expose request, approval and posting state.
+- `POST /payment-reversals/{reversalReference}/decision` requires a distinct supervisor, expected work-item version and decision comment.
+
+The original payment and ledger transaction remain immutable. Approval locks the request and original posting and creates a linked equal-and-opposite ledger transaction exactly once; rejection creates no accounting movement. Internal reversals additionally require sufficient available funds at the original destination account.
+
 Customer names, short names, addresses and descriptive fields accept Unicode, including Arabic script. Customer search accepts Arabic names and the Latin transliterations retained in seeded short names. Structured banking identifiers such as customer numbers, account numbers, IBANs, country codes, dates and money remain LTR formatted.
 
 ## Customer document examples

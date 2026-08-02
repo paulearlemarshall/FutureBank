@@ -28,6 +28,7 @@ export const accountStatusEnum = pgEnum("account_status", ["ACTIVE", "BLOCKED", 
 export const beneficiaryStatusEnum = pgEnum("beneficiary_status", ["ACTIVE", "INACTIVE"]);
 export const paymentTypeEnum = pgEnum("payment_type", ["INTERNAL", "EXTERNAL"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["BOOKED", "PENDING", "REJECTED", "EXPIRED"]);
+export const paymentReversalStatusEnum = pgEnum("payment_reversal_status", ["PENDING_APPROVAL", "BOOKED", "REJECTED"]);
 export const paymentInstructionTypeEnum = pgEnum("payment_instruction_type", ["SCHEDULED", "STANDING_ORDER"]);
 export const paymentInstructionStatusEnum = pgEnum("payment_instruction_status", ["ACTIVE", "PAUSED", "CANCELLED", "COMPLETED", "FAILED"]);
 export const paymentInstructionFrequencyEnum = pgEnum("payment_instruction_frequency", ["ONCE", "WEEKLY", "MONTHLY"]);
@@ -36,7 +37,7 @@ export const processingRunStatusEnum = pgEnum("processing_run_status", ["RUNNING
 export const directDebitMandateStatusEnum = pgEnum("direct_debit_mandate_status", ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]);
 export const directDebitCollectionStatusEnum = pgEnum("direct_debit_collection_status", ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]);
 export const entryDirectionEnum = pgEnum("entry_direction", ["DEBIT", "CREDIT"]);
-export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
+export const workItemTypeEnum = pgEnum("work_item_type", ["KYC_APPROVAL", "PAYMENT_APPROVAL", "PAYMENT_REVERSAL", "OVERDRAFT_APPROVAL", "OVERDRAFT_CHANGE", "OVERDRAFT_ALERT"]);
 export const workItemStatusEnum = pgEnum("work_item_status", ["OPEN", "ASSIGNED", "APPROVED", "REJECTED", "CANCELLED", "COMPLETED"]);
 export const workItemPriorityEnum = pgEnum("work_item_priority", ["LOW", "NORMAL", "HIGH", "CRITICAL"]);
 export const kycCaseTypeEnum = pgEnum("kyc_case_type", ["ONBOARDING", "PERIODIC_REVIEW", "TRIGGER_EVENT", "REMEDIATION"]);
@@ -551,6 +552,24 @@ export const clearingEntries = pgTable("clearing_entries", {
   balanceAfter: numeric("balance_after", { precision: 18, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("clearing_entries_transaction_idx").on(table.transactionId)]);
+
+export const paymentReversals = pgTable("payment_reversals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reference: text("reference").notNull().unique(),
+  originalPaymentOrderId: uuid("original_payment_order_id").notNull().unique().references(() => paymentOrders.id, { onDelete: "restrict" }),
+  reversalTransactionId: uuid("reversal_transaction_id").unique().references(() => ledgerTransactions.id, { onDelete: "restrict" }),
+  status: paymentReversalStatusEnum("status").notNull().default("PENDING_APPROVAL"),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  reason: text("reason").notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  requestedBy: text("requested_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+  decisionComment: text("decision_comment"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  ...timestamps,
+}, (table) => [index("payment_reversals_status_idx").on(table.status)]);
 
 export const loanDetails = pgTable("loan_details", {
   accountId: uuid("account_id").primaryKey().references(() => bankAccounts.id, { onDelete: "cascade" }),

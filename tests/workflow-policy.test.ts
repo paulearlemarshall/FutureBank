@@ -6,6 +6,7 @@ describe("maker-checker policy", () => {
     expect(canCheckWorkItem("KYC_APPROVAL", "COMPLIANCE")).toBe(true);
     expect(canCheckWorkItem("KYC_APPROVAL", "SUPERVISOR")).toBe(false);
     expect(canCheckWorkItem("PAYMENT_APPROVAL", "SUPERVISOR")).toBe(true);
+    expect(canCheckWorkItem("PAYMENT_REVERSAL", "SUPERVISOR")).toBe(true);
     expect(canCheckWorkItem("OVERDRAFT_APPROVAL", "ADMIN")).toBe(true);
   });
 

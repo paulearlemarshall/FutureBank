@@ -22,6 +22,8 @@ describe("FutureBank API contract", () => {
     expect(specification.paths["/customers"].post).toBeDefined();
     expect(specification.paths["/accounts/{accountNumber}/statement"].get.responses["200"].content["text/csv"]).toBeDefined();
     expect(specification.paths["/payments"].post).toBeDefined();
+    expect(specification.paths["/payments/{paymentReference}/reversals"].post).toBeDefined();
+    expect(specification.paths["/payment-reversals/{reversalReference}/decision"].post).toBeDefined();
     expect(specification.paths["/payment-instructions"].get).toBeDefined();
     expect(specification.paths["/payment-instructions"].post).toBeDefined();
     expect(specification.paths["/payment-instructions/{instructionReference}/cancellation"].post).toBeDefined();
@@ -34,7 +36,7 @@ describe("FutureBank API contract", () => {
 
   it("declares every implemented API router resource", () => {
     const paths = Object.keys(specification.paths);
-    for (const prefix of ["/customers", "/accounts", "/beneficiaries", "/payments", "/payment-instructions", "/direct-debits", "/kyc-cases", "/overdrafts", "/work-items", "/audit-events"]) {
+    for (const prefix of ["/customers", "/accounts", "/beneficiaries", "/payments", "/payment-instructions", "/payment-reversals", "/direct-debits", "/kyc-cases", "/overdrafts", "/work-items", "/audit-events"]) {
       expect(paths.some((path) => path === prefix || path.startsWith(`${prefix}/`)), prefix).toBe(true);
     }
   });

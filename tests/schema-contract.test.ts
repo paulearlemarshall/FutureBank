@@ -22,6 +22,7 @@ import {
   paymentInstructionExecutions,
   paymentInstructions,
   paymentOrders,
+  paymentReversals,
   processingRuns,
   products,
   session,
@@ -47,6 +48,7 @@ describe("database model contract", () => {
       bankAccounts,
       beneficiaries,
       paymentOrders,
+      paymentReversals,
       directDebitMandates,
       directDebitCollections,
       paymentInstructions,
@@ -69,6 +71,7 @@ describe("database model contract", () => {
       "customer_document_files",
       "bank_accounts",
       "payment_orders",
+      "payment_reversals",
       "direct_debit_mandates",
       "direct_debit_collections",
       "payment_instructions",
@@ -88,6 +91,7 @@ describe("database model contract", () => {
       bankAccounts.availableBalance,
       overdraftFacilities.approvedLimit,
       paymentOrders.amount,
+      paymentReversals.amount,
       paymentInstructions.amount,
       directDebitMandates.maximumSingleAmount,
       directDebitCollections.amount,
@@ -114,6 +118,8 @@ describe("database model contract", () => {
     expect(bankAccounts.accountNumber.isUnique).toBe(true);
     expect(paymentOrders.reference.isUnique).toBe(true);
     expect(paymentOrders.idempotencyKey.isUnique).toBe(true);
+    expect(paymentReversals.reference.isUnique).toBe(true);
+    expect(paymentReversals.idempotencyKey.isUnique).toBe(true);
     expect(paymentInstructions.reference.isUnique).toBe(true);
     expect(paymentInstructionExecutions.idempotencyKey.isUnique).toBe(true);
     expect(processingRuns.reference.isUnique).toBe(true);

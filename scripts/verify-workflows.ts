@@ -6,6 +6,7 @@ import { stableUuid } from "../src/db/seed-manifest";
 import { runDuePaymentInstructions } from "../src/modules/services/payment-instructions";
 import { submitDirectDebitCollection } from "../src/modules/services/direct-debits";
 import { approvePendingPayment } from "../src/modules/services/payments";
+import { decidePaymentReversal } from "../src/modules/services/payment-reversals";
 
 async function main() {
   const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin" };
@@ -64,7 +65,24 @@ async function main() {
         (select count(*)::int from ledger_transactions l join payment_orders p on p.id = l.payment_order_id where p.idempotency_key like 'direct-debit:%') as ledger_transactions
     `);
     for (const [label, value] of Object.entries(collectionResult.rows[0] as unknown as Record<string, number>)) if (Number(value) !== 1) throw new Error(`direct debit ${label}: expected 1, received ${value}`);
-    console.info("Workflow integration verification passed: locking prevented double approval, and scheduled and direct-debit payments booked exactly once through the balanced ledger path.");
+    const reversalAttempts = await Promise.allSettled([
+      decidePaymentReversal({ reversalReference: "REV-000001", workItemReference: "WRK-000010", expectedVersion: 1, comment: "Concurrent reversal approval A", decision: "APPROVE" }, supervisor),
+      decidePaymentReversal({ reversalReference: "REV-000001", workItemReference: "WRK-000010", expectedVersion: 1, comment: "Concurrent reversal approval B", decision: "APPROVE" }, supervisor),
+    ]);
+    if (reversalAttempts.filter((item) => item.status === "fulfilled").length !== 1 || reversalAttempts.filter((item) => item.status === "rejected").length !== 1) {
+      const outcomes = reversalAttempts.map((item) => item.status === "fulfilled" ? "fulfilled" : `rejected:${item.reason instanceof Error ? item.reason.message : String(item.reason)}`).join(", ");
+      throw new Error(`Reversal race did not produce exactly one successful decision (${outcomes})`);
+    }
+    const reversalResult = await db.execute(sql`
+      select
+        (select count(*)::int from payment_reversals where reference = 'REV-000001' and status = 'BOOKED' and version = 2) as reversals,
+        (select count(*)::int from ledger_transactions l join payment_reversals r on r.reversal_transaction_id = l.id where r.reference = 'REV-000001' and l.type = 'PAYMENT_REVERSAL') as ledger_transactions,
+        (select count(*)::int from ledger_entries e join payment_reversals r on r.reversal_transaction_id = e.transaction_id where r.reference = 'REV-000001') as account_entries,
+        (select count(*)::int from clearing_entries e join payment_reversals r on r.reversal_transaction_id = e.transaction_id where r.reference = 'REV-000001') as clearing_entries,
+        (select count(*)::int from work_items where reference = 'WRK-000010' and status = 'APPROVED' and version = 2) as approved_work_items
+    `);
+    for (const [label, value] of Object.entries(reversalResult.rows[0] as unknown as Record<string, number>)) if (Number(value) !== 1) throw new Error(`payment reversal ${label}: expected 1, received ${value}`);
+    console.info("Workflow integration verification passed: locking prevented double approval, and scheduled, direct-debit, and reversal postings booked exactly once through balanced ledger paths.");
   } finally {
     await resetBaseline(db, admin);
   }

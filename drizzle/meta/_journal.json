@@ -43,6 +43,13 @@
       "when": 1785674381098,
       "tag": "0005_massive_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785675264766,
+      "tag": "0006_skinny_joseph",
+      "breakpoints": true
     }
   ]
 }

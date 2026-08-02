@@ -20,6 +20,8 @@ const authenticatedRoutes = [
   ["/payment-instructions/PIN-000001", "payment-instruction-detail"],
   ["/direct-debits", "direct-debits"],
   ["/direct-debits/DDM-000001", "direct-debit-detail"],
+  ["/payment-reversals", "payment-reversals"],
+  ["/payment-reversals/REV-000001", "payment-reversal-detail"],
   ["/work-queue", "work-queue"],
   ["/work-queue/WRK-000001", "work-item-detail"],
   ["/kyc", "kyc-register"],
