@@ -52,20 +52,21 @@ $headers = @{
 Invoke-RestMethod "http://localhost:3000/api/v1/customers?limit=9" -Headers $headers
 ```
 
-The canonical OpenAPI source is [`openapi/futurebank.v1.source.json`](openapi/futurebank.v1.source.json). `npm run openapi:generate` produces the committed [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) artifact, and `npm run openapi:check` validates the source and rejects artifact drift. The running app serves the generated document publicly at `/api/openapi.json`, allowing an external actor to discover the contract without credentials; all `/api/v1` business routes remain authenticated. See [`docs/api.md`](docs/api.md) for accessibility, authentication, payment-instruction and response conventions.
+The canonical OpenAPI source is [`openapi/futurebank.v1.source.json`](openapi/futurebank.v1.source.json). `npm run openapi:generate` produces the committed [`openapi/futurebank.v1.json`](openapi/futurebank.v1.json) artifact, and `npm run openapi:check` validates the source and rejects artifact drift. `npm run api-guide:generate` produces the committed [`docs/FutureBank-API-Guide.docx`](docs/FutureBank-API-Guide.docx) Word guide (overview, authentication and roles, format conventions, per-operation parameter tables and error reference); `npm run api-guide:check` rejects drift, and `npm run verify:docs` includes both artifact freshness checks. The running app serves the generated document publicly at `/api/openapi.json`, allowing an external actor to discover the contract without credentials; all `/api/v1` business routes remain authenticated. See [`docs/api.md`](docs/api.md) for accessibility, authentication, payment-instruction and response conventions.
 
 ## Quality checks
 
 ```powershell
 npm run verify:docs
 npm run openapi:check
+npm run api-guide:check
 npm run lint
 npm run typecheck
 npm test
 npm run build
 ```
 
-Use `npm run verify:fast` for the documentation, OpenAPI, lint, typecheck and unit-test contract. `npm run verify:db` migrates and resets the configured disposable database, verifies the baseline, exercises database-backed workflows and verifies the restored baseline again. After installing the Playwright browsers, `npm run verify:full` adds the production build and canonical browser journeys.
+Use `npm run verify:fast` for the documentation, OpenAPI, API-guide, lint, typecheck and unit-test contract. `npm run verify:db` migrates and resets the configured disposable database, verifies the baseline, exercises database-backed workflows and verifies the restored baseline again. After installing the Playwright browsers, `npm run verify:full` adds the production build and canonical browser journeys.
 
 The unit suite covers monetary validation, role boundaries, same-currency transfer rules, insufficient funds, read-only accounts, balanced double-entry postings, deterministic seed identifiers, and baseline state coverage.
 

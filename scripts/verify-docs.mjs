@@ -2,6 +2,7 @@ import { access, readFile, readdir } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { renderGuide, contentHash } from "./generate-api-guide.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const documentationFiles = [
@@ -55,6 +56,16 @@ for (const relativePath of requiredOwnerPaths) {
   if (!(await exists(path.join(root, relativePath)))) errors.push(`Missing routed owner path: ${relativePath}`);
 }
 if (await exists(path.join(root, "CLAUDE.md"))) errors.push("CLAUDE.md is a superseded review journal; keep durable guidance with its owning contract.");
+
+const guidePath = path.join(root, "docs", "FutureBank-API-Guide.docx");
+if (await exists(guidePath)) {
+  const [committed, generated] = await Promise.all([readFile(guidePath), renderGuide()]);
+  if (contentHash(committed) !== contentHash(generated)) {
+    errors.push("docs/FutureBank-API-Guide.docx is stale; run npm run api-guide:generate and commit the regenerated file.");
+  }
+} else {
+  errors.push("docs/FutureBank-API-Guide.docx is missing; run npm run api-guide:generate and commit the file.");
+}
 
 const readme = await readFile(path.join(root, "README.md"), "utf8");
 const agents = await readFile(path.join(root, "AGENTS.md"), "utf8");
