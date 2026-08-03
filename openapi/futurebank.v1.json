@@ -162,9 +162,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "description": "Operational dashboard metrics; monetary values are decimal strings.",
-                      "additionalProperties": true
+                      "$ref": "#/components/schemas/DashboardSummary"
                     }
                   }
                 }
@@ -8110,6 +8108,66 @@
           "correlationId": {
             "type": "string",
             "description": "Request correlation identifier."
+          }
+        }
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "description": "Operational dashboard metrics; monetary values are decimal strings.",
+        "required": [
+          "customers",
+          "activeAccounts",
+          "totalDeposits",
+          "pendingKycReviews",
+          "paymentsToday",
+          "openWorkItems",
+          "pendingPayments",
+          "overdraftExposure",
+          "repeatUseAlerts",
+          "recentActivity"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "customers": {
+            "type": "integer",
+            "description": "Total customer count."
+          },
+          "activeAccounts": {
+            "type": "integer",
+            "description": "Active account count."
+          },
+          "totalDeposits": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "pendingKycReviews": {
+            "type": "integer",
+            "description": "Pending KYC reviews."
+          },
+          "paymentsToday": {
+            "type": "integer",
+            "description": "Payments submitted today."
+          },
+          "openWorkItems": {
+            "type": "integer",
+            "description": "Open maker-checker work items."
+          },
+          "pendingPayments": {
+            "type": "integer",
+            "description": "Pending payment approvals."
+          },
+          "overdraftExposure": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "repeatUseAlerts": {
+            "type": "integer",
+            "description": "Repeat-use alerts."
+          },
+          "recentActivity": {
+            "type": "array",
+            "description": "Recent audit activity.",
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            }
           }
         }
       },

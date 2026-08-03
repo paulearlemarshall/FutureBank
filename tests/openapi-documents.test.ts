@@ -1,6 +1,7 @@
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import futurebankSpec from "../openapi/futurebank.v1.json";
 
 describe("OpenAPI customer document contract", () => {
   it("is valid, self-describing OpenAPI 3.0.3", async () => {
@@ -36,5 +37,35 @@ describe("OpenAPI customer document contract", () => {
     expect(specification.components.schemas.DocumentMeta).toBeDefined();
     expect(specification.components.schemas.DocumentSlot.enum).toEqual(["PASSPORT", "NATIONAL_ID"]);
     expect(operationIds.size).toBe(86);
+  });
+
+  it("types every 200 JSON data payload concretely so Blue Prism can expose each operation", () => {
+    const freeform: string[] = [];
+    for (const [path, item] of Object.entries(futurebankSpec.paths)) {
+      for (const operation of Object.values(item)) {
+        const ok = operation.responses?.["200"];
+        const schema = ok?.content?.["application/json"]?.schema;
+        if (!schema) continue;
+        const data = schema.properties?.data ?? schema;
+        if (data.type === "object" && !data.properties && !data.$ref) {
+          freeform.push(`${path}`);
+        }
+      }
+    }
+    expect(freeform, "operations whose data is an anonymous free-form object are dropped by the Blue Prism importer").toEqual([]);
+
+    const dashboardGet = futurebankSpec.paths["/dashboard"].get;
+    expect(dashboardGet.operationId).toBe("getDashboard");
+    const dashboardData = dashboardGet.responses["200"].content["application/json"].schema.properties.data;
+    expect(dashboardData).toEqual({ $ref: "#/components/schemas/DashboardSummary" });
+
+    const summary = futurebankSpec.components.schemas.DashboardSummary;
+    expect(summary.required).toEqual([
+      "customers", "activeAccounts", "totalDeposits", "pendingKycReviews", "paymentsToday",
+      "openWorkItems", "pendingPayments", "overdraftExposure", "repeatUseAlerts", "recentActivity",
+    ]);
+    expect(summary.properties.totalDeposits).toEqual({ $ref: "#/components/schemas/Money" });
+    expect(summary.properties.overdraftExposure).toEqual({ $ref: "#/components/schemas/Money" });
+    expect(summary.properties.recentActivity.items).toEqual({ $ref: "#/components/schemas/AuditEvent" });
   });
 });
