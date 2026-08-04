@@ -239,6 +239,10 @@ export type KycCaseSummary = {
   type: "ONBOARDING" | "PERIODIC_REVIEW" | "TRIGGER_EVENT" | "REMEDIATION";
   jurisdiction: string;
   status: "OPEN" | "IN_PROGRESS" | "AWAITING_INFORMATION" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  locked: boolean;
+  lockReason: string | null;
+  lockedAt: string | null;
+  version: number;
   riskScore: number;
   riskRating: RiskRating;
   enhancedDueDiligence: boolean;
@@ -274,10 +278,14 @@ export type KycEvidence = {
   reference: string;
   evidenceType: string;
   documentReference: string;
+  documentId: string | null;
   source: string;
   receivedAt: string;
+  issuedAt: string | null;
   verificationStatus: "NOT_VERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
   expiresAt: string | null;
+  firstName: string | null;
+  lastName: string | null;
   reviewerNotes: string | null;
 };
 

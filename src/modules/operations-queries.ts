@@ -57,7 +57,8 @@ export async function listKycCases(): Promise<KycCaseSummary[]> {
     .innerJoin(customers, eq(kycCases.customerId, customers.id)).orderBy(desc(kycCases.updatedAt), kycCases.reference);
   return rows.map(({ kycCase, customer }) => ({
     reference: kycCase.reference, customerNumber: customer.customerNumber, customerName: displayName(customer), type: kycCase.type,
-    jurisdiction: kycCase.jurisdiction, status: kycCase.status, riskScore: kycCase.calculatedRiskScore,
+    jurisdiction: kycCase.jurisdiction, status: kycCase.status, locked: kycCase.locked, lockReason: kycCase.lockReason,
+    lockedAt: kycCase.lockedAt ? iso(kycCase.lockedAt) : null, version: kycCase.version, riskScore: kycCase.calculatedRiskScore,
     riskRating: kycCase.finalRiskRating ?? kycCase.calculatedRiskRating, enhancedDueDiligence: kycCase.enhancedDueDiligence, dueAt: iso(kycCase.dueAt),
   }));
 }
@@ -77,7 +78,8 @@ export async function getKycCase(reference: string): Promise<KycCaseDetail | nul
   const profile = profiles[0];
   return {
     reference: row.kycCase.reference, customerNumber: row.customer.customerNumber, customerName: displayName(row.customer), type: row.kycCase.type,
-    jurisdiction: row.kycCase.jurisdiction, status: row.kycCase.status, riskScore: row.kycCase.calculatedRiskScore,
+    jurisdiction: row.kycCase.jurisdiction, status: row.kycCase.status, locked: row.kycCase.locked, lockReason: row.kycCase.lockReason,
+    lockedAt: row.kycCase.lockedAt ? iso(row.kycCase.lockedAt) : null, version: row.kycCase.version, riskScore: row.kycCase.calculatedRiskScore,
     riskRating: row.kycCase.finalRiskRating ?? row.kycCase.calculatedRiskRating, finalRiskRating: row.kycCase.finalRiskRating,
     overrideReason: row.kycCase.overrideReason, enhancedDueDiligence: row.kycCase.enhancedDueDiligence, dueAt: iso(row.kycCase.dueAt),
     requirements: row.kycCase.requirements as KycCaseDetail["requirements"],
@@ -88,7 +90,7 @@ export async function getKycCase(reference: string): Promise<KycCaseDetail | nul
       sourceOfWealth: profile.sourceOfWealth, incomeOrTurnoverBand: profile.incomeOrTurnoverBand, netWorthBand: profile.netWorthBand,
     } : null,
     riskFactors: factors.map((factor) => ({ category: factor.category, rule: factor.rule, score: factor.score, explanation: factor.explanation })),
-    evidence: evidenceRows.map((item) => ({ reference: item.reference, evidenceType: item.evidenceType, documentReference: item.documentReference, source: item.source, receivedAt: item.receivedAt, verificationStatus: item.verificationStatus, expiresAt: item.expiresAt, reviewerNotes: item.reviewerNotes })),
+    evidence: evidenceRows.map((item) => ({ reference: item.reference, evidenceType: item.evidenceType, documentReference: item.documentReference, documentId: item.documentId, source: item.source, receivedAt: item.receivedAt, issuedAt: item.issuedAt, verificationStatus: item.verificationStatus, expiresAt: item.expiresAt, firstName: item.firstName, lastName: item.lastName, reviewerNotes: item.reviewerNotes })),
     screenings: screeningRows.map((item) => ({ reference: item.reference, subjectType: item.subjectType, subjectReference: item.subjectReference, subjectName: item.subjectName, screeningType: item.screeningType, matchScore: item.matchScore, outcome: item.outcome, resolutionComment: item.resolutionComment, createdAt: iso(item.createdAt) })),
     restrictions: restrictionRows.map((item) => ({ reference: item.reference, type: item.type, reason: item.reason, effectiveFrom: iso(item.effectiveFrom), effectiveTo: item.effectiveTo ? iso(item.effectiveTo) : null, active: item.active })),
   };

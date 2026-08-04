@@ -20,6 +20,27 @@ const decisionSchema = z.object({
   decision: z.enum(["APPROVE", "REJECT"]), comment: z.string().min(5), finalRiskRating: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(), overrideReason: z.string().nullable(),
 });
 
+const lockSchema = z.object({ locked: z.boolean(), reason: z.string().min(5), expectedVersion: z.coerce.number().int().positive() });
+
+export async function toggleKycCaseLockAction(caseReference: string, _previous: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = lockSchema.safeParse({ locked: formData.get("locked") === "true", reason: formText(formData, "reason"), expectedVersion: formText(formData, "expectedVersion") });
+  if (!parsed.success) return invalidAction(parsed.error);
+  try {
+    const actor = await requirePermission("KYC_LOCK");
+    await db.transaction(async (tx) => {
+      const result = await tx.execute(sql`select id, locked, version from kyc_cases where reference = ${caseReference} for update`);
+      const row = (result.rows as unknown as Array<{ id: string; locked: boolean; version: number }>)[0];
+      if (!row) throw new BankingError("KYC_CASE_NOT_FOUND", "KYC case not found.");
+      if (row.version !== parsed.data.expectedVersion) throw new BankingError("STALE_KYC_CASE", "This KYC case changed after it was loaded. Refresh and try again.");
+      if (row.locked === parsed.data.locked) throw new BankingError("KYC_LOCK_UNCHANGED", `The KYC case is already ${parsed.data.locked ? "locked" : "unlocked"}.`);
+      await tx.update(kycCases).set({ locked: parsed.data.locked, lockReason: parsed.data.locked ? parsed.data.reason : null, lockedAt: parsed.data.locked ? new Date() : null, lockedBy: parsed.data.locked ? actor.id : null, version: row.version + 1, updatedAt: new Date() }).where(eq(kycCases.id, row.id));
+      await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: parsed.data.locked ? "KYC_CASE_LOCKED" : "KYC_CASE_UNLOCKED", entityType: "KYC_CASE", entityReference: caseReference, correlationId: crypto.randomUUID(), before: { locked: row.locked, version: row.version }, after: { locked: parsed.data.locked, reason: parsed.data.reason, version: row.version + 1 } });
+    });
+    revalidatePath(`/kyc/${caseReference}`); revalidatePath("/kyc");
+    return { ok: true, code: parsed.data.locked ? "KYC_CASE_LOCKED" : "KYC_CASE_UNLOCKED", message: `KYC case ${caseReference} was ${parsed.data.locked ? "locked" : "unlocked"}.` };
+  } catch (error) { return failedAction(error); }
+}
+
 export async function openKycCaseAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = z.object({ customerNumber: z.string().min(7), type: z.enum(["ONBOARDING", "PERIODIC_REVIEW", "TRIGGER_EVENT", "REMEDIATION"]) }).safeParse({ customerNumber: formText(formData, "customerNumber"), type: formText(formData, "caseType") });
   if (!parsed.success) return invalidAction(parsed.error);
@@ -55,6 +76,7 @@ export async function updateCddProfileAction(caseReference: string, _previous: A
     const actor = await requirePermission("KYC_GATHER");
     const [kycCase] = await db.select().from(kycCases).where(eq(kycCases.reference, caseReference)).limit(1);
     if (!kycCase) throw new BankingError("KYC_CASE_NOT_FOUND", "KYC case not found.");
+    if (kycCase.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
     const values = { ...parsed.data, expectedCountries: parsed.data.expectedCountries.split(",").map((value) => value.trim().toUpperCase()).filter(Boolean), updatedAt: new Date() };
     await db.insert(customerDueDiligenceProfiles).values({ kycCaseId: kycCase.id, ...values }).onConflictDoUpdate({ target: customerDueDiligenceProfiles.kycCaseId, set: values });
     await db.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "CDD_PROFILE_UPDATED", entityType: "KYC_CASE", entityReference: caseReference, correlationId: crypto.randomUUID(), before: null, after: values });
@@ -63,18 +85,46 @@ export async function updateCddProfileAction(caseReference: string, _previous: A
   } catch (error) { return failedAction(error); }
 }
 
+const evidenceMetadataSchema = z.object({
+  evidenceType: z.string().min(2), documentReference: z.string().min(3), documentId: z.string().min(1).nullable(), source: z.string().min(3),
+  receivedAt: z.string().date(), issuedAt: z.string().date().nullable(), expiresAt: z.string().date().nullable(), firstName: z.string().min(1).nullable(), lastName: z.string().min(1).nullable(), reviewerNotes: z.string().nullable(),
+}).superRefine((value, context) => {
+  if ((value.firstName === null) !== (value.lastName === null)) context.addIssue({ code: "custom", path: [value.firstName === null ? "firstName" : "lastName"], message: "First name and last name must be supplied together." });
+  if (value.issuedAt && value.expiresAt && value.issuedAt > value.expiresAt) context.addIssue({ code: "custom", path: ["expiresAt"], message: "Expiry date must not be before issue date." });
+});
+
+function evidenceMetadataForm(formData: FormData) {
+  return { evidenceType: formText(formData, "evidenceType"), documentReference: formText(formData, "documentReference"), documentId: optionalFormText(formData, "documentId"), source: formText(formData, "source"), receivedAt: formText(formData, "receivedAt"), issuedAt: optionalFormText(formData, "issuedAt"), expiresAt: optionalFormText(formData, "expiresAt"), firstName: optionalFormText(formData, "firstName"), lastName: optionalFormText(formData, "lastName"), reviewerNotes: optionalFormText(formData, "reviewerNotes") };
+}
+
 export async function recordKycEvidenceAction(caseReference: string, _previous: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = z.object({ evidenceType: z.string().min(2), documentReference: z.string().min(3), source: z.string().min(3), receivedAt: z.string().date(), expiresAt: z.string().date().nullable(), reviewerNotes: z.string().nullable() }).safeParse({ evidenceType: formText(formData, "evidenceType"), documentReference: formText(formData, "documentReference"), source: formText(formData, "source"), receivedAt: formText(formData, "receivedAt"), expiresAt: optionalFormText(formData, "expiresAt"), reviewerNotes: optionalFormText(formData, "reviewerNotes") });
+  const parsed = evidenceMetadataSchema.safeParse(evidenceMetadataForm(formData));
   if (!parsed.success) return invalidAction(parsed.error);
   try {
     const actor = await requirePermission("KYC_GATHER");
     const [kycCase] = await db.select().from(kycCases).where(eq(kycCases.reference, caseReference)).limit(1);
     if (!kycCase) throw new BankingError("KYC_CASE_NOT_FOUND", "KYC case not found.");
+    if (kycCase.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
     const reference = `EVD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
     await db.insert(kycEvidence).values({ reference, kycCaseId: kycCase.id, ...parsed.data, verificationStatus: "PENDING" });
     await db.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "KYC_EVIDENCE_RECORDED", entityType: "KYC_EVIDENCE", entityReference: reference, correlationId: crypto.randomUUID(), before: null, after: { caseReference, evidenceType: parsed.data.evidenceType } });
     revalidatePath(`/kyc/${caseReference}`);
     return { ok: true, code: "EVIDENCE_RECORDED", message: `Evidence ${reference} was recorded.` };
+  } catch (error) { return failedAction(error); }
+}
+
+export async function updateKycEvidenceAction(caseReference: string, evidenceReference: string, _previous: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = evidenceMetadataSchema.safeParse(evidenceMetadataForm(formData));
+  if (!parsed.success) return invalidAction(parsed.error);
+  try {
+    const actor = await requirePermission("KYC_GATHER");
+    const [row] = await db.select({ evidence: kycEvidence, kycCase: kycCases }).from(kycEvidence).innerJoin(kycCases, eq(kycEvidence.kycCaseId, kycCases.id)).where(and(eq(kycCases.reference, caseReference), eq(kycEvidence.reference, evidenceReference))).limit(1);
+    if (!row) throw new BankingError("EVIDENCE_NOT_FOUND", "Evidence was not found in this case.");
+    if (row.kycCase.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
+    await db.update(kycEvidence).set({ ...parsed.data, updatedAt: new Date() }).where(eq(kycEvidence.id, row.evidence.id));
+    await db.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "KYC_EVIDENCE_UPDATED", entityType: "KYC_EVIDENCE", entityReference: evidenceReference, correlationId: crypto.randomUUID(), before: { evidenceType: row.evidence.evidenceType, documentReference: row.evidence.documentReference, documentId: row.evidence.documentId, issuedAt: row.evidence.issuedAt, expiresAt: row.evidence.expiresAt, firstName: row.evidence.firstName, lastName: row.evidence.lastName }, after: parsed.data });
+    revalidatePath(`/kyc/${caseReference}`);
+    return { ok: true, code: "EVIDENCE_UPDATED", message: `Evidence ${evidenceReference} was updated.` };
   } catch (error) { return failedAction(error); }
 }
 
@@ -85,6 +135,8 @@ export async function verifyKycEvidenceAction(caseReference: string, _previous: 
     const actor = await requirePermission("KYC_GATHER");
     const [evidence] = await db.select({ evidence: kycEvidence }).from(kycEvidence).innerJoin(kycCases, eq(kycEvidence.kycCaseId, kycCases.id)).where(and(eq(kycCases.reference, caseReference), eq(kycEvidence.reference, parsed.data.evidenceReference))).limit(1);
     if (!evidence) throw new BankingError("EVIDENCE_NOT_FOUND", "Evidence was not found in this case.");
+    const evidenceCaseId = evidence.evidence?.kycCaseId;
+    if (evidenceCaseId && (await db.select({ locked: kycCases.locked }).from(kycCases).where(eq(kycCases.id, evidenceCaseId)).limit(1))[0]?.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
     await db.update(kycEvidence).set({ verificationStatus: parsed.data.outcome, verifiedBy: actor.id, verifiedAt: new Date(), reviewerNotes: parsed.data.reviewerNotes, updatedAt: new Date() }).where(eq(kycEvidence.id, evidence.evidence.id));
     revalidatePath(`/kyc/${caseReference}`);
     return { ok: true, code: "EVIDENCE_VERIFIED", message: `Evidence ${parsed.data.evidenceReference} is ${parsed.data.outcome.toLowerCase()}.` };
@@ -97,6 +149,7 @@ export async function runScreeningAction(caseReference: string, _previous: Actio
     const actor = await requirePermission("KYC_SCREEN");
     const [row] = await db.select({ kycCase: kycCases, customer: customers }).from(kycCases).innerJoin(customers, eq(kycCases.customerId, customers.id)).where(eq(kycCases.reference, caseReference)).limit(1);
     if (!row) throw new BankingError("KYC_CASE_NOT_FOUND", "KYC case not found.");
+    if (row.kycCase.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
     const name = row.customer.legalName ?? `${row.customer.givenName ?? ""} ${row.customer.familyName ?? ""}`.trim();
     const watchlist = await db.select().from(screeningWatchlistEntries).where(eq(screeningWatchlistEntries.active, true));
     const normalized = name.toLowerCase();
@@ -123,6 +176,7 @@ export async function resolveScreeningAction(caseReference: string, _previous: A
     const actor = await requirePermission("KYC_DECIDE");
     const [check] = await db.select().from(screeningChecks).where(eq(screeningChecks.reference, parsed.data.screeningReference)).limit(1);
     if (!check || check.outcome !== "POSSIBLE_MATCH") throw new BankingError("SCREENING_NOT_OPEN", "The screening result is not an unresolved possible match.");
+    if (check.kycCaseId && (await db.select({ locked: kycCases.locked }).from(kycCases).where(eq(kycCases.id, check.kycCaseId)).limit(1))[0]?.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
     await db.update(screeningChecks).set({ outcome: parsed.data.outcome, resolvedBy: actor.id, resolvedAt: new Date(), resolutionComment: parsed.data.comment, updatedAt: new Date() }).where(eq(screeningChecks.id, check.id));
     revalidatePath(`/kyc/${caseReference}`);
     return { ok: true, code: "SCREENING_RESOLVED", message: `Screening ${parsed.data.screeningReference} was resolved.` };
@@ -137,6 +191,8 @@ export async function submitKycCaseAction(caseReference: string, _previous: Acti
       const result = await tx.execute(sql`select id, customer_id, status, requirements from kyc_cases where reference = ${caseReference} for update`);
       const kycCase = (result.rows as unknown as Array<{ id: string; customer_id: string; status: string; requirements: KycCaseRequirements }>)[0];
       if (!kycCase || !["OPEN", "IN_PROGRESS", "AWAITING_INFORMATION"].includes(kycCase.status)) throw new BankingError("KYC_CASE_NOT_SUBMITTABLE", "The KYC case cannot be submitted from its current state.");
+      const lockResult = await tx.execute(sql`select locked from kyc_cases where id = ${kycCase.id}`);
+      if ((lockResult.rows as unknown as Array<{ locked: boolean }>)[0]?.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
       const evidence = await tx.select().from(kycEvidence).where(eq(kycEvidence.kycCaseId, kycCase.id));
       if (!canSubmitKyc(kycCase.requirements, evidence)) throw new BankingError("MANDATORY_EVIDENCE_MISSING", "Mandatory verified evidence is missing or expired.");
       const [profile] = await tx.select().from(customerDueDiligenceProfiles).where(eq(customerDueDiligenceProfiles.kycCaseId, kycCase.id)).limit(1);
@@ -162,9 +218,10 @@ export async function decideKycCaseAction(_previous: ActionState, formData: Form
     const actor = await requirePermission("KYC_DECIDE");
     await db.transaction(async (tx) => {
       const item = await lockApprovalWorkItem(tx, { reference: parsed.data.workItemReference, entityType: "KYC_CASE", entityReference: parsed.data.entityReference, expectedVersion: parsed.data.expectedVersion }, actor);
-      const result = await tx.execute(sql`select id, customer_id, status, calculated_risk_rating from kyc_cases where reference = ${parsed.data.entityReference} for update`);
-      const kycCase = (result.rows as unknown as Array<{ id: string; customer_id: string; status: string; calculated_risk_rating: RiskRating }>)[0];
+      const result = await tx.execute(sql`select id, customer_id, status, locked, calculated_risk_rating from kyc_cases where reference = ${parsed.data.entityReference} for update`);
+      const kycCase = (result.rows as unknown as Array<{ id: string; customer_id: string; status: string; locked: boolean; calculated_risk_rating: RiskRating }>)[0];
       if (!kycCase || kycCase.status !== "PENDING_APPROVAL") throw new BankingError("KYC_NOT_PENDING", "The KYC case is not pending approval.");
+      if (kycCase.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
       const checks = await tx.select().from(screeningChecks).where(eq(screeningChecks.kycCaseId, kycCase.id));
       const confirmedSanctions = checks.some((check) => check.screeningType === "SANCTIONS" && check.outcome === "CONFIRMED_MATCH");
       if (parsed.data.decision === "APPROVE" && confirmedSanctions) throw new BankingError("SANCTIONS_REQUIRES_REJECTION", "A confirmed fictional sanctions result cannot be approved.");

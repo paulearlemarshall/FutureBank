@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.10.0",
+    "version": "1.11.0",
     "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
@@ -3085,16 +3085,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "data": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/KycCaseSummary"
-                        },
-                        {
-                          "type": "object",
-                          "description": "Complete KYC case workspace.",
-                          "additionalProperties": true
-                        }
-                      ]
+                      "$ref": "#/components/schemas/KycCaseDetail"
                     }
                   }
                 }
@@ -3116,6 +3107,76 @@
         },
         "operationId": "getKycCase",
         "description": "Returns CDD profile, risk, screening, evidence, restrictions and decision data."
+      }
+    },
+    "/kyc-cases/{caseReference}/lock": {
+      "post": {
+        "tags": [
+          "KYC"
+        ],
+        "summary": "Lock or unlock a KYC case",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "locked",
+                  "reason",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "locked": {
+                    "type": "boolean",
+                    "description": "True to lock; false to unlock."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 5,
+                    "description": "Reason for the lock state change."
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Current KYC case version."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postKycCasesCaseReferenceLock",
+        "description": "Toggles the KYC case lock. All authenticated staff personas may use this control; while locked, KYC mutations are rejected."
       }
     },
     "/kyc-cases/{caseReference}/cdd": {
@@ -3247,6 +3308,11 @@
                     "type": "string",
                     "description": "Fictional document reference."
                   },
+                  "documentId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Document identifier when applicable."
+                  },
                   "source": {
                     "type": "string",
                     "description": "Evidence source."
@@ -3255,6 +3321,12 @@
                     "type": "string",
                     "description": "Receipt date.",
                     "format": "date"
+                  },
+                  "issuedAt": {
+                    "type": "string",
+                    "description": "Document issue date when applicable.",
+                    "format": "date",
+                    "nullable": true
                   },
                   "expiresAt": {
                     "type": "string",
@@ -3266,6 +3338,16 @@
                     "type": "string",
                     "description": "Optional notes.",
                     "nullable": true
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "First name shown on the evidence when applicable."
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Last name shown on the evidence when applicable."
                   }
                 }
               }
@@ -3288,6 +3370,107 @@
         },
         "operationId": "postKycCasesCaseReferenceEvidence",
         "description": "Record fictional evidence metadata. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
+      },
+      "patch": {
+        "tags": [
+          "KYC"
+        ],
+        "summary": "Update evidence metadata",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseReference"
+          },
+          {
+            "name": "evidenceReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Evidence reference."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Updates evidence metadata only; it does not upload a file or change verification status.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "evidenceType",
+                  "documentReference",
+                  "source",
+                  "receivedAt"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "evidenceType": {
+                    "type": "string"
+                  },
+                  "documentReference": {
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "issuedAt": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "reviewerNotes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "patchKycCasesCaseReferenceEvidenceEvidenceReference",
+        "description": "Update evidence metadata. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
       }
     },
     "/kyc-cases/{caseReference}/evidence-verification": {
@@ -6713,6 +6896,327 @@
           }
         }
       },
+      "KycEvidence": {
+        "type": "object",
+        "description": "KYC evidence metadata and verification state.",
+        "required": [
+          "reference",
+          "evidenceType",
+          "documentReference",
+          "documentId",
+          "source",
+          "receivedAt",
+          "issuedAt",
+          "verificationStatus",
+          "expiresAt",
+          "firstName",
+          "lastName",
+          "reviewerNotes"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "evidenceType": {
+            "type": "string"
+          },
+          "documentReference": {
+            "type": "string"
+          },
+          "documentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": [
+              "NOT_VERIFIED",
+              "PENDING",
+              "VERIFIED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewerNotes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "KycCaseDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/KycCaseSummary"
+          },
+          {
+            "type": "object",
+            "description": "Complete KYC case workspace.",
+            "required": [
+              "finalRiskRating",
+              "overrideReason",
+              "requirements",
+              "profile",
+              "riskFactors",
+              "screenings",
+              "evidence",
+              "restrictions"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "finalRiskRating": {
+                "type": "string",
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH"
+                ],
+                "nullable": true
+              },
+              "overrideReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "label",
+                    "mandatory"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "mandatory": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "profile": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": false,
+                "required": [
+                  "accountPurpose",
+                  "occupationOrBusiness",
+                  "expectedMonthlyCredits",
+                  "expectedMonthlyDebits",
+                  "expectedCountries",
+                  "cashUsage",
+                  "sourceOfFunds",
+                  "sourceOfWealth",
+                  "incomeOrTurnoverBand",
+                  "netWorthBand"
+                ],
+                "properties": {
+                  "accountPurpose": {
+                    "type": "string"
+                  },
+                  "occupationOrBusiness": {
+                    "type": "string"
+                  },
+                  "expectedMonthlyCredits": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "expectedMonthlyDebits": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "expectedCountries": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cashUsage": {
+                    "type": "string"
+                  },
+                  "sourceOfFunds": {
+                    "type": "string"
+                  },
+                  "sourceOfWealth": {
+                    "type": "string"
+                  },
+                  "incomeOrTurnoverBand": {
+                    "type": "string"
+                  },
+                  "netWorthBand": {
+                    "type": "string"
+                  }
+                }
+              },
+              "riskFactors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "category",
+                    "rule",
+                    "score",
+                    "explanation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "rule": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "integer"
+                    },
+                    "explanation": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "screenings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "reference",
+                    "subjectType",
+                    "subjectReference",
+                    "subjectName",
+                    "screeningType",
+                    "matchScore",
+                    "outcome",
+                    "resolutionComment",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "reference": {
+                      "type": "string"
+                    },
+                    "subjectType": {
+                      "type": "string"
+                    },
+                    "subjectReference": {
+                      "type": "string"
+                    },
+                    "subjectName": {
+                      "type": "string"
+                    },
+                    "screeningType": {
+                      "type": "string",
+                      "enum": [
+                        "SANCTIONS",
+                        "PEP",
+                        "ADVERSE_MEDIA"
+                      ]
+                    },
+                    "matchScore": {
+                      "type": "integer"
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "CLEAR",
+                        "POSSIBLE_MATCH",
+                        "FALSE_POSITIVE",
+                        "CONFIRMED_MATCH"
+                      ]
+                    },
+                    "resolutionComment": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/KycEvidence"
+                }
+              },
+              "restrictions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "reference",
+                    "type",
+                    "reason",
+                    "effectiveFrom",
+                    "effectiveTo",
+                    "active"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "reference": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "DEBIT_BLOCK",
+                        "PAYMENT_REVIEW",
+                        "ONBOARDING_HOLD"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "effectiveFrom": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "effectiveTo": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
       "KycCaseSummary": {
         "type": "object",
         "description": "KYC case register row.",
@@ -6723,6 +7227,10 @@
           "type",
           "jurisdiction",
           "status",
+          "locked",
+          "lockReason",
+          "lockedAt",
+          "version",
           "riskScore",
           "riskRating",
           "enhancedDueDiligence",
@@ -6767,6 +7275,26 @@
               "APPROVED",
               "REJECTED"
             ]
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "Whether KYC mutations are currently blocked."
+          },
+          "lockReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Reason recorded when the case was locked."
+          },
+          "lockedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the current lock was applied."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optimistic concurrency version for case controls."
           },
           "riskScore": {
             "type": "integer",

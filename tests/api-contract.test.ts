@@ -38,6 +38,13 @@ describe("FutureBank API contract", () => {
     expect(specification.paths["/loans/{applicationReference}"].get).toBeDefined();
     expect(specification.paths["/loans/{applicationReference}/decision"].post).toBeDefined();
     expect(specification.paths["/kyc-cases/{caseReference}/decision"].post).toBeDefined();
+    expect(specification.paths["/kyc-cases/{caseReference}/evidence"].patch).toBeDefined();
+    expect(specification.components.schemas.KycEvidence.properties.documentId).toBeDefined();
+    expect(specification.components.schemas.KycEvidence.properties.issuedAt).toBeDefined();
+    expect(specification.components.schemas.KycEvidence.properties.firstName).toBeDefined();
+    expect(specification.components.schemas.KycEvidence.properties.lastName).toBeDefined();
+    expect(specification.paths["/kyc-cases/{caseReference}/lock"].post).toBeDefined();
+    expect(specification.components.schemas.KycCaseSummary.required).toEqual(expect.arrayContaining(["locked", "lockReason", "lockedAt", "version"]));
     expect(specification.paths["/overdrafts/{facilityReference}/decision"].post).toBeDefined();
   });
 
