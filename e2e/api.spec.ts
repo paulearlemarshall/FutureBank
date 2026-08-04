@@ -158,7 +158,7 @@ test("discovers seeded payment instructions through the authenticated API", asyn
   const headers = { "X-API-Key": apiKey! };
   const discovery = await request.get("/api/v1", { headers });
   expect(discovery.ok()).toBe(true);
-  expect((await discovery.json()).data).toMatchObject({ version: "1.10.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans"]) });
+  expect((await discovery.json()).data).toMatchObject({ version: "1.11.0", resources: expect.arrayContaining(["payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans"]) });
   const list = await request.get("/api/v1/payment-instructions", { headers });
   expect(list.ok()).toBe(true);
   expect((await list.json()).data).toEqual(expect.arrayContaining([
