@@ -3370,7 +3370,9 @@
         },
         "operationId": "postKycCasesCaseReferenceEvidence",
         "description": "Record fictional evidence metadata. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
-      },
+      }
+    },
+    "/kyc-cases/{caseReference}/evidence/{evidenceReference}": {
       "patch": {
         "tags": [
           "KYC"
