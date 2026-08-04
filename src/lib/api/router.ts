@@ -13,8 +13,8 @@ import {
   updateAccountStatusAction, updateBeneficiaryAction, updateCustomerAction,
 } from "@/modules/actions/banking";
 import {
-  applyRestrictionAction, decideKycCaseAction, liftRestrictionAction, openKycCaseAction,
-  recordKycEvidenceAction, resolveScreeningAction, runScreeningAction, submitKycCaseAction,
+  applyRestrictionAction, decideKycCaseAction, liftRestrictionAction, openKycCaseAction, toggleKycCaseLockAction,
+  recordKycEvidenceAction, resolveScreeningAction, runScreeningAction, submitKycCaseAction, updateKycEvidenceAction,
   updateCddProfileAction, verifyKycEvidenceAction,
 } from "@/modules/actions/kyc";
 import {
@@ -99,7 +99,7 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.10.0", openapi: "/api/openapi.json",
+      name: "FutureBank API", version: "1.11.0", openapi: "/api/openapi.json",
       resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
@@ -349,6 +349,11 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       const body = await readJsonObject(request);
       return responseForAction(await openKycCaseAction(initialActionState, formDataFromObject({ ...body, caseType: body.caseType ?? body.type })), 201);
     }
+    if (segments[0] === "kyc-cases" && segments.length === 3 && segments[2] === "lock") {
+      const body = await readJsonObject(request);
+      if (typeof body.locked !== "boolean" || typeof body.expectedVersion !== "number") throw new ApiError(400, "VALIDATION_ERROR", "locked and expectedVersion are required.");
+      return responseForAction(await toggleKycCaseLockAction(segments[1], initialActionState, formDataFromObject({ ...body, locked: String(body.locked) })));
+    }
     if (segments[0] === "kyc-cases" && segments.length === 3 && segments[2] === "evidence") return responseForAction(await recordKycEvidenceAction(segments[1], initialActionState, await bodyForm(request)), 201);
     if (segments[0] === "kyc-cases" && segments.length === 3 && segments[2] === "evidence-verification") return responseForAction(await verifyKycEvidenceAction(segments[1], initialActionState, await bodyForm(request)));
     if (segments[0] === "kyc-cases" && segments.length === 3 && segments[2] === "screening") return responseForAction(await runScreeningAction(segments[1], initialActionState, new FormData()));
@@ -375,6 +380,7 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     if (segments[0] === "accounts" && segments.length === 3 && segments[2] === "status") return responseForAction(await updateAccountStatusAction(segments[1], initialActionState, await bodyForm(request)));
     if (segments[0] === "beneficiaries" && segments.length === 2) return responseForAction(await updateBeneficiaryAction(segments[1], initialActionState, await bodyForm(request)));
     if (segments[0] === "kyc-cases" && segments.length === 3 && segments[2] === "cdd") return responseForAction(await updateCddProfileAction(segments[1], initialActionState, await bodyForm(request)));
+    if (segments[0] === "kyc-cases" && segments.length === 4 && segments[2] === "evidence") return responseForAction(await updateKycEvidenceAction(segments[1], segments[3], initialActionState, await bodyForm(request)));
     notFound();
   }
 

@@ -16,6 +16,10 @@ describe("role boundaries", () => {
   );
 
   it("separates operator, supervisor and compliance duties", () => {
+    expect(hasPermission("OPERATOR", "KYC_LOCK")).toBe(true);
+    expect(hasPermission("SUPERVISOR", "KYC_LOCK")).toBe(true);
+    expect(hasPermission("COMPLIANCE", "KYC_LOCK")).toBe(true);
+    expect(hasPermission("ADMIN", "KYC_LOCK")).toBe(true);
     expect(hasPermission("OPERATOR", "PAYMENT_INITIATE")).toBe(true);
     expect(hasPermission("OPERATOR", "PAYMENT_DECIDE")).toBe(false);
     expect(hasPermission("OPERATOR", "PAYMENT_REVERSAL_INITIATE")).toBe(true);

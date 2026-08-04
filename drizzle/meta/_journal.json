@@ -113,6 +113,20 @@
       "when": 1785692016168,
       "tag": "0015_auth_simplification",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785863824399,
+      "tag": "0016_strange_lifeguard",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785864796149,
+      "tag": "0017_clever_jimmy_woo",
+      "breakpoints": true
     }
   ]
 }
