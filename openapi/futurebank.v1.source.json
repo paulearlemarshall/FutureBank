@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "FutureBank Demo API",
-    "version": "1.11.0",
+    "version": "1.12.0",
     "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
@@ -2900,7 +2900,7 @@
         "tags": [
           "Documents"
         ],
-        "summary": "List both customer document slots",
+        "summary": "List customer documents",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
@@ -2921,10 +2921,8 @@
                   "properties": {
                     "data": {
                       "type": "array",
-                      "minItems": 2,
-                      "maxItems": 2,
-                      "items": {
-                        "$ref": "#/components/schemas/CustomerDocumentSlot"
+                        "items": {
+                        "$ref": "#/components/schemas/DocumentMeta"
                       }
                     }
                   }
@@ -2948,8 +2946,20 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "operationId": "listCustomerDocumentSlots",
-        "description": "Returns exactly the PASSPORT and NATIONAL_ID slots; each contains safe metadata or empty=true."
+        "operationId": "listCustomerDocuments",
+        "description": "Returns all customer document files with safe metadata. Private Blob locations are excluded."
+      },
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Add a customer document",
+        "description": "Adds or replaces a document in the customer document collection. Requires KYC_GATHER.",
+        "parameters": [{"$ref": "#/components/parameters/CustomerNumber"}],
+        "requestBody": {
+          "required": true,
+          "content": {"multipart/form-data": {"schema": {"type": "object", "required": ["documentReference", "documentType", "file"], "properties": {"documentReference": {"type": "string"}, "documentType": {"type": "string"}, "file": {"type": "string", "format": "binary"}}}}}
+        },
+        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "415": {"$ref": "#/components/responses/Error"}},
+        "operationId": "addCustomerDocument"
       }
     },
     "/customers/{customerNumber}/documents/{slot}": {
@@ -3870,6 +3880,8 @@
       "DocumentMeta": {
         "type": "object",
         "required": [
+          "documentReference",
+          "documentType",
           "slot",
           "filename",
           "mimeType",
@@ -3879,8 +3891,17 @@
         ],
         "additionalProperties": false,
         "properties": {
+          "documentReference": {
+            "type": "string",
+            "description": "Stable document reference shared with identity metadata."
+          },
+          "documentType": {
+            "type": "string",
+            "description": "Business document type, such as PASSPORT, NATIONAL_ID or VISA."
+          },
           "slot": {
             "$ref": "#/components/schemas/DocumentSlot"
+            ,"nullable": true
           },
           "filename": {
             "type": "string",

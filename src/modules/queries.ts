@@ -126,8 +126,9 @@ export async function getCustomer(customerNumber: string): Promise<CustomerDetai
     identityDocuments: identityRows.map((item) => ({ id: item.id, type: item.type, documentReference: item.documentReference, documentNumber: item.documentNumber, issuingCountry: item.issuingCountry, issuedAt: item.issuedAt, expiresAt: item.expiresAt, verificationStatus: item.verificationStatus, verificationMethod: item.verificationMethod, expiryAlertAt: item.expiryAlertAt })),
     documents: (["PASSPORT", "NATIONAL_ID"] as const).map((slot) => {
       const item = documentBySlot.get(slot);
-      return item ? { slot, filename: item.filename, mimeType: item.mimeType, sizeBytes: item.sizeBytes, uploadedBy: item.uploadedBy, uploadedAt: iso(item.uploadedAt) } : { slot, empty: true as const };
+      return item ? { slot, documentReference: item.documentReference, documentType: item.documentType, filename: item.filename, mimeType: item.mimeType, sizeBytes: item.sizeBytes, uploadedBy: item.uploadedBy, uploadedAt: iso(item.uploadedAt) } : { slot, empty: true as const };
     }),
+    documentCollection: documentRows.map((item) => ({ documentReference: item.documentReference, documentType: item.documentType, slot: item.slot, filename: item.filename, mimeType: item.mimeType, sizeBytes: item.sizeBytes, uploadedBy: item.uploadedBy, uploadedAt: iso(item.uploadedAt) })),
     relationships,
     accounts: accountRows.map(mapAccount),
   };

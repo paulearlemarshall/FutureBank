@@ -126,7 +126,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
 
   if (preparedDocuments.length) {
     await tx.insert(tables.customerDocumentFiles).values(preparedDocuments.map((document) => ({
-      id: stableUuid(`customer-document-C000001-${document.slot}`), customerId: customerId("C000001"), slot: document.slot,
+      id: stableUuid(`customer-document-C000001-${document.slot}`), customerId: customerId("C000001"), slot: document.slot, documentReference: `IDN-C000001-${document.slot}`, documentType: document.slot,
       filename: document.filename, mimeType: document.mimeType, sizeBytes: document.sizeBytes, blobUrl: document.blobUrl,
       blobPathname: document.blobPathname, blobEtag: document.blobEtag, sha256: document.sha256,
       uploadedBy: "system.seed", uploadedAt: new Date("2026-07-20T08:00:00.000Z"), isSeeded: true,

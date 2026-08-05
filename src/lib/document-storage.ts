@@ -22,6 +22,10 @@ export function documentUploadPath(customerNumber: string, slot: DocumentSlot, f
   return `${documentBlobPrefix()}/uploads/${customerNumber}/${slot}/${crypto.randomUUID()}-${filename}`;
 }
 
+export function documentCollectionUploadPath(customerNumber: string, documentReference: string, filename: string): string {
+  return `${documentBlobPrefix()}/uploads/${customerNumber}/${safeSegment(documentReference)}/${crypto.randomUUID()}-${filename}`;
+}
+
 export function seedDocumentPath(slot: DocumentSlot, sha256: string, filename: string): string {
   return `${documentBlobPrefix()}/seed/C000001/${slot}/${sha256}-${filename}`;
 }
