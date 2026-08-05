@@ -5,9 +5,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { db } from "@/db";
 import { auditEvents, customerDocumentFiles, customers, staffProfiles, user as authUsers } from "@/db/schema";
-import { deleteDocumentBlob, documentCollectionUploadPath, documentUploadPath, getDocumentBlob, putDocumentBlob, readAndValidateCompletedBlob } from "@/lib/document-storage";
+import { deleteDocumentBlob, documentCollectionUploadPath, getDocumentBlob, putDocumentBlob, readAndValidateCompletedBlob } from "@/lib/document-storage";
 import type { DocumentMeta, DocumentSlot, SessionUser } from "@/modules/contracts";
-import { validateDocumentUpload } from "@/modules/domain/document-policy";
+import { isDocumentSlot, validateDocumentUpload } from "@/modules/domain/document-policy";
 import { hasPermission } from "@/modules/domain/auth-policy";
 import { BankingError } from "./errors";
 
@@ -51,7 +51,7 @@ async function persistDocument(input: {
     const values = {
       filename: input.filename, mimeType: input.mimeType, sizeBytes: input.sizeBytes, blobUrl: input.blob.url,
       blobPathname: input.blob.pathname, blobEtag: input.blob.etag, sha256: input.sha256, uploadedBy: actor.username,
-      uploadedAt, isSeeded: input.isSeeded ?? false, updatedAt: uploadedAt, documentReference: input.documentReference, documentType: input.documentType, slot: input.slot,
+      uploadedAt, isSeeded: input.isSeeded ?? false, updatedAt: uploadedAt, documentReference: input.documentReference, documentType: input.documentType, slot: input.slot ?? prior?.slot ?? null,
     };
     const [row] = prior
       ? await tx.update(customerDocumentFiles).set(values).where(eq(customerDocumentFiles.id, prior.id)).returning()
@@ -68,60 +68,14 @@ async function persistDocument(input: {
   return { document: meta(stored), created: !prior };
 }
 
-export async function uploadCustomerDocument(input: { customerNumber: string; slot: DocumentSlot; file: File | { name: string; type: string; content: Buffer } }, actor: SessionUser) {
-  const content = "content" in input.file ? input.file.content : Buffer.from(await input.file.arrayBuffer());
-  const validation = validateDocumentUpload({ filename: input.file.name, mimeType: input.file.type, content });
-  if (!validation.ok) throw new BankingError(validation.code, validationMessage(validation.code));
-  const customer = await customerIdentity(input.customerNumber);
-  const pathname = documentUploadPath(customer.customerNumber, input.slot, validation.filename);
-  const blob = await putDocumentBlob(pathname, content);
-  try {
-    return await persistDocument({ customerId: customer.id, customerNumber: customer.customerNumber, documentReference: `IDN-${customer.customerNumber}-${input.slot}`, documentType: input.slot, slot: input.slot, filename: validation.filename, mimeType: validation.mimeType, sizeBytes: validation.sizeBytes, sha256: createHash("sha256").update(content).digest("hex"), blob }, actor);
-  } catch (error) {
-    await deleteDocumentBlob(blob.url).catch(() => undefined);
-    throw error;
-  }
-}
-
-export async function completeClientDocumentUpload(input: { customerNumber: string; slot: DocumentSlot; filename: string; blob: PutBlobResult }, actor: SessionUser) {
+export async function completeClientDocumentCollectionUpload(input: { customerNumber: string; documentReference: string; documentType: string; filename: string; blob: PutBlobResult }, actor: SessionUser) {
   const customer = await customerIdentity(input.customerNumber);
   let checked: Awaited<ReturnType<typeof readAndValidateCompletedBlob>>;
   try { checked = await readAndValidateCompletedBlob(input.blob); }
   catch (error) { await deleteDocumentBlob(input.blob.url).catch(() => undefined); throw error; }
   const validation = validateDocumentUpload({ filename: input.filename, mimeType: input.blob.contentType, content: checked.content });
   if (!validation.ok) { await deleteDocumentBlob(input.blob.url).catch(() => undefined); throw new BankingError(validation.code, validationMessage(validation.code)); }
-  return persistDocument({ customerId: customer.id, customerNumber: customer.customerNumber, documentReference: `IDN-${customer.customerNumber}-${input.slot}`, documentType: input.slot, slot: input.slot, filename: validation.filename, mimeType: validation.mimeType, sizeBytes: validation.sizeBytes, sha256: checked.sha256, blob: input.blob }, actor);
-}
-
-export async function deleteCustomerDocument(input: { customerNumber: string; slot: DocumentSlot }, actor: SessionUser): Promise<boolean> {
-  const customer = await customerIdentity(input.customerNumber);
-  let removed: typeof customerDocumentFiles.$inferSelect | undefined;
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${customer.id}:${input.slot}`}))`);
-    [removed] = await tx.delete(customerDocumentFiles).where(and(eq(customerDocumentFiles.customerId, customer.id), eq(customerDocumentFiles.slot, input.slot))).returning();
-    if (removed) await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "DOCUMENT_DELETED", entityType: "CUSTOMER", entityReference: customer.customerNumber, correlationId: crypto.randomUUID(), before: { documentReference: removed.documentReference, documentType: removed.documentType, filename: removed.filename, mimeType: removed.mimeType, sizeBytes: removed.sizeBytes }, after: null });
-  });
-  if (removed && !removed.isSeeded) await deleteDocumentBlob(removed.blobUrl).catch(() => undefined);
-  return Boolean(removed);
-}
-
-export async function getCustomerDocument(customerNumber: string, slot: DocumentSlot) {
-  const [row] = await db.select({ document: customerDocumentFiles }).from(customerDocumentFiles).innerJoin(customers, eq(customers.id, customerDocumentFiles.customerId))
-    .where(and(eq(customers.customerNumber, customerNumber), eq(customerDocumentFiles.slot, slot))).limit(1);
-  return row?.document ?? null;
-}
-
-export async function getCustomerDocumentMetadata(customerNumber: string, slot: DocumentSlot): Promise<DocumentMeta | null> {
-  const document = await getCustomerDocument(customerNumber, slot);
-  return document ? meta(document) : null;
-}
-
-export async function getCustomerDocumentContent(customerNumber: string, slot: DocumentSlot) {
-  const document = await getCustomerDocument(customerNumber, slot);
-  if (!document) return null;
-  const blob = await getDocumentBlob(document.blobUrl);
-  if (!blob || blob.statusCode !== 200) return null;
-  return { document, stream: blob.stream };
+  return persistDocument({ customerId: customer.id, customerNumber: customer.customerNumber, documentReference: input.documentReference, documentType: input.documentType, slot: isDocumentSlot(input.documentType) ? input.documentType : null, filename: validation.filename, mimeType: validation.mimeType, sizeBytes: validation.sizeBytes, sha256: checked.sha256, blob: input.blob }, actor);
 }
 
 export async function deleteCustomerDocumentByReference(input: { customerNumber: string; documentReference: string }, actor: SessionUser): Promise<boolean> {
@@ -162,7 +116,7 @@ export async function uploadCustomerDocumentCollection(input: { customerNumber: 
   const pathname = documentCollectionUploadPath(customer.customerNumber, input.documentReference, validation.filename);
   const blob = await putDocumentBlob(pathname, content);
   try {
-    return await persistDocument({ customerId: customer.id, customerNumber: customer.customerNumber, documentReference: input.documentReference, documentType: input.documentType, slot: null, filename: validation.filename, mimeType: validation.mimeType, sizeBytes: validation.sizeBytes, sha256: createHash("sha256").update(content).digest("hex"), blob }, actor);
+    return await persistDocument({ customerId: customer.id, customerNumber: customer.customerNumber, documentReference: input.documentReference, documentType: input.documentType, slot: isDocumentSlot(input.documentType) ? input.documentType : null, filename: validation.filename, mimeType: validation.mimeType, sizeBytes: validation.sizeBytes, sha256: createHash("sha256").update(content).digest("hex"), blob }, actor);
   } catch (error) { await deleteDocumentBlob(blob.url).catch(() => undefined); throw error; }
 }
 

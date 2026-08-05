@@ -31,12 +31,11 @@ describe("OpenAPI customer document contract", () => {
     }
 
     expect(specification.paths["/customers/{customerNumber}/documents"].get).toBeDefined();
-    expect(specification.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
-    expect(specification.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
-    expect(specification.paths["/customers/{customerNumber}/documents/{slot}/content"].get).toBeDefined();
+    expect(specification.paths["/customers/{customerNumber}/documents"].post).toBeDefined();
+    expect(specification.paths["/customers/{customerNumber}/documents/{documentReference}"].delete).toBeDefined();
+    expect(specification.paths["/customers/{customerNumber}/documents/{documentReference}/content"].get).toBeDefined();
     expect(specification.components.schemas.DocumentMeta).toBeDefined();
-    expect(specification.components.schemas.DocumentSlot.enum).toEqual(["PASSPORT", "NATIONAL_ID"]);
-    expect(operationIds.size).toBe(89);
+    expect(operationIds.size).toBe(88);
   });
 
   it("types every 200 JSON data payload concretely so Blue Prism can expose each operation", () => {

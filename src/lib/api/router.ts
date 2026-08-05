@@ -3,11 +3,10 @@ import "server-only";
 import type { LoanApplicationStatus, PaymentApprovalDetail, PaymentReversalView, WorkItemPriority, WorkItemStatus, WorkItemType } from "@/modules/contracts";
 import { initialActionState } from "@/modules/contracts";
 import { requirePermission } from "@/lib/auth/session";
-import { isDocumentSlot } from "@/modules/domain/document-policy";
 import { BankingError } from "@/modules/services/errors";
 import { defaultStatementPeriod, renderAccountStatementCsv } from "@/modules/domain/statement-policy";
 import { getAccountStatement } from "@/modules/services/statements";
-import { deleteCustomerDocument, deleteCustomerDocumentByReference, getCustomerDocumentByReference, getCustomerDocumentContent, getCustomerDocumentContentByReference, listCustomerDocuments, uploadCustomerDocument, uploadCustomerDocumentCollection } from "@/modules/services/documents";
+import { deleteCustomerDocumentByReference, getCustomerDocumentByReference, getCustomerDocumentContentByReference, listCustomerDocuments, uploadCustomerDocumentCollection } from "@/modules/services/documents";
 import {
   createBeneficiaryAction, createCustomerAction, openAccountAction, submitPaymentAction,
   updateAccountStatusAction, updateBeneficiaryAction, updateCustomerAction,
@@ -116,19 +115,12 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       return jsonResponse(await listCustomerDocuments(segments[1]));
     }
     if (segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
-      if (isDocumentSlot(segments[3])) {
-        const item = await getCustomer(segments[1]);
-        if (!item) notFound("Customer");
-        const document = item.documents.find((candidate) => candidate.slot === segments[3]);
-        if (!document || "empty" in document) notFound("Customer document");
-        return jsonResponse(document);
-      }
       const document = await getCustomerDocumentByReference(segments[1], segments[3]);
       if (!document) notFound("Customer document");
       return jsonResponse({ documentReference: document.documentReference, documentType: document.documentType, slot: document.slot, filename: document.filename, mimeType: document.mimeType, sizeBytes: document.sizeBytes, uploadedBy: document.uploadedBy, uploadedAt: document.uploadedAt.toISOString() });
     }
     if (segments[0] === "customers" && segments.length === 5 && segments[2] === "documents" && segments[4] === "content") {
-      const content = isDocumentSlot(segments[3]) ? await getCustomerDocumentContent(segments[1], segments[3]) : await getCustomerDocumentContentByReference(segments[1], segments[3]);
+      const content = await getCustomerDocumentContentByReference(segments[1], segments[3]);
       if (!content) notFound("Customer document");
       return binaryStreamResponse(content.stream, content.document.mimeType, content.document.filename, {
         sizeBytes: content.document.sizeBytes,
@@ -373,6 +365,20 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     if (segments[0] === "overdraft-alerts" && segments.length === 3 && segments[2] === "resolution") return responseForAction(await resolveOverdraftAlertAction(segments[1], initialActionState, await bodyForm(request)));
     if (segments[0] === "work-items" && segments.length === 3 && segments[2] === "claim") return responseForAction(await claimWorkItemAction(initialActionState, await bodyForm(request, { workItemReference: segments[1] })));
     if (segments[0] === "work-items" && segments.length === 3 && segments[2] === "release") return responseForAction(await releaseWorkItemAction(initialActionState, await bodyForm(request, { workItemReference: segments[1] })));
+    if (segments[0] === "customers" && segments.length === 3 && segments[2] === "documents") {
+      try {
+        const actor = await documentWriteActor();
+        if (!request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Customer document uploads require multipart/form-data.");
+        const form = await request.formData();
+        const file = form.get("file");
+        const documentReference = String(form.get("documentReference") ?? "").trim();
+        const documentType = String(form.get("documentType") ?? "").trim();
+        if (!(file instanceof File)) throw new ApiError(400, "VALIDATION_ERROR", "A multipart file field named file is required.");
+        if (!documentReference || !documentType) throw new ApiError(400, "VALIDATION_ERROR", "documentReference and documentType are required.");
+        const result = await uploadCustomerDocumentCollection({ customerNumber: segments[1], documentReference, documentType, file }, actor);
+        return jsonResponse(result.document, { status: result.created ? 201 : 200 });
+      } catch (error) { documentFailure(error); }
+    }
     notFound();
   }
 
@@ -385,40 +391,10 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     notFound();
   }
 
-  if (method === "PUT" && segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
-    if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
-    try {
-      const actor = await documentWriteActor();
-      if (!request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) {
-        throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Customer document uploads require multipart/form-data with a file field.");
-      }
-      const form = await request.formData();
-      const file = form.get("file");
-      if (!(file instanceof File)) throw new ApiError(400, "VALIDATION_ERROR", "A multipart file field named file is required.", { file: ["Choose a document file"] });
-      const result = await uploadCustomerDocument({ customerNumber: segments[1], slot: segments[3], file }, actor);
-      return jsonResponse(result.document, { status: result.created ? 201 : 200 });
-    } catch (error) { documentFailure(error); }
-  }
-
-  if (method === "POST" && segments[0] === "customers" && segments.length === 3 && segments[2] === "documents") {
-    try {
-      const actor = await documentWriteActor();
-      if (!request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Customer document uploads require multipart/form-data.");
-      const form = await request.formData();
-      const file = form.get("file");
-      const documentReference = String(form.get("documentReference") ?? "").trim();
-      const documentType = String(form.get("documentType") ?? "").trim();
-      if (!(file instanceof File)) throw new ApiError(400, "VALIDATION_ERROR", "A multipart file field named file is required.");
-      if (!documentReference || !documentType) throw new ApiError(400, "VALIDATION_ERROR", "documentReference and documentType are required.");
-      const result = await uploadCustomerDocumentCollection({ customerNumber: segments[1], documentReference, documentType, file }, actor);
-      return jsonResponse(result.document, { status: result.created ? 201 : 200 });
-    } catch (error) { documentFailure(error); }
-  }
-
   if (method === "DELETE" && segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
     try {
       const actor = await documentWriteActor();
-      return jsonResponse({ deleted: isDocumentSlot(segments[3]) ? await deleteCustomerDocument({ customerNumber: segments[1], slot: segments[3] }, actor) : await deleteCustomerDocumentByReference({ customerNumber: segments[1], documentReference: segments[3] }, actor) });
+      return jsonResponse({ deleted: await deleteCustomerDocumentByReference({ customerNumber: segments[1], documentReference: segments[3] }, actor) });
     } catch (error) { documentFailure(error); }
   }
 

@@ -1,6 +1,6 @@
 # Customer documents — implemented architecture
 
-FutureBank exposes two fixed customer file slots: `PASSPORT` and `NATIONAL_ID`. File bytes are held in a private Vercel Blob store; Neon holds the customer/slot relationship, safe display metadata, private blob locator, ETag and audit history. The existing `identity_documents` metadata table is intentionally unchanged.
+FutureBank exposes a scalable customer document collection. Each file is keyed by `documentReference` and classified by `documentType`; Passport and National ID are seeded types. File bytes are held in a private Vercel Blob store; Neon holds the customer relationship, safe display metadata, private blob locator, ETag and audit history. The existing `identity_documents` metadata table is intentionally unchanged.
 
 ## Controls
 
@@ -9,7 +9,7 @@ FutureBank exposes two fixed customer file slots: `PASSPORT` and `NATIONAL_ID`. 
 - Any authenticated active staff user may view a document through an authenticated proxy route.
 - Upload, replacement and deletion require `KYC_GATHER` (`OPERATOR` or `ADMIN`).
 - Private Blob URLs and bytes are never returned in DTOs or written to audit JSON.
-- Browser uploads use a ten-minute, customer-and-slot-scoped Vercel Blob token. REST uploads use multipart form data.
+- Browser uploads use a ten-minute, customer-and-reference-scoped Vercel Blob token. REST uploads use multipart form data.
 
 ## User interface and automation
 
@@ -18,10 +18,10 @@ The customer Documents tab always renders fixed Passport and National ID cards w
 ## REST API
 
 - `GET /api/v1/customers/{customerNumber}/documents`
-- `GET /api/v1/customers/{customerNumber}/documents/{slot}`
-- `GET /api/v1/customers/{customerNumber}/documents/{slot}/content`
-- `PUT /api/v1/customers/{customerNumber}/documents/{slot}` with multipart field `file`
-- `DELETE /api/v1/customers/{customerNumber}/documents/{slot}`
+- `GET /api/v1/customers/{customerNumber}/documents/{documentReference}`
+- `GET /api/v1/customers/{customerNumber}/documents/{documentReference}/content`
+- `POST /api/v1/customers/{customerNumber}/documents` with `documentReference`, `documentType` and multipart field `file`
+- `DELETE /api/v1/customers/{customerNumber}/documents/{documentReference}`
 
 All endpoints require an actor-owned FutureBank API key. Writes apply the key owner's permissions. The content endpoint is the only route that returns raw bytes instead of a `{data}` JSON envelope.
 
