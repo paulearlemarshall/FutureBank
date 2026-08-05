@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { deleteCustomerDocumentAction } from "@/modules/actions/documents";
-import { initialActionState, type CustomerDocumentSlot, type DocumentSlot } from "@/modules/contracts";
+import { initialActionState, type CustomerDocument, type CustomerDocumentSlot, type DocumentSlot } from "@/modules/contracts";
 import { MAX_DOCUMENT_BYTES, sanitizeDocumentFilename } from "@/modules/domain/document-policy";
 
 function slug(slot: DocumentSlot) { return slot === "PASSPORT" ? "passport" : "national-id"; }
@@ -56,7 +56,7 @@ function DocumentCard({ customerNumber, document, uploadPrefix, canEdit }: { cus
     <h3>{label(document.slot)}</h3>
     {"empty" in document ? <div className="document-empty">No file uploaded</div> : <>
       {document.mimeType.startsWith("image/") ? <Image className="document-preview" src={`${contentUrl}?v=${encodeURIComponent(document.uploadedAt)}`} alt={`${label(document.slot)} preview`} width={640} height={420} loading="eager" unoptimized /> : <div className="document-pdf">PDF document</div>}
-      <dl className="definition-grid"><div><dt>Filename</dt><dd>{document.filename}</dd></div><div><dt>Size</dt><dd>{displaySize(document.sizeBytes)}</dd></div><div><dt>Uploaded by</dt><dd>{document.uploadedBy}</dd></div><div><dt>Uploaded</dt><dd>{new Date(document.uploadedAt).toLocaleString("en-GB")}</dd></div></dl>
+      <dl className="definition-grid"><div><dt>Type</dt><dd>{document.documentType}</dd></div><div><dt>Document reference</dt><dd className="mono">{document.documentReference}</dd></div><div><dt>Filename</dt><dd>{document.filename}</dd></div><div><dt>Size</dt><dd>{displaySize(document.sizeBytes)}</dd></div><div><dt>Uploaded by</dt><dd>{document.uploadedBy}</dd></div><div><dt>Uploaded</dt><dd>{new Date(document.uploadedAt).toLocaleString("en-GB")}</dd></div></dl>
       <a className="secondary-button" href={contentUrl} target="_blank" rel="noreferrer" data-bp={`document-view-${slotSlug}`}>View</a>
       {canEdit ? <form action={deleteFormAction} className="document-delete-form" onSubmit={() => setUploadMessage("")}><label htmlFor={`document-delete-confirm-${slotSlug}`}><input id={`document-delete-confirm-${slotSlug}`} name="confirmDelete" type="checkbox" value="yes" data-bp={`document-delete-confirm-${slotSlug}`} required /> Confirm delete</label><button id={`document-delete-${slotSlug}`} name={`delete-${slotSlug}`} type="submit" className="danger-button" data-bp={`document-delete-${slotSlug}`} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button></form> : null}
     </>}
@@ -69,6 +69,7 @@ function DocumentCard({ customerNumber, document, uploadPrefix, canEdit }: { cus
   </section>;
 }
 
-export function CustomerDocuments(props: { customerNumber: string; documents: CustomerDocumentSlot[]; uploadPrefix: string; canEdit: boolean }) {
-  return <div className="document-grid">{props.documents.map((document) => <DocumentCard key={document.slot} customerNumber={props.customerNumber} document={document} uploadPrefix={props.uploadPrefix} canEdit={props.canEdit} />)}</div>;
+export function CustomerDocuments(props: { customerNumber: string; documents: CustomerDocumentSlot[]; documentCollection?: CustomerDocument[]; uploadPrefix: string; canEdit: boolean }) {
+  const additional = (props.documentCollection ?? []).filter((document) => !document.slot);
+  return <><div className="document-grid">{props.documents.map((document) => <DocumentCard key={document.slot} customerNumber={props.customerNumber} document={document} uploadPrefix={props.uploadPrefix} canEdit={props.canEdit} />)}</div>{additional.length ? <section className="page-stack" aria-label="Additional customer documents"><h3>Additional documents</h3><table className="data-table" data-bp="customer-document-collection"><thead><tr><th>Type</th><th>Document reference</th><th>Filename</th><th>Uploaded</th></tr></thead><tbody>{additional.map((document) => <tr key={document.documentReference}><td>{document.documentType}</td><td className="mono">{document.documentReference}</td><td>{document.filename}</td><td>{new Date(document.uploadedAt).toLocaleString("en-GB")}</td></tr>)}</tbody></table></section> : null}</>;
 }

@@ -134,6 +134,13 @@
       "when": 1785905685111,
       "tag": "0018_normalize-document-fields",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785915381298,
+      "tag": "0019_flatten-customer-documents",
+      "breakpoints": true
     }
   ]
 }

@@ -220,10 +220,19 @@ Customer names, short names, addresses and descriptive fields accept Unicode, in
 
 ## Customer document examples
 
+The document collection is the canonical API. Each file has a `documentReference` and `documentType`; the former is shared with identity metadata. The older `PASSPORT` and `NATIONAL_ID` slot routes remain compatibility aliases.
+
 ```bash
 # List Passport and National ID slots
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
+
+# Add any document type to the collection
+curl -X POST "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
+  -F "documentReference=IDN-C000001-VISA-001" \
+  -F "documentType=VISA" \
+  -F "file=@visa.pdf;type=application/pdf"
 
 # Read safe metadata for one slot (never returns a private Blob URL)
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/NATIONAL_ID" \

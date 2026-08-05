@@ -7,7 +7,7 @@ import { isDocumentSlot } from "@/modules/domain/document-policy";
 import { BankingError } from "@/modules/services/errors";
 import { defaultStatementPeriod, renderAccountStatementCsv } from "@/modules/domain/statement-policy";
 import { getAccountStatement } from "@/modules/services/statements";
-import { deleteCustomerDocument, getCustomerDocumentContent, uploadCustomerDocument } from "@/modules/services/documents";
+import { deleteCustomerDocument, deleteCustomerDocumentByReference, getCustomerDocumentByReference, getCustomerDocumentContent, getCustomerDocumentContentByReference, listCustomerDocuments, uploadCustomerDocument, uploadCustomerDocumentCollection } from "@/modules/services/documents";
 import {
   createBeneficiaryAction, createCustomerAction, openAccountAction, submitPaymentAction,
   updateAccountStatusAction, updateBeneficiaryAction, updateCustomerAction,
@@ -99,7 +99,7 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
 
   if (method === "GET") {
     if (!segments.length) return jsonResponse({
-      name: "FutureBank API", version: "1.11.0", openapi: "/api/openapi.json",
+      name: "FutureBank API", version: "1.12.0", openapi: "/api/openapi.json",
       resources: ["customers", "customer-documents", "accounts", "beneficiaries", "payments", "payment-instructions", "payment-reversals", "direct-debits", "end-of-day-runs", "reconciliation-runs", "accounting-periods", "general-ledger", "loans", "kyc-cases", "overdrafts", "work-items", "products", "audit-events"],
     });
     if (segments[0] === "dashboard" && segments.length === 1) return jsonResponse(await getDashboardSummary());
@@ -113,21 +113,22 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
       return jsonResponse(item);
     }
     if (segments[0] === "customers" && segments.length === 3 && segments[2] === "documents") {
-      const item = await getCustomer(segments[1]);
-      if (!item) notFound("Customer");
-      return jsonResponse(item.documents);
+      return jsonResponse(await listCustomerDocuments(segments[1]));
     }
     if (segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
-      if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
-      const item = await getCustomer(segments[1]);
-      if (!item) notFound("Customer");
-      const document = item.documents.find((candidate) => candidate.slot === segments[3]);
-      if (!document || "empty" in document) notFound("Customer document");
-      return jsonResponse(document);
+      if (isDocumentSlot(segments[3])) {
+        const item = await getCustomer(segments[1]);
+        if (!item) notFound("Customer");
+        const document = item.documents.find((candidate) => candidate.slot === segments[3]);
+        if (!document || "empty" in document) notFound("Customer document");
+        return jsonResponse(document);
+      }
+      const document = await getCustomerDocumentByReference(segments[1], segments[3]);
+      if (!document) notFound("Customer document");
+      return jsonResponse({ documentReference: document.documentReference, documentType: document.documentType, slot: document.slot, filename: document.filename, mimeType: document.mimeType, sizeBytes: document.sizeBytes, uploadedBy: document.uploadedBy, uploadedAt: document.uploadedAt.toISOString() });
     }
     if (segments[0] === "customers" && segments.length === 5 && segments[2] === "documents" && segments[4] === "content") {
-      if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
-      const content = await getCustomerDocumentContent(segments[1], segments[3]);
+      const content = isDocumentSlot(segments[3]) ? await getCustomerDocumentContent(segments[1], segments[3]) : await getCustomerDocumentContentByReference(segments[1], segments[3]);
       if (!content) notFound("Customer document");
       return binaryStreamResponse(content.stream, content.document.mimeType, content.document.filename, {
         sizeBytes: content.document.sizeBytes,
@@ -399,11 +400,25 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     } catch (error) { documentFailure(error); }
   }
 
-  if (method === "DELETE" && segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
-    if (!isDocumentSlot(segments[3])) throw new ApiError(400, "INVALID_SLOT", "Document slot must be PASSPORT or NATIONAL_ID.");
+  if (method === "POST" && segments[0] === "customers" && segments.length === 3 && segments[2] === "documents") {
     try {
       const actor = await documentWriteActor();
-      return jsonResponse({ deleted: await deleteCustomerDocument({ customerNumber: segments[1], slot: segments[3] }, actor) });
+      if (!request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Customer document uploads require multipart/form-data.");
+      const form = await request.formData();
+      const file = form.get("file");
+      const documentReference = String(form.get("documentReference") ?? "").trim();
+      const documentType = String(form.get("documentType") ?? "").trim();
+      if (!(file instanceof File)) throw new ApiError(400, "VALIDATION_ERROR", "A multipart file field named file is required.");
+      if (!documentReference || !documentType) throw new ApiError(400, "VALIDATION_ERROR", "documentReference and documentType are required.");
+      const result = await uploadCustomerDocumentCollection({ customerNumber: segments[1], documentReference, documentType, file }, actor);
+      return jsonResponse(result.document, { status: result.created ? 201 : 200 });
+    } catch (error) { documentFailure(error); }
+  }
+
+  if (method === "DELETE" && segments[0] === "customers" && segments.length === 4 && segments[2] === "documents") {
+    try {
+      const actor = await documentWriteActor();
+      return jsonResponse({ deleted: isDocumentSlot(segments[3]) ? await deleteCustomerDocument({ customerNumber: segments[1], slot: segments[3] }, actor) : await deleteCustomerDocumentByReference({ customerNumber: segments[1], documentReference: segments[3] }, actor) });
     } catch (error) { documentFailure(error); }
   }
 

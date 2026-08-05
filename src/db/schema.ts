@@ -256,7 +256,9 @@ export const identityDocuments = pgTable("identity_documents", {
 export const customerDocumentFiles = pgTable("customer_document_files", {
   id: uuid("id").primaryKey().defaultRandom(),
   customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
-  slot: documentSlotEnum("slot").notNull(),
+  slot: documentSlotEnum("slot"),
+  documentReference: text("document_reference").notNull(),
+  documentType: text("document_type").notNull(),
   filename: text("filename").notNull(),
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
@@ -269,8 +271,9 @@ export const customerDocumentFiles = pgTable("customer_document_files", {
   isSeeded: boolean("is_seeded").notNull().default(false),
   ...timestamps,
 }, (table) => [
-  uniqueIndex("customer_document_files_slot_idx").on(table.customerId, table.slot),
+  uniqueIndex("customer_document_files_reference_idx").on(table.customerId, table.documentReference),
   index("customer_document_files_customer_idx").on(table.customerId),
+  index("customer_document_files_type_idx").on(table.customerId, table.documentType),
   index("customer_document_files_pathname_idx").on(table.blobPathname),
 ]);
 
