@@ -1885,10 +1885,10 @@
                     "type": "string",
                     "description": "Fictional document reference."
                   },
-                  "documentId": {
+                  "documentNumber": {
                     "type": "string",
                     "nullable": true,
-                    "description": "Document identifier when applicable."
+                    "description": "Passport or national identity number when applicable."
                   },
                   "source": {
                     "type": "string",
@@ -1969,7 +1969,7 @@
                 "properties": {
                   "evidenceType": {"type": "string"},
                   "documentReference": {"type": "string"},
-                  "documentId": {"type": "string", "nullable": true},
+                  "documentNumber": {"type": "string", "nullable": true},
                   "source": {"type": "string"},
                   "receivedAt": {"type": "string", "format": "date"},
                   "issuedAt": {"type": "string", "format": "date", "nullable": true},
@@ -4028,6 +4028,7 @@
         "required": [
           "id",
           "type",
+          "documentReference",
           "documentNumber",
           "issuingCountry",
           "issuedAt",
@@ -4043,6 +4044,10 @@
           "type": {
             "type": "string",
             "description": "Document type."
+          },
+          "documentReference": {
+            "type": "string",
+            "description": "Stable identity-document reference."
           },
           "documentNumber": {
             "type": "string",
@@ -4834,13 +4839,13 @@
       "KycEvidence": {
         "type": "object",
         "description": "KYC evidence metadata and verification state.",
-        "required": ["reference", "evidenceType", "documentReference", "documentId", "source", "receivedAt", "issuedAt", "verificationStatus", "expiresAt", "firstName", "lastName", "reviewerNotes"],
+        "required": ["reference", "evidenceType", "documentReference", "documentNumber", "source", "receivedAt", "issuedAt", "verificationStatus", "expiresAt", "firstName", "lastName", "reviewerNotes"],
         "additionalProperties": false,
         "properties": {
           "reference": {"type": "string"},
           "evidenceType": {"type": "string"},
           "documentReference": {"type": "string"},
-          "documentId": {"type": "string", "nullable": true},
+          "documentNumber": {"type": "string", "nullable": true},
           "source": {"type": "string"},
           "receivedAt": {"type": "string", "format": "date"},
           "issuedAt": {"type": "string", "format": "date", "nullable": true},

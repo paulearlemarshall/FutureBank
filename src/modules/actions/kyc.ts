@@ -86,7 +86,7 @@ export async function updateCddProfileAction(caseReference: string, _previous: A
 }
 
 const evidenceMetadataSchema = z.object({
-  evidenceType: z.string().min(2), documentReference: z.string().min(3), documentId: z.string().min(1).nullable(), source: z.string().min(3),
+  evidenceType: z.string().min(2), documentReference: z.string().min(3), documentNumber: z.string().min(1).nullable(), source: z.string().min(3),
   receivedAt: z.string().date(), issuedAt: z.string().date().nullable(), expiresAt: z.string().date().nullable(), firstName: z.string().min(1).nullable(), lastName: z.string().min(1).nullable(), reviewerNotes: z.string().nullable(),
 }).superRefine((value, context) => {
   if ((value.firstName === null) !== (value.lastName === null)) context.addIssue({ code: "custom", path: [value.firstName === null ? "firstName" : "lastName"], message: "First name and last name must be supplied together." });
@@ -94,7 +94,7 @@ const evidenceMetadataSchema = z.object({
 });
 
 function evidenceMetadataForm(formData: FormData) {
-  return { evidenceType: formText(formData, "evidenceType"), documentReference: formText(formData, "documentReference"), documentId: optionalFormText(formData, "documentId"), source: formText(formData, "source"), receivedAt: formText(formData, "receivedAt"), issuedAt: optionalFormText(formData, "issuedAt"), expiresAt: optionalFormText(formData, "expiresAt"), firstName: optionalFormText(formData, "firstName"), lastName: optionalFormText(formData, "lastName"), reviewerNotes: optionalFormText(formData, "reviewerNotes") };
+  return { evidenceType: formText(formData, "evidenceType"), documentReference: formText(formData, "documentReference"), documentNumber: optionalFormText(formData, "documentNumber"), source: formText(formData, "source"), receivedAt: formText(formData, "receivedAt"), issuedAt: optionalFormText(formData, "issuedAt"), expiresAt: optionalFormText(formData, "expiresAt"), firstName: optionalFormText(formData, "firstName"), lastName: optionalFormText(formData, "lastName"), reviewerNotes: optionalFormText(formData, "reviewerNotes") };
 }
 
 export async function recordKycEvidenceAction(caseReference: string, _previous: ActionState, formData: FormData): Promise<ActionState> {
@@ -122,7 +122,7 @@ export async function updateKycEvidenceAction(caseReference: string, evidenceRef
     if (!row) throw new BankingError("EVIDENCE_NOT_FOUND", "Evidence was not found in this case.");
     if (row.kycCase.locked) throw new BankingError("KYC_CASE_LOCKED", "This KYC case is locked and cannot be changed.");
     await db.update(kycEvidence).set({ ...parsed.data, updatedAt: new Date() }).where(eq(kycEvidence.id, row.evidence.id));
-    await db.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "KYC_EVIDENCE_UPDATED", entityType: "KYC_EVIDENCE", entityReference: evidenceReference, correlationId: crypto.randomUUID(), before: { evidenceType: row.evidence.evidenceType, documentReference: row.evidence.documentReference, documentId: row.evidence.documentId, issuedAt: row.evidence.issuedAt, expiresAt: row.evidence.expiresAt, firstName: row.evidence.firstName, lastName: row.evidence.lastName }, after: parsed.data });
+    await db.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "KYC_EVIDENCE_UPDATED", entityType: "KYC_EVIDENCE", entityReference: evidenceReference, correlationId: crypto.randomUUID(), before: { evidenceType: row.evidence.evidenceType, documentReference: row.evidence.documentReference, documentNumber: row.evidence.documentNumber, issuedAt: row.evidence.issuedAt, expiresAt: row.evidence.expiresAt, firstName: row.evidence.firstName, lastName: row.evidence.lastName }, after: parsed.data });
     revalidatePath(`/kyc/${caseReference}`);
     return { ok: true, code: "EVIDENCE_UPDATED", message: `Evidence ${evidenceReference} was updated.` };
   } catch (error) { return failedAction(error); }

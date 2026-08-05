@@ -123,7 +123,7 @@ export async function getCustomer(customerNumber: string): Promise<CustomerDetai
     kycReviewDate: customer.kycReviewDate,
     addresses: addressRows.map((item) => ({ id: item.id, type: item.type, line1: item.line1, line2: item.line2, city: item.city, region: item.region, postalCode: item.postalCode, country: item.country })),
     contacts: contactRows.map((item) => ({ id: item.id, type: item.type, value: item.value, preferred: item.preferred })),
-    identityDocuments: identityRows.map((item) => ({ id: item.id, type: item.type, documentNumber: item.documentNumber, issuingCountry: item.issuingCountry, issuedAt: item.issuedAt, expiresAt: item.expiresAt, verificationStatus: item.verificationStatus, verificationMethod: item.verificationMethod, expiryAlertAt: item.expiryAlertAt })),
+    identityDocuments: identityRows.map((item) => ({ id: item.id, type: item.type, documentReference: item.documentReference, documentNumber: item.documentNumber, issuingCountry: item.issuingCountry, issuedAt: item.issuedAt, expiresAt: item.expiresAt, verificationStatus: item.verificationStatus, verificationMethod: item.verificationMethod, expiryAlertAt: item.expiryAlertAt })),
     documents: (["PASSPORT", "NATIONAL_ID"] as const).map((slot) => {
       const item = documentBySlot.get(slot);
       return item ? { slot, filename: item.filename, mimeType: item.mimeType, sizeBytes: item.sizeBytes, uploadedBy: item.uploadedBy, uploadedAt: iso(item.uploadedAt) } : { slot, empty: true as const };

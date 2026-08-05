@@ -3308,10 +3308,10 @@
                     "type": "string",
                     "description": "Fictional document reference."
                   },
-                  "documentId": {
+                  "documentNumber": {
                     "type": "string",
                     "nullable": true,
-                    "description": "Document identifier when applicable."
+                    "description": "Passport or national identity number when applicable."
                   },
                   "source": {
                     "type": "string",
@@ -3413,7 +3413,7 @@
                   "documentReference": {
                     "type": "string"
                   },
-                  "documentId": {
+                  "documentNumber": {
                     "type": "string",
                     "nullable": true
                   },
@@ -5693,6 +5693,7 @@
         "required": [
           "id",
           "type",
+          "documentReference",
           "documentNumber",
           "issuingCountry",
           "issuedAt",
@@ -5708,6 +5709,10 @@
           "type": {
             "type": "string",
             "description": "Document type."
+          },
+          "documentReference": {
+            "type": "string",
+            "description": "Stable identity-document reference."
           },
           "documentNumber": {
             "type": "string",
@@ -6905,7 +6910,7 @@
           "reference",
           "evidenceType",
           "documentReference",
-          "documentId",
+          "documentNumber",
           "source",
           "receivedAt",
           "issuedAt",
@@ -6926,7 +6931,7 @@
           "documentReference": {
             "type": "string"
           },
-          "documentId": {
+          "documentNumber": {
             "type": "string",
             "nullable": true
           },

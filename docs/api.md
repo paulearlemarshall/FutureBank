@@ -199,7 +199,7 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/general-ledger/journals
 - `GET /kyc-cases` includes `locked`, `lockReason`, `lockedAt` and `version` on every register row.
 - `POST /kyc-cases/{caseReference}/lock` accepts `{ "locked": true|false, "reason": "...", "expectedVersion": 1 }`. All authenticated staff personas may toggle the lock; the operation is audited and version-checked.
 - A locked case remains readable but rejects CDD, evidence, screening, submission and decision mutations until unlocked.
-- `POST /kyc-cases/{caseReference}/evidence` records evidence metadata including `documentId`, `issuedAt`, `expiresAt`, `firstName` and `lastName`; `GET /kyc-cases/{caseReference}` returns those fields.
+- `POST /kyc-cases/{caseReference}/evidence` records evidence metadata including `documentReference`, `documentNumber`, `issuedAt`, `expiresAt`, `firstName` and `lastName`; `GET /kyc-cases/{caseReference}` returns those fields. Customer identity documents use the same `documentReference`/`documentNumber` pairing.
 - `PATCH /kyc-cases/{caseReference}/evidence/{evidenceReference}` corrects evidence metadata without changing verification status or uploading document bytes.
 
 - `GET /loans` and `GET /loans/{applicationReference}` expose applications, independent-work state and any booked repayment schedule.

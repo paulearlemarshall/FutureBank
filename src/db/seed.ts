@@ -164,7 +164,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
         ];
     return documents.map((document, documentIndex) => ({
       id: stableUuid(`identity-${customer.customerNumber}-${document.type}`), customerId: customerId(customer.customerNumber),
-      type: document.type, documentNumber: document.number, issuingCountry: document.country, issuedAt: "issuedAt" in document ? document.issuedAt : `2021-0${index + 1}-15`,
+      type: document.type, documentReference: `IDN-${customer.customerNumber}-${document.type}`, documentNumber: document.number, issuingCountry: document.country, issuedAt: "issuedAt" in document ? document.issuedAt : `2021-0${index + 1}-15`,
       expiresAt: "expiresAt" in document ? document.expiresAt : customer.customerNumber === "C000009" ? timeline.date(-30) : customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? timeline.date(20) : timeline.date(1825 + index),
       verificationStatus: customer.customerNumber === "C000006" ? "NOT_VERIFIED" as const : customer.customerNumber === "C000007" && document.type === "EMIRATES_ID" ? "PENDING" as const : customer.customerNumber === "C000009" ? "EXPIRED" as const : "VERIFIED" as const,
       verificationMethod: customer.customerNumber === "C000006" ? null : "Fictional document inspection",
@@ -230,7 +230,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     return types.map((evidenceType, index) => ({
       id: stableUuid(`evidence-${item.customerNumber}-${evidenceType}`), reference: `EVD-${item.customerNumber.slice(-3)}-${index + 1}`,
       kycCaseId: kycCaseId(item.customerNumber), evidenceType, documentReference: item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? "PASSPORT-123456789" : `FICT-${item.customerNumber}-${evidenceType}`,
-      ...(item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? { documentId: "123456789", issuedAt: "2025-01-01", firstName: "Amelia", lastName: "Hart" } : {}),
+      ...(item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? { documentNumber: "123456789", issuedAt: "2025-01-01", firstName: "Amelia", lastName: "Hart" } : {}),
       source: "Customer supplied fictional metadata", receivedAt: item.customerNumber === "C000009" ? "2024-06-10" : timeline.date(-10),
       verificationStatus: item.customerNumber === "C000009" ? "EXPIRED" as const : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "PENDING" as const : "VERIFIED" as const,
       verifiedBy: ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? null : staffId("operator"),
