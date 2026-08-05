@@ -101,7 +101,7 @@ export async function createCustomerAction(_previous: ActionState, formData: For
       ]);
       if (value.identityDocumentNumber && value.identityDocumentType && value.identityIssuingCountry && value.identityIssuedAt && value.identityExpiresAt) {
         await tx.insert(identityDocuments).values({
-          customerId: created.id, type: value.identityDocumentType, documentNumber: value.identityDocumentNumber,
+          customerId: created.id, type: value.identityDocumentType, documentReference: `IDN-${next}-${value.identityDocumentType}`, documentNumber: value.identityDocumentNumber,
           issuingCountry: value.identityIssuingCountry, issuedAt: value.identityIssuedAt, expiresAt: value.identityExpiresAt,
           verificationStatus: "NOT_VERIFIED", verificationMethod: "Awaiting KYC verification",
         });

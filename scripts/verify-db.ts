@@ -37,7 +37,7 @@ async function main() {
   expectEqual("Latin transliteration customer search", await scalar(sql`
     select count(*)::int as value from customers where short_name ilike '%Omar Al Mansoori%' or short_name ilike '%Crescent Digital%'
   `), 2);
-  expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 13);
+  expectEqual("identity documents", await scalar(sql`select count(*)::int as value from identity_documents`), 14);
   expectEqual("customer document files", await scalar(sql`select count(*)::int as value from customer_document_files`), 2);
   expectEqual("seeded Amelia document slots", await scalar(sql`
     select count(*)::int as value from customer_document_files d join customers c on c.id = d.customer_id

@@ -118,6 +118,7 @@ export type ContactView = {
 export type IdentityDocumentView = {
   id: string;
   type: string;
+  documentReference: string;
   documentNumber: string;
   issuingCountry: string;
   issuedAt: string;
@@ -278,7 +279,7 @@ export type KycEvidence = {
   reference: string;
   evidenceType: string;
   documentReference: string;
-  documentId: string | null;
+  documentNumber: string | null;
   source: string;
   receivedAt: string;
   issuedAt: string | null;

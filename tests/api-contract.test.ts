@@ -39,7 +39,9 @@ describe("FutureBank API contract", () => {
     expect(specification.paths["/loans/{applicationReference}/decision"].post).toBeDefined();
     expect(specification.paths["/kyc-cases/{caseReference}/decision"].post).toBeDefined();
     expect(specification.paths["/kyc-cases/{caseReference}/evidence/{evidenceReference}"].patch).toBeDefined();
-    expect(specification.components.schemas.KycEvidence.properties.documentId).toBeDefined();
+    expect(specification.components.schemas.KycEvidence.properties.documentNumber).toBeDefined();
+    expect(specification.components.schemas.IdentityDocument.properties.documentReference).toBeDefined();
+    expect(specification.components.schemas.IdentityDocument.properties.documentNumber).toBeDefined();
     expect(specification.components.schemas.KycEvidence.properties.issuedAt).toBeDefined();
     expect(specification.components.schemas.KycEvidence.properties.firstName).toBeDefined();
     expect(specification.components.schemas.KycEvidence.properties.lastName).toBeDefined();
