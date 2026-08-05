@@ -151,7 +151,12 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: stableUuid(`contact-phone-${customer.customerNumber}`), customerId: customerId(customer.customerNumber), type: "MOBILE", value: customer.residenceCountry === "AE" ? `+9715000000${index}` : `+4477009000${index}`, preferred: false },
   ]));
   await tx.insert(tables.identityDocuments).values(baselineCustomers.flatMap((customer, index) => {
-    const documents = customer.partyType === "SME"
+    const documents = customer.customerNumber === "C000001"
+      ? [
+          { type: "PASSPORT", number: "123456789", country: "GB", issuedAt: "2025-01-01", expiresAt: "2035-01-01" },
+          { type: "EMIRATES_ID", number: "784-1987-1234567-1", country: "AE", issuedAt: "1987-04-16", expiresAt: "2035-01-01" },
+        ]
+      : customer.partyType === "SME"
       ? [{ type: customer.residenceCountry === "AE" ? "TRADE_LICENSE" : "COMPANY_REGISTRATION", number: customer.registrationNumber!, country: customer.residenceCountry }]
       : [
           { type: "PASSPORT", number: `FICT-P-${customer.customerNumber.slice(1)}`, country: customer.nationality },
@@ -159,13 +164,13 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
         ];
     return documents.map((document, documentIndex) => ({
       id: stableUuid(`identity-${customer.customerNumber}-${document.type}`), customerId: customerId(customer.customerNumber),
-      type: document.type, documentNumber: document.number, issuingCountry: document.country, issuedAt: `2021-0${index + 1}-15`,
-      expiresAt: customer.customerNumber === "C000009" ? timeline.date(-30) : customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? timeline.date(20) : timeline.date(1825 + index),
+      type: document.type, documentNumber: document.number, issuingCountry: document.country, issuedAt: "issuedAt" in document ? document.issuedAt : `2021-0${index + 1}-15`,
+      expiresAt: "expiresAt" in document ? document.expiresAt : customer.customerNumber === "C000009" ? timeline.date(-30) : customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? timeline.date(20) : timeline.date(1825 + index),
       verificationStatus: customer.customerNumber === "C000006" ? "NOT_VERIFIED" as const : customer.customerNumber === "C000007" && document.type === "EMIRATES_ID" ? "PENDING" as const : customer.customerNumber === "C000009" ? "EXPIRED" as const : "VERIFIED" as const,
       verificationMethod: customer.customerNumber === "C000006" ? null : "Fictional document inspection",
       verifiedBy: ["C000006", "C000007"].includes(customer.customerNumber) && document.type === "EMIRATES_ID" ? null : customer.customerNumber === "C000006" ? null : staffId("operator"),
       verifiedAt: ["C000006", "C000007"].includes(customer.customerNumber) && document.type === "EMIRATES_ID" ? null : customer.customerNumber === "C000006" ? null : new Date("2026-07-10T09:00:00.000Z"),
-      expiryAlertAt: customer.customerNumber === "C000009" ? timeline.date(-60) : customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? timeline.date(0) : timeline.date(1460 + index + documentIndex),
+      expiryAlertAt: customer.customerNumber === "C000009" ? timeline.date(-60) : customer.customerNumber === "C000003" && document.type === "EMIRATES_ID" ? timeline.date(0) : customer.customerNumber === "C000001" ? "2034-07-01" : timeline.date(1460 + index + documentIndex),
     }));
   }));
   await tx.insert(tables.customerRelationships).values([
@@ -224,12 +229,13 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     const types = ["C000003", "C000007", "C000009"].includes(item.customerNumber) ? ["EMIRATES_ID", "PASSPORT", "RESIDENCY"] : customer.partyType === "SME" ? ["INCORPORATION", "OWNERSHIP", "CONTROLLERS", "BENEFICIAL_OWNERS"] : ["IDENTITY", "ADDRESS"];
     return types.map((evidenceType, index) => ({
       id: stableUuid(`evidence-${item.customerNumber}-${evidenceType}`), reference: `EVD-${item.customerNumber.slice(-3)}-${index + 1}`,
-      kycCaseId: kycCaseId(item.customerNumber), evidenceType, documentReference: `FICT-${item.customerNumber}-${evidenceType}`,
+      kycCaseId: kycCaseId(item.customerNumber), evidenceType, documentReference: item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? "PASSPORT-123456789" : `FICT-${item.customerNumber}-${evidenceType}`,
+      ...(item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? { documentId: "123456789", issuedAt: "2025-01-01", firstName: "Amelia", lastName: "Hart" } : {}),
       source: "Customer supplied fictional metadata", receivedAt: item.customerNumber === "C000009" ? "2024-06-10" : timeline.date(-10),
       verificationStatus: item.customerNumber === "C000009" ? "EXPIRED" as const : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "PENDING" as const : "VERIFIED" as const,
       verifiedBy: ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? null : staffId("operator"),
       verifiedAt: ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? null : item.customerNumber === "C000009" ? new Date("2024-06-11T10:00:00.000Z") : timeline.instant(-9, 10),
-      expiresAt: item.customerNumber === "C000009" ? timeline.date(-30) : item.customerNumber === "C000003" && evidenceType === "EMIRATES_ID" ? timeline.date(20) : timeline.date(730),
+      expiresAt: item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? "2035-01-01" : item.customerNumber === "C000009" ? timeline.date(-30) : item.customerNumber === "C000003" && evidenceType === "EMIRATES_ID" ? timeline.date(20) : timeline.date(730),
       reviewerNotes: item.customerNumber === "C000009" ? "Evidence expired; relationship inactive and debits blocked." : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "Updated residency evidence requested." : "Fictional evidence verified for demonstration.",
     }));
   });
