@@ -220,10 +220,10 @@ Customer names, short names, addresses and descriptive fields accept Unicode, in
 
 ## Customer document examples
 
-The document collection is the canonical API. Each file has a `documentReference` and `documentType`; the former is shared with identity metadata. The older `PASSPORT` and `NATIONAL_ID` slot routes remain compatibility aliases.
+The document collection is the canonical API. Each file has a `documentReference` and `documentType`; the former is shared with identity metadata. Passport and National ID are seeded document types, not API route slots.
 
 ```bash
-# List Passport and National ID slots
+# List all customer documents
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 
@@ -234,25 +234,20 @@ curl -X POST "https://future-bank-demo.vercel.app/api/v1/customers/C000001/docum
   -F "documentType=VISA" \
   -F "file=@visa.pdf;type=application/pdf"
 
-# Read safe metadata for one slot (never returns a private Blob URL)
-curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/NATIONAL_ID" \
+# Read safe metadata by document reference (never returns a private Blob URL)
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-NATIONAL_ID" \
   -H "Authorization: Bearer $FUTUREBANK_ACTOR_API_KEY"
 
-# Upload or replace the Passport slot (maximum 4 MB)
-curl -X PUT "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
-  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" \
-  -F "file=@Passport-AmeliaHart.jpg;type=image/jpeg"
-
 # Stream the authenticated file bytes
-curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT/content" \
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" --output passport.jpg
 
-# Delete a slot (idempotent; reset restores Amelia Hart's seeded originals)
-curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/PASSPORT" \
+# Delete by document reference (idempotent; reset restores Amelia Hart's seeded originals)
+curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 ```
 
-`PUT` accepts one `multipart/form-data` field named `file` and returns `201` for an empty slot or `200` when replacing a file. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. All other document operations use the standard JSON envelope.
+`POST` accepts `documentReference`, `documentType` and one `multipart/form-data` field named `file`, returning `201` for a new reference or `200` when replacing it. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../{documentReference}/content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. All other document operations use the standard JSON envelope.
 
 ## OpenAPI
 

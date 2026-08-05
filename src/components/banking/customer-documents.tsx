@@ -12,12 +12,12 @@ function slug(slot: DocumentSlot) { return slot === "PASSPORT" ? "passport" : "n
 function label(slot: DocumentSlot) { return slot === "PASSPORT" ? "Passport" : "National ID"; }
 function displaySize(bytes: number) { return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`; }
 
-async function waitForDocumentMetadata(customerNumber: string, slot: DocumentSlot, previousUploadedAt: string | null): Promise<Exclude<CustomerDocumentSlot, { empty: true }>> {
-  const metadataUrl = `/customers/${customerNumber}/documents/${slot}/metadata`;
+async function waitForDocumentMetadata(customerNumber: string, documentReference: string, previousUploadedAt: string | null): Promise<CustomerDocument> {
+  const metadataUrl = `/customers/${customerNumber}/documents/${encodeURIComponent(documentReference)}/metadata`;
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const response = await fetch(metadataUrl, { cache: "no-store" });
     if (response.ok) {
-      const payload = await response.json() as { data: Exclude<CustomerDocumentSlot, { empty: true }> };
+      const payload = await response.json() as { data: CustomerDocument };
       if (!previousUploadedAt || payload.data.uploadedAt !== previousUploadedAt) return payload.data;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -27,11 +27,16 @@ async function waitForDocumentMetadata(customerNumber: string, slot: DocumentSlo
 
 function DocumentCard({ customerNumber, document, uploadPrefix, canEdit }: { customerNumber: string; document: CustomerDocumentSlot; uploadPrefix: string; canEdit: boolean }) {
   const router = useRouter();
-  const slotSlug = slug(document.slot);
+  const isEmpty = "empty" in document;
+  const reference = isEmpty ? `IDN-${customerNumber}-${document.slot}` : document.documentReference;
+  const documentType = isEmpty ? document.slot : document.documentType;
+  const referenceSlug = reference.toLowerCase();
+  const selectorSlug = isEmpty || document.slot ? slug(document.slot) : referenceSlug;
+  const pathReference = reference.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "default";
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
-  const [deleteState, deleteFormAction, deleting] = useActionState(deleteCustomerDocumentAction.bind(null, customerNumber, document.slot), initialActionState);
-  const contentUrl = `/customers/${customerNumber}/documents/${document.slot}`;
+  const [deleteState, deleteFormAction, deleting] = useActionState(deleteCustomerDocumentAction.bind(null, customerNumber, reference), initialActionState);
+  const contentUrl = `/customers/${customerNumber}/documents/${encodeURIComponent(reference)}`;
 
   async function submitUpload(formData: FormData) {
     const file = formData.get("file");
@@ -41,31 +46,31 @@ function DocumentCard({ customerNumber, document, uploadPrefix, canEdit }: { cus
     if (file.size > MAX_DOCUMENT_BYTES) { setUploadMessage("Document files must not exceed 4 MB."); return; }
     setUploading(true); setUploadMessage("Uploading document…");
     try {
-      const previousUploadedAt = "empty" in document ? null : document.uploadedAt;
-      const pathname = `${uploadPrefix}/uploads/${customerNumber}/${document.slot}/${crypto.randomUUID()}-${filename}`;
-      await upload(pathname, file, { access: "private", handleUploadUrl: "/api/customer-document-upload", clientPayload: JSON.stringify({ customerNumber, slot: document.slot, filename }) });
+      const previousUploadedAt = isEmpty ? null : document.uploadedAt;
+      const pathname = `${uploadPrefix}/uploads/${customerNumber}/${pathReference}/${crypto.randomUUID()}-${filename}`;
+      await upload(pathname, file, { access: "private", handleUploadUrl: "/api/customer-document-upload", clientPayload: JSON.stringify({ customerNumber, documentReference: reference, documentType, filename }) });
       setUploadMessage("Finalizing document…");
-      await waitForDocumentMetadata(customerNumber, document.slot, previousUploadedAt);
+      await waitForDocumentMetadata(customerNumber, reference, previousUploadedAt);
       setUploadMessage("Document uploaded.");
       router.refresh();
     } catch { setUploadMessage("The document upload could not be completed."); }
     finally { setUploading(false); }
   }
 
-  return <section className="document-card" data-bp={`document-slot-${slotSlug}`}>
+  return <section className="document-card" data-bp={`document-slot-${selectorSlug}`}>
     <h3>{label(document.slot)}</h3>
     {"empty" in document ? <div className="document-empty">No file uploaded</div> : <>
       {document.mimeType.startsWith("image/") ? <Image className="document-preview" src={`${contentUrl}?v=${encodeURIComponent(document.uploadedAt)}`} alt={`${label(document.slot)} preview`} width={640} height={420} loading="eager" unoptimized /> : <div className="document-pdf">PDF document</div>}
       <dl className="definition-grid"><div><dt>Type</dt><dd>{document.documentType}</dd></div><div><dt>Document reference</dt><dd className="mono">{document.documentReference}</dd></div><div><dt>Filename</dt><dd>{document.filename}</dd></div><div><dt>Size</dt><dd>{displaySize(document.sizeBytes)}</dd></div><div><dt>Uploaded by</dt><dd>{document.uploadedBy}</dd></div><div><dt>Uploaded</dt><dd>{new Date(document.uploadedAt).toLocaleString("en-GB")}</dd></div></dl>
-      <a className="secondary-button" href={contentUrl} target="_blank" rel="noreferrer" data-bp={`document-view-${slotSlug}`}>View</a>
-      {canEdit ? <form action={deleteFormAction} className="document-delete-form" onSubmit={() => setUploadMessage("")}><label htmlFor={`document-delete-confirm-${slotSlug}`}><input id={`document-delete-confirm-${slotSlug}`} name="confirmDelete" type="checkbox" value="yes" data-bp={`document-delete-confirm-${slotSlug}`} required /> Confirm delete</label><button id={`document-delete-${slotSlug}`} name={`delete-${slotSlug}`} type="submit" className="danger-button" data-bp={`document-delete-${slotSlug}`} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button></form> : null}
+      <a className="secondary-button" href={contentUrl} target="_blank" rel="noreferrer" data-bp={`document-view-${selectorSlug}`}>View</a>
+      {canEdit ? <form action={deleteFormAction} className="document-delete-form" onSubmit={() => setUploadMessage("")}><label htmlFor={`document-delete-confirm-${selectorSlug}`}><input id={`document-delete-confirm-${selectorSlug}`} name="confirmDelete" type="checkbox" value="yes" data-bp={`document-delete-confirm-${selectorSlug}`} required /> Confirm delete</label><button id={`document-delete-${selectorSlug}`} name={`delete-${selectorSlug}`} type="submit" className="danger-button" data-bp={`document-delete-${selectorSlug}`} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button></form> : null}
     </>}
     {canEdit ? <form action={submitUpload} className="document-upload-form">
-      <label htmlFor={`document-file-${slotSlug}`}>{"empty" in document ? "Upload file" : "Replace file"}</label>
-      <input id={`document-file-${slotSlug}`} name="file" type="file" accept="image/jpeg,image/png,application/pdf" data-bp={`document-file-${slotSlug}`} required />
-      <button id={`document-upload-${slotSlug}`} name={`upload-${slotSlug}`} type="submit" className="primary-button" data-bp={`document-upload-${slotSlug}`} disabled={uploading}>{uploading ? "Uploading…" : "Upload"}</button>
+      <label htmlFor={`document-file-${selectorSlug}`}>{isEmpty ? "Upload file" : "Replace file"}</label>
+      <input id={`document-file-${selectorSlug}`} name="file" type="file" accept="image/jpeg,image/png,application/pdf" data-bp={`document-file-${selectorSlug}`} required />
+      <button id={`document-upload-${selectorSlug}`} name={`upload-${selectorSlug}`} type="submit" className="primary-button" data-bp={`document-upload-${selectorSlug}`} disabled={uploading}>{uploading ? "Uploading…" : "Upload"}</button>
     </form> : null}
-    <div id={`document-status-${slotSlug}`} className="form-status" role="status" aria-live="polite" data-bp={`status-document-${slotSlug}`}>{uploadMessage || deleteState.message}</div>
+    <div id={`document-status-${selectorSlug}`} className="form-status" role="status" aria-live="polite" data-bp={`status-document-${selectorSlug}`}>{uploadMessage || deleteState.message}</div>
   </section>;
 }
 

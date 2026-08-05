@@ -3,7 +3,7 @@
   "info": {
     "title": "FutureBank Demo API",
     "version": "1.12.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, the scalable customer document collection, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -376,7 +376,7 @@
           }
         },
         "operationId": "getCustomer",
-        "description": "Returns the complete CRM customer record, accounts, identity metadata, relationships and two document slots."
+        "description": "Returns the complete CRM customer record, accounts, identity metadata, relationships and customer document collection."
       },
       "patch": {
         "tags": [
@@ -4427,7 +4427,7 @@
           }
         },
         "operationId": "listCustomerDocuments",
-        "description": "Returns all customer document files with safe metadata. Private Blob locations are excluded."
+        "description": "Returns all customer document files with safe metadata. Use documentReference to retrieve, stream or delete a file."
       },
       "post": {
         "tags": [
@@ -4490,18 +4490,18 @@
         "operationId": "addCustomerDocument"
       }
     },
-    "/customers/{customerNumber}/documents/{slot}": {
+    "/customers/{customerNumber}/documents/{documentReference}": {
       "get": {
         "tags": [
           "Documents"
         ],
-        "summary": "Get document-slot metadata",
+        "summary": "Get document-document reference metadata",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
           },
           {
-            "$ref": "#/components/parameters/DocumentSlot"
+            "$ref": "#/components/parameters/DocumentReference"
           }
         ],
         "responses": {
@@ -4542,117 +4542,20 @@
           }
         },
         "operationId": "getCustomerDocumentMetadata",
-        "description": "Returns safe metadata for one Passport or National ID slot. File bytes are available from the /content operation."
-      },
-      "put": {
-        "tags": [
-          "Documents"
-        ],
-        "summary": "Upload or replace a customer document",
-        "description": "Uploads or replaces one private Passport or National ID file. Requires KYC_GATHER; accepts JPEG, PNG or PDF up to exactly 4 MiB after MIME and file-signature validation.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/CustomerNumber"
-          },
-          {
-            "$ref": "#/components/parameters/DocumentSlot"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "file"
-                ],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "Non-empty JPEG, PNG or PDF whose declared MIME type matches its file signature; maximum 4,194,304 bytes."
-                  }
-                }
-              }
-            }
-          },
-          "description": "A single multipart part named file. The route rejects other Content-Types with 415."
-        },
-        "responses": {
-          "200": {
-            "description": "Existing slot replaced",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "Successful response envelope.",
-                  "required": [
-                    "data"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/DocumentMeta"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "New slot created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "Successful response envelope.",
-                  "required": [
-                    "data"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/DocumentMeta"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "415": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "operationId": "putCustomerDocument"
+        "description": "Returns safe metadata for one any customer document document reference. File bytes are available from the /content operation."
       },
       "delete": {
         "tags": [
           "Documents"
         ],
         "summary": "Delete a customer document",
-        "description": "Idempotently deletes one customer file slot. Requires KYC_GATHER and never changes identity-document metadata.",
+        "description": "Idempotently deletes one customer file document reference. Requires KYC_GATHER and never changes identity-document metadata.",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
           },
           {
-            "$ref": "#/components/parameters/DocumentSlot"
+            "$ref": "#/components/parameters/DocumentReference"
           }
         ],
         "responses": {
@@ -4695,19 +4598,19 @@
         "operationId": "deleteCustomerDocument"
       }
     },
-    "/customers/{customerNumber}/documents/{slot}/content": {
+    "/customers/{customerNumber}/documents/{documentReference}/content": {
       "get": {
         "tags": [
           "Documents"
         ],
         "summary": "Stream private document content",
-        "description": "Streams authenticated private Passport or National ID bytes. This operation is not JSON-wrapped and is never cacheable.",
+        "description": "Streams authenticated private any customer document bytes. This operation is not JSON-wrapped and is never cacheable.",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
           },
           {
-            "$ref": "#/components/parameters/DocumentSlot"
+            "$ref": "#/components/parameters/DocumentReference"
           }
         ],
         "responses": {
@@ -4975,6 +4878,15 @@
         "required": true,
         "schema": {
           "$ref": "#/components/schemas/DocumentSlot"
+        }
+      },
+      "DocumentReference": {
+        "name": "documentReference",
+        "in": "path",
+        "required": true,
+        "description": "Stable customer document reference.",
+        "schema": {
+          "type": "string"
         }
       }
     },
@@ -5666,17 +5578,6 @@
           }
         },
         "description": "EmptyDocumentSlot API data contract."
-      },
-      "CustomerDocumentSlot": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/DocumentMeta"
-          },
-          {
-            "$ref": "#/components/schemas/EmptyDocumentSlot"
-          }
-        ],
-        "description": "CustomerDocumentSlot API data contract."
       },
       "Address": {
         "type": "object",

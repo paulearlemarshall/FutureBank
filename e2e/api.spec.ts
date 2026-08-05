@@ -49,9 +49,9 @@ test("serves the OpenAPI 3 artifact without authentication", async ({ request })
   expect(document.paths["/loans"].post).toBeDefined();
   expect(document.paths["/loans/{applicationReference}"].get).toBeDefined();
   expect(document.paths["/loans/{applicationReference}/decision"].post).toBeDefined();
-  expect(document.paths["/customers/{customerNumber}/documents/{slot}"].put).toBeDefined();
-  expect(document.paths["/customers/{customerNumber}/documents/{slot}"].delete).toBeDefined();
-  expect(document.paths["/customers/{customerNumber}/documents/{slot}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
+  expect(document.paths["/customers/{customerNumber}/documents"].post).toBeDefined();
+  expect(document.paths["/customers/{customerNumber}/documents/{documentReference}"].delete).toBeDefined();
+  expect(document.paths["/customers/{customerNumber}/documents/{documentReference}/content"].get.responses["200"].content["image/jpeg"].schema.format).toBe("binary");
 });
 
 test("reads Amelia Hart's seeded private document metadata and content", async ({ request }) => {
@@ -63,7 +63,7 @@ test("reads Amelia Hart's seeded private document metadata and content", async (
     expect.objectContaining({ slot: "PASSPORT", filename: "Passport-AmeliaHart.jpg", sizeBytes: 58533 }),
     expect.objectContaining({ slot: "NATIONAL_ID", filename: "EmiratesID-AmeliaHart.jpg", sizeBytes: 85430 }),
   ]));
-  const content = await request.get("/api/v1/customers/C000001/documents/PASSPORT/content", { headers });
+  const content = await request.get("/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content", { headers });
   expect(content.ok()).toBe(true);
   expect(content.headers()["content-type"]).toContain("image/jpeg");
   expect(content.headers()["content-length"]).toBe("58533");
@@ -74,22 +74,22 @@ test("reads Amelia Hart's seeded private document metadata and content", async (
 
 test("requires multipart form data for customer document uploads", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
-  const response = await request.put("/api/v1/customers/C000006/documents/PASSPORT", {
+  const response = await request.post("/api/v1/customers/C000006/documents", {
     headers: { "X-API-Key": apiKey!, "Content-Type": "application/json" },
     data: { file: "not-binary" },
   });
   expect(response.status()).toBe(415);
   expect(await response.json()).toEqual({
-    error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Customer document uploads require multipart/form-data with a file field." },
+    error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Customer document uploads require multipart/form-data." },
   });
 });
 
 test("enforces document write permissions without mutating data", async ({ request }) => {
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
   const supervisorKey = await issueActorKey(request, "supervisor");
-  const response = await request.put("/api/v1/customers/C000001/documents/PASSPORT", {
+  const response = await request.post("/api/v1/customers/C000001/documents", {
     headers: { "X-API-Key": supervisorKey },
-    multipart: { file: { name: "tiny.jpg", mimeType: "image/jpeg", buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]) } },
+    multipart: { documentReference: "IDN-C000001-TEST", documentType: "TEST", file: { name: "tiny.jpg", mimeType: "image/jpeg", buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]) } },
   });
   expect(response.status()).toBe(403);
 });
@@ -98,19 +98,19 @@ test("uploads, reads and deletes a customer document through the REST API", asyn
   expect(apiKey, "FUTUREBANK_API_KEY must be configured for API tests").toBeTruthy();
   const headers = { "X-API-Key": apiKey! };
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x11, 0x22]);
-  const upload = await request.put("/api/v1/customers/C000006/documents/NATIONAL_ID", {
+  const upload = await request.post("/api/v1/customers/C000006/documents", {
     headers,
-    multipart: { file: { name: "api-fixture.jpg", mimeType: "image/jpeg", buffer: jpeg } },
+    multipart: { documentReference: "API-C000006-NATIONAL-ID", documentType: "NATIONAL_ID", file: { name: "api-fixture.jpg", mimeType: "image/jpeg", buffer: jpeg } },
   });
   const uploadBody = await upload.json();
   expect(upload.status(), JSON.stringify(uploadBody)).toBe(201);
-  expect(uploadBody.data).toMatchObject({ slot: "NATIONAL_ID", filename: "api-fixture.jpg", sizeBytes: jpeg.byteLength });
+  expect(uploadBody.data).toMatchObject({ documentReference: "API-C000006-NATIONAL-ID", documentType: "NATIONAL_ID", filename: "api-fixture.jpg", sizeBytes: jpeg.byteLength });
 
-  const content = await request.get("/api/v1/customers/C000006/documents/NATIONAL_ID/content", { headers });
+  const content = await request.get("/api/v1/customers/C000006/documents/API-C000006-NATIONAL-ID/content", { headers });
   expect(content.ok()).toBe(true);
   expect(await content.body()).toEqual(jpeg);
 
-  const deleted = await request.delete("/api/v1/customers/C000006/documents/NATIONAL_ID", { headers });
+  const deleted = await request.delete("/api/v1/customers/C000006/documents/API-C000006-NATIONAL-ID", { headers });
   expect(deleted.ok()).toBe(true);
   expect((await deleted.json()).data).toEqual({ deleted: true });
 });

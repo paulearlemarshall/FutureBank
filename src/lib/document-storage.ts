@@ -2,15 +2,15 @@ import { del, get, head, list, put, type PutBlobResult } from "@vercel/blob";
 import { createHash } from "node:crypto";
 import { ALLOWED_DOCUMENT_MIME_TYPES, MAX_DOCUMENT_BYTES, type DocumentSlot } from "@/modules/domain/document-policy";
 
-function safeSegment(value: string): string {
+export function safeDocumentSegment(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "default";
 }
 
 export function documentBlobNamespace(): string {
-  if (process.env.FUTUREBANK_BLOB_NAMESPACE) return safeSegment(process.env.FUTUREBANK_BLOB_NAMESPACE);
-  if (process.env.CI && process.env.GITHUB_RUN_ID) return `ci-${safeSegment(process.env.GITHUB_RUN_ID)}-${safeSegment(process.env.GITHUB_RUN_ATTEMPT ?? "1")}`;
+  if (process.env.FUTUREBANK_BLOB_NAMESPACE) return safeDocumentSegment(process.env.FUTUREBANK_BLOB_NAMESPACE);
+  if (process.env.CI && process.env.GITHUB_RUN_ID) return `ci-${safeDocumentSegment(process.env.GITHUB_RUN_ID)}-${safeDocumentSegment(process.env.GITHUB_RUN_ATTEMPT ?? "1")}`;
   if (process.env.VERCEL_ENV === "production") return "production";
-  if (process.env.VERCEL_ENV === "preview") return `preview-${safeSegment(process.env.VERCEL_GIT_COMMIT_REF ?? "default")}`;
+  if (process.env.VERCEL_ENV === "preview") return `preview-${safeDocumentSegment(process.env.VERCEL_GIT_COMMIT_REF ?? "default")}`;
   return "development";
 }
 
@@ -23,7 +23,11 @@ export function documentUploadPath(customerNumber: string, slot: DocumentSlot, f
 }
 
 export function documentCollectionUploadPath(customerNumber: string, documentReference: string, filename: string): string {
-  return `${documentBlobPrefix()}/uploads/${customerNumber}/${safeSegment(documentReference)}/${crypto.randomUUID()}-${filename}`;
+  return `${documentBlobPrefix()}/uploads/${customerNumber}/${safeDocumentSegment(documentReference)}/${crypto.randomUUID()}-${filename}`;
+}
+
+export function documentCollectionUploadPrefix(customerNumber: string, documentReference: string): string {
+  return `${documentBlobPrefix()}/uploads/${customerNumber}/${safeDocumentSegment(documentReference)}/`;
 }
 
 export function seedDocumentPath(slot: DocumentSlot, sha256: string, filename: string): string {

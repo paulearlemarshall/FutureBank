@@ -8,7 +8,7 @@ test("shows Amelia Hart's seeded Passport and National ID", async ({ page }) => 
   await expectReady(page, "customer-detail");
   await expect(bp(page, "document-slot-passport")).toContainText("Passport-AmeliaHart.jpg");
   await expect(bp(page, "document-slot-national-id")).toContainText("EmiratesID-AmeliaHart.jpg");
-  const response = await page.request.get("/customers/C000001/documents/PASSPORT");
+  const response = await page.request.get("/customers/C000001/documents/IDN-C000001-PASSPORT");
   expect(response.ok()).toBe(true);
   expect(response.headers()["content-type"]).toContain("image/jpeg");
   expect((await response.body()).byteLength).toBe(58533);

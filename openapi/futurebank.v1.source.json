@@ -3,7 +3,7 @@
   "info": {
     "title": "FutureBank Demo API",
     "version": "1.12.0",
-    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, Passport and National ID files, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
+    "description": "OpenAPI contract for the authenticated read/write FutureBank demonstration API. It covers CRM, the scalable customer document collection, accounts, immediate and scheduled payments, payment reversals, direct debits, end-of-day charges and interest, clearing reconciliation, general-ledger projection and manual journals, maker-checker accounting-period close, loan origination, KYC, overdrafts, work queues and audit data. Each API key is owned by one active staff actor; callers cannot select or impersonate another actor. All people, documents, screening results and policies are fictional. Mutations use the same role, maker-checker, KYC, hold, ledger and audit controls as the user interface.",
     "license": {
       "name": "Demonstration use only"
     }
@@ -286,8 +286,7 @@
           "Customers"
         ],
         "summary": "Create a fully populated customer",
-        "parameters": [
-          ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -377,15 +376,14 @@
           }
         },
         "operationId": "getCustomer",
-        "description": "Returns the complete CRM customer record, accounts, identity metadata, relationships and two document slots."
+        "description": "Returns the complete CRM customer record, accounts, identity metadata, relationships and customer document collection."
       },
       "patch": {
         "tags": [
           "Customers"
         ],
         "summary": "Update a customer",
-        "parameters": [
-          ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "description": "Complete replacement values for the mutable CRM fields.",
@@ -589,8 +587,7 @@
           "Accounts"
         ],
         "summary": "Open an account",
-        "parameters": [
-          ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -758,27 +755,77 @@
     },
     "/accounts/{accountNumber}/statement": {
       "get": {
-        "tags": ["Accounts"],
+        "tags": [
+          "Accounts"
+        ],
         "summary": "Download an account statement as UTF-8 CSV",
         "parameters": [
-          {"$ref": "#/components/parameters/AccountNumber"},
-          {"name": "from", "in": "query", "description": "Inclusive statement start date. Defaults to 89 days before today.", "schema": {"type": "string", "format": "date"}},
-          {"name": "to", "in": "query", "description": "Inclusive statement end date. Defaults to today.", "schema": {"type": "string", "format": "date"}}
+          {
+            "$ref": "#/components/parameters/AccountNumber"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Inclusive statement start date. Defaults to 89 days before today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Inclusive statement end date. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "CSV statement with metadata, exact opening/closing balances and ordered ledger entries.",
             "headers": {
-              "Content-Disposition": {"description": "Download filename containing account number and period.", "schema": {"type": "string"}},
-              "Cache-Control": {"description": "Statements are never cached.", "schema": {"type": "string", "enum": ["no-store"]}}
+              "Content-Disposition": {
+                "description": "Download filename containing account number and period.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Statements are never cached.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "no-store"
+                  ]
+                }
+              }
             },
-            "content": {"text/csv": {"schema": {"type": "string", "format": "binary"}}}
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           },
-          "400": {"$ref": "#/components/responses/Error"},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "404": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "downloadAccountStatement",
         "description": "Exports at most 366 inclusive days. Values remain decimal strings, narratives are CSV/formula safe, and the route requires normal API authentication."
@@ -903,8 +950,7 @@
           "Beneficiaries"
         ],
         "summary": "Create a beneficiary",
-        "parameters": [
-          ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "description": "Creates an active external beneficiary owned by the customer.",
@@ -1239,8 +1285,7 @@
           "Payments"
         ],
         "summary": "Expire stale pending payments and release holds",
-        "parameters": [
-          ],
+        "parameters": [],
         "responses": {
           "200": {
             "$ref": "#/components/responses/ActionSuccess"
@@ -1261,64 +1306,270 @@
     },
     "/payments/{paymentReference}/reversals": {
       "post": {
-        "tags": ["Payment reversals"], "summary": "Request a full payment reversal",
-        "parameters": [{"$ref": "#/components/parameters/PaymentReference"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentReversalRequest"}}}},
-        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "requestPaymentReversal", "description": "Creates one pending full-value reversal and a supervisor work item. The original payment and posting remain immutable."
+        "tags": [
+          "Payment reversals"
+        ],
+        "summary": "Request a full payment reversal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentReference"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentReversalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "requestPaymentReversal",
+        "description": "Creates one pending full-value reversal and a supervisor work item. The original payment and posting remain immutable."
       }
     },
     "/payment-reversals": {
       "get": {
-        "tags": ["Payment reversals"], "summary": "List payment reversals",
-        "parameters": [{"name": "status", "in": "query", "schema": {"type": "string", "enum": ["PENDING_APPROVAL", "BOOKED", "REJECTED"]}}],
-        "responses": {"200": {"description": "Payment reversal register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/PaymentReversal"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listPaymentReversals", "description": "Lists reversal requests in pending, booked and rejected states."
+        "tags": [
+          "Payment reversals"
+        ],
+        "summary": "List payment reversals",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_APPROVAL",
+                "BOOKED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment reversal register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PaymentReversal"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listPaymentReversals",
+        "description": "Lists reversal requests in pending, booked and rejected states."
       }
     },
     "/payment-reversals/{reversalReference}": {
       "get": {
-        "tags": ["Payment reversals"], "summary": "Get a payment reversal",
-        "parameters": [{"$ref": "#/components/parameters/PaymentReversalReference"}],
-        "responses": {"200": {"description": "Payment reversal detail.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"$ref": "#/components/schemas/PaymentReversal"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getPaymentReversal", "description": "Returns the original payment link, request, decision, work item and reversal transaction reference."
+        "tags": [
+          "Payment reversals"
+        ],
+        "summary": "Get a payment reversal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentReversalReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment reversal detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PaymentReversal"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getPaymentReversal",
+        "description": "Returns the original payment link, request, decision, work item and reversal transaction reference."
       }
     },
     "/payment-reversals/{reversalReference}/decision": {
       "post": {
-        "tags": ["Payment reversals"], "summary": "Approve or reject a payment reversal",
-        "parameters": [{"$ref": "#/components/parameters/PaymentReversalReference"}], "requestBody": {"$ref": "#/components/requestBodies/Decision"},
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "decidePaymentReversal", "description": "A different supervisor approves or rejects using the expected work-item version. Approval posts the equal-and-opposite ledger transaction exactly once."
+        "tags": [
+          "Payment reversals"
+        ],
+        "summary": "Approve or reject a payment reversal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentReversalReference"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Decision"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "decidePaymentReversal",
+        "description": "A different supervisor approves or rejects using the expected work-item version. Approval posts the equal-and-opposite ledger transaction exactly once."
       }
     },
     "/payment-instructions": {
       "get": {
-        "tags": ["Payment instructions"],
+        "tags": [
+          "Payment instructions"
+        ],
         "summary": "List future-dated payments and standing orders",
         "responses": {
           "200": {
             "description": "Payment instruction register.",
-            "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/PaymentInstruction"}}}}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PaymentInstruction"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "listPaymentInstructions",
         "description": "Lists future payment intent separately from payment orders and ledger bookings."
       },
       "post": {
-        "tags": ["Payment instructions"],
+        "tags": [
+          "Payment instructions"
+        ],
         "summary": "Create a future-dated payment or standing order",
         "parameters": [],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentInstructionWrite"}}}},
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInstructionWrite"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {"$ref": "#/components/responses/ActionSuccess"},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "409": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "createPaymentInstruction",
         "description": "Creates future intent without reserving funds. The selected staff actor requires PAYMENT_INSTRUCTION_MAINTAIN permission."
@@ -1326,15 +1577,47 @@
     },
     "/payment-instructions/{instructionReference}": {
       "get": {
-        "tags": ["Payment instructions"],
+        "tags": [
+          "Payment instructions"
+        ],
         "summary": "Get a payment instruction and execution history",
-        "parameters": [{"$ref": "#/components/parameters/PaymentInstructionReference"}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentInstructionReference"
+          }
+        ],
         "responses": {
-          "200": {"description": "Payment instruction detail.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"$ref": "#/components/schemas/PaymentInstruction"}}}}}},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "404": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "200": {
+            "description": "Payment instruction detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PaymentInstruction"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "getPaymentInstruction",
         "description": "Returns schedule state plus every booked, pending or failed occurrence."
@@ -1342,16 +1625,41 @@
     },
     "/payment-instructions/{instructionReference}/cancellation": {
       "post": {
-        "tags": ["Payment instructions"],
+        "tags": [
+          "Payment instructions"
+        ],
         "summary": "Cancel an active payment instruction",
-        "parameters": [{"$ref": "#/components/parameters/PaymentInstructionReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentInstructionCancellation"}}}},
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentInstructionReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInstructionCancellation"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {"$ref": "#/components/responses/ActionSuccess"},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "409": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "cancelPaymentInstruction",
         "description": "Cancels with optimistic version checking and rejects cancellation while an occurrence is processing."
@@ -1359,29 +1667,83 @@
     },
     "/payment-instructions/processing-runs": {
       "get": {
-        "tags": ["Payment instructions"],
+        "tags": [
+          "Payment instructions"
+        ],
         "summary": "List recent due-instruction processing runs",
-        "parameters": [{"$ref": "#/components/parameters/Limit"}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
         "responses": {
-          "200": {"description": "Processing run history.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "additionalProperties": false, "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/ProcessingRun"}}}}}}},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "200": {
+            "description": "Processing run history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProcessingRun"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "listPaymentInstructionProcessingRuns",
         "description": "Lists recent batch outcomes and occurrence counters."
       },
       "post": {
-        "tags": ["Payment instructions"],
+        "tags": [
+          "Payment instructions"
+        ],
         "summary": "Execute all instructions due on a business date",
         "parameters": [],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentInstructionRunWrite"}}}},
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInstructionRunWrite"
+              }
+            }
+          }
+        },
         "responses": {
-          "202": {"$ref": "#/components/responses/ActionSuccess"},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "409": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "runPaymentInstructions",
         "description": "Claims due occurrences, rechecks live payment controls and uses a stable occurrence idempotency key before booking through the existing payment and ledger service."
@@ -1389,188 +1751,1215 @@
     },
     "/direct-debits": {
       "get": {
-        "tags": ["Direct debits"], "summary": "List direct debit mandates",
-        "responses": {"200": {"description": "Mandate register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/DirectDebitMandate"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listDirectDebitMandates", "description": "Lists active and terminal mandates with collection history."
+        "tags": [
+          "Direct debits"
+        ],
+        "summary": "List direct debit mandates",
+        "responses": {
+          "200": {
+            "description": "Mandate register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectDebitMandate"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listDirectDebitMandates",
+        "description": "Lists active and terminal mandates with collection history."
       },
       "post": {
-        "tags": ["Direct debits"], "summary": "Register a direct debit mandate", "parameters": [],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitMandateWrite"}}}},
-        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "createDirectDebitMandate", "description": "Registers customer authority after account, ownership, KYC and currency checks; no funds are reserved."
+        "tags": [
+          "Direct debits"
+        ],
+        "summary": "Register a direct debit mandate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectDebitMandateWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "createDirectDebitMandate",
+        "description": "Registers customer authority after account, ownership, KYC and currency checks; no funds are reserved."
       }
     },
     "/direct-debits/{mandateReference}": {
       "get": {
-        "tags": ["Direct debits"], "summary": "Get a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}],
-        "responses": {"200": {"description": "Mandate and collection history.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/DirectDebitMandate"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getDirectDebitMandate", "description": "Returns mandate limits, lifecycle state and linked payment outcomes."
+        "tags": [
+          "Direct debits"
+        ],
+        "summary": "Get a direct debit mandate",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DirectDebitMandateReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandate and collection history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DirectDebitMandate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getDirectDebitMandate",
+        "description": "Returns mandate limits, lifecycle state and linked payment outcomes."
       }
     },
     "/direct-debits/{mandateReference}/cancellation": {
       "post": {
-        "tags": ["Direct debits"], "summary": "Cancel a direct debit mandate", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitMandateCancellation"}}}},
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "cancelDirectDebitMandate", "description": "Cancels with an expected version and rejects cancellation while a collection is processing."
+        "tags": [
+          "Direct debits"
+        ],
+        "summary": "Cancel a direct debit mandate",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DirectDebitMandateReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectDebitMandateCancellation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "cancelDirectDebitMandate",
+        "description": "Cancels with an expected version and rejects cancellation while a collection is processing."
       }
     },
     "/direct-debits/{mandateReference}/collections": {
       "post": {
-        "tags": ["Direct debits"], "summary": "Submit a creditor collection", "parameters": [{"$ref": "#/components/parameters/DirectDebitMandateReference"}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DirectDebitCollectionWrite"}}}},
-        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "submitDirectDebitCollection", "description": "Claims an idempotent occurrence, applies mandate limits and delegates live booking, holds and approvals to the external-payment service."
+        "tags": [
+          "Direct debits"
+        ],
+        "summary": "Submit a creditor collection",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DirectDebitMandateReference"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectDebitCollectionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "submitDirectDebitCollection",
+        "description": "Claims an idempotent occurrence, applies mandate limits and delegates live booking, holds and approvals to the external-payment service."
       }
     },
     "/end-of-day-runs": {
       "get": {
-        "tags": ["End of day"], "summary": "List recent end-of-day runs", "parameters": [{"$ref": "#/components/parameters/Limit"}],
-        "responses": {"200": {"description": "End-of-day run history.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/EndOfDayRun"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listEndOfDayRuns", "description": "Lists batch state, counts and account-level posting outcomes for recent business dates."
+        "tags": [
+          "End of day"
+        ],
+        "summary": "List recent end-of-day runs",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "End-of-day run history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EndOfDayRun"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listEndOfDayRuns",
+        "description": "Lists batch state, counts and account-level posting outcomes for recent business dates."
       },
       "post": {
-        "tags": ["End of day"], "summary": "Run end-of-day posting", "parameters": [],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EndOfDayRunWrite"}}}},
-        "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "runEndOfDay", "description": "Claims one run for the business date, then books configured daily overdraft charges and exact product-rate daily interest through balanced customer and currency-clearing ledger legs."
+        "tags": [
+          "End of day"
+        ],
+        "summary": "Run end-of-day posting",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndOfDayRunWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "runEndOfDay",
+        "description": "Claims one run for the business date, then books configured daily overdraft charges and exact product-rate daily interest through balanced customer and currency-clearing ledger legs."
       }
     },
     "/end-of-day-runs/{runReference}": {
       "get": {
-        "tags": ["End of day"], "summary": "Get an end-of-day run", "parameters": [{"$ref": "#/components/parameters/EndOfDayRunReference"}],
-        "responses": {"200": {"description": "End-of-day run and postings.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/EndOfDayRun"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getEndOfDayRun", "description": "Returns the processing summary and immutable booked or failed account-level posting records."
+        "tags": [
+          "End of day"
+        ],
+        "summary": "Get an end-of-day run",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EndOfDayRunReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "End-of-day run and postings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EndOfDayRun"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getEndOfDayRun",
+        "description": "Returns the processing summary and immutable booked or failed account-level posting records."
       }
     },
     "/reconciliation-runs": {
       "get": {
-        "tags": ["Reconciliation"], "summary": "List recent clearing reconciliation runs", "parameters": [{"$ref": "#/components/parameters/Limit"}],
-        "responses": {"200": {"description": "Reconciliation run history.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/ReconciliationRun"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listReconciliationRuns", "description": "Lists settlement dates, exact-match counts, and durable exception counts."
+        "tags": [
+          "Reconciliation"
+        ],
+        "summary": "List recent clearing reconciliation runs",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation run history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReconciliationRun"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listReconciliationRuns",
+        "description": "Lists settlement dates, exact-match counts, and durable exception counts."
       },
       "post": {
-        "tags": ["Reconciliation"], "summary": "Run clearing reconciliation", "parameters": [],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReconciliationRunWrite"}}}},
-        "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "runReconciliation", "description": "Claims one run for a settlement date and compares imported records with immutable internal clearing entries by transaction reference, currency, amount, and direction."
+        "tags": [
+          "Reconciliation"
+        ],
+        "summary": "Run clearing reconciliation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliationRunWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "runReconciliation",
+        "description": "Claims one run for a settlement date and compares imported records with immutable internal clearing entries by transaction reference, currency, amount, and direction."
       }
     },
     "/reconciliation-runs/{runReference}": {
       "get": {
-        "tags": ["Reconciliation"], "summary": "Get a clearing reconciliation run", "parameters": [{"$ref": "#/components/parameters/ReconciliationRunReference"}],
-        "responses": {"200": {"description": "Reconciliation run and comparison items.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/ReconciliationRun"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getReconciliationRun", "description": "Returns matched records and open or resolved amount, direction, currency, and missing-side exceptions."
+        "tags": [
+          "Reconciliation"
+        ],
+        "summary": "Get a clearing reconciliation run",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ReconciliationRunReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation run and comparison items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ReconciliationRun"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getReconciliationRun",
+        "description": "Returns matched records and open or resolved amount, direction, currency, and missing-side exceptions."
       }
     },
     "/reconciliation-runs/{runReference}/items/{itemReference}/resolution": {
       "post": {
-        "tags": ["Reconciliation"], "summary": "Resolve a reconciliation exception", "parameters": [{"$ref": "#/components/parameters/ReconciliationRunReference"}, {"$ref": "#/components/parameters/ReconciliationItemReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReconciliationResolutionWrite"}}}},
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "resolveReconciliationItem", "description": "Records a version-checked resolution comment and audit event without modifying settlement records, clearing entries, or ledger transactions."
+        "tags": [
+          "Reconciliation"
+        ],
+        "summary": "Resolve a reconciliation exception",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ReconciliationRunReference"
+          },
+          {
+            "$ref": "#/components/parameters/ReconciliationItemReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliationResolutionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "resolveReconciliationItem",
+        "description": "Records a version-checked resolution comment and audit event without modifying settlement records, clearing entries, or ledger transactions."
       }
     },
     "/accounting-periods": {
       "get": {
-        "tags": ["Accounting periods"], "summary": "List accounting periods",
-        "responses": {"200": {"description": "Accounting-period register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/AccountingPeriod"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listAccountingPeriods", "description": "Lists open, closing and closed periods with versioned close evidence."
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "List accounting periods",
+        "responses": {
+          "200": {
+            "description": "Accounting-period register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccountingPeriod"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listAccountingPeriods",
+        "description": "Lists open, closing and closed periods with versioned close evidence."
       }
     },
     "/accounting-periods/{periodReference}": {
       "get": {
-        "tags": ["Accounting periods"], "summary": "Get an accounting period", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}],
-        "responses": {"200": {"description": "Accounting period and latest close work item.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/AccountingPeriod"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getAccountingPeriod", "description": "Returns period status, request and decision evidence, version and latest maker-checker work item."
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "Get an accounting period",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountingPeriodReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accounting period and latest close work item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AccountingPeriod"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAccountingPeriod",
+        "description": "Returns period status, request and decision evidence, version and latest maker-checker work item."
       }
     },
     "/accounting-periods/{periodReference}/close-requests": {
       "post": {
-        "tags": ["Accounting periods"], "summary": "Request accounting-period close", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AccountingPeriodCloseRequestWrite"}}}},
-        "responses": {"202": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "requestAccountingPeriodClose", "description": "A Supervisor locks the period, proves final end-of-day and later reconciliation evidence, zero open exceptions, full clearing coverage, no running process and a balanced ledger, then creates an Admin approval item and freezes the period while closing."
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "Request accounting-period close",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountingPeriodReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountingPeriodCloseRequestWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "requestAccountingPeriodClose",
+        "description": "A Supervisor locks the period, proves final end-of-day and later reconciliation evidence, zero open exceptions, full clearing coverage, no running process and a balanced ledger, then creates an Admin approval item and freezes the period while closing."
       }
     },
     "/accounting-periods/{periodReference}/close-decisions": {
       "post": {
-        "tags": ["Accounting periods"], "summary": "Approve or reject accounting-period close", "parameters": [{"$ref": "#/components/parameters/AccountingPeriodReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AccountingPeriodCloseDecisionWrite"}}}},
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "decideAccountingPeriodClose", "description": "A distinct Admin rechecks all close gates under locks and either closes the period or returns it to OPEN. CLOSING and CLOSED dates reject every runtime ledger writer."
+        "tags": [
+          "Accounting periods"
+        ],
+        "summary": "Approve or reject accounting-period close",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountingPeriodReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountingPeriodCloseDecisionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "decideAccountingPeriodClose",
+        "description": "A distinct Admin rechecks all close gates under locks and either closes the period or returns it to OPEN. CLOSING and CLOSED dates reject every runtime ledger writer."
       }
     },
     "/general-ledger/accounts": {
       "get": {
-        "tags": ["General ledger"], "summary": "List general-ledger accounts",
-        "responses": {"200": {"description": "Active and inactive chart-of-account records.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/GeneralLedgerAccount"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listGeneralLedgerAccounts", "description": "Returns the currency-specific settlement, customer-control, income and expense accounts used by automated and manual journals."
+        "tags": [
+          "General ledger"
+        ],
+        "summary": "List general-ledger accounts",
+        "responses": {
+          "200": {
+            "description": "Active and inactive chart-of-account records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GeneralLedgerAccount"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listGeneralLedgerAccounts",
+        "description": "Returns the currency-specific settlement, customer-control, income and expense accounts used by automated and manual journals."
       }
     },
     "/general-ledger/trial-balance": {
       "get": {
-        "tags": ["General ledger"], "summary": "Get a posted trial balance",
-        "parameters": [{"name": "fromDate", "in": "query", "schema": {"type": "string", "format": "date"}}, {"name": "toDate", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}}, {"name": "currency", "in": "query", "schema": {"type": "string", "pattern": "^[A-Z]{3}$"}}],
-        "responses": {"200": {"description": "Posted general-ledger trial balance.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/TrialBalance"}}}}}}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getTrialBalance", "description": "Aggregates posted journal lines only, optionally within an inclusive date range and currency, and reports exact debit, credit and natural balances."
+        "tags": [
+          "General ledger"
+        ],
+        "summary": "Get a posted trial balance",
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Posted general-ledger trial balance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/TrialBalance"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getTrialBalance",
+        "description": "Aggregates posted journal lines only, optionally within an inclusive date range and currency, and reports exact debit, credit and natural balances."
       }
     },
     "/general-ledger/journals": {
       "get": {
-        "tags": ["General ledger"], "summary": "List general-ledger journals", "parameters": [{"$ref": "#/components/parameters/Limit"}],
-        "responses": {"200": {"description": "General-ledger journal register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/GeneralLedgerJournal"}}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listGeneralLedgerJournals", "description": "Lists automated subledger projections and pending, posted or rejected manual journals with their balanced lines."
+        "tags": [
+          "General ledger"
+        ],
+        "summary": "List general-ledger journals",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "General-ledger journal register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GeneralLedgerJournal"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listGeneralLedgerJournals",
+        "description": "Lists automated subledger projections and pending, posted or rejected manual journals with their balanced lines."
       },
       "post": {
-        "tags": ["General ledger"], "summary": "Submit a manual general-ledger journal", "parameters": [ {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ManualGeneralLedgerJournalWrite"}}}},
-        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "createManualGeneralLedgerJournal", "description": "A Supervisor submits one exact two-line, same-currency journal into pending state; no trial-balance movement occurs until a distinct Admin approves it."
+        "tags": [
+          "General ledger"
+        ],
+        "summary": "Submit a manual general-ledger journal",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualGeneralLedgerJournalWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "createManualGeneralLedgerJournal",
+        "description": "A Supervisor submits one exact two-line, same-currency journal into pending state; no trial-balance movement occurs until a distinct Admin approves it."
       }
     },
     "/general-ledger/journals/{journalReference}": {
       "get": {
-        "tags": ["General ledger"], "summary": "Get a general-ledger journal", "parameters": [{"$ref": "#/components/parameters/GeneralLedgerJournalReference"}],
-        "responses": {"200": {"description": "Journal, lines, actor evidence and latest work item.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/GeneralLedgerJournal"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getGeneralLedgerJournal", "description": "Returns a journal's immutable accounting lines, source transaction, submission and decision evidence, version and maker-checker work item."
+        "tags": [
+          "General ledger"
+        ],
+        "summary": "Get a general-ledger journal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/GeneralLedgerJournalReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Journal, lines, actor evidence and latest work item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/GeneralLedgerJournal"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getGeneralLedgerJournal",
+        "description": "Returns a journal's immutable accounting lines, source transaction, submission and decision evidence, version and maker-checker work item."
       }
     },
     "/general-ledger/journals/{journalReference}/decision": {
       "post": {
-        "tags": ["General ledger"], "summary": "Approve or reject a manual journal", "parameters": [{"$ref": "#/components/parameters/GeneralLedgerJournalReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GeneralLedgerJournalDecisionWrite"}}}},
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "decideManualGeneralLedgerJournal", "description": "A distinct Admin locks the work item and journal, rechecks the open accounting period, account availability, currency and exact balance, then posts once or rejects without movement."
+        "tags": [
+          "General ledger"
+        ],
+        "summary": "Approve or reject a manual journal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/GeneralLedgerJournalReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneralLedgerJournalDecisionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "decideManualGeneralLedgerJournal",
+        "description": "A distinct Admin locks the work item and journal, rechecks the open accounting period, account availability, currency and exact balance, then posts once or rejects without movement."
       }
     },
     "/loans": {
       "get": {
-        "tags": ["Loans"], "summary": "List loan applications",
-        "parameters": [{"name": "status", "in": "query", "schema": {"type": "string", "enum": ["PENDING_APPROVAL", "APPROVED", "REJECTED"]}}],
-        "responses": {"200": {"description": "Loan-application register.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/LoanApplicationSummary"}}}}}}}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "listLoanApplications", "description": "Lists pending, approved or rejected loan proposals with snapshotted terms, affordability ratio and booking references."
+        "tags": [
+          "Loans"
+        ],
+        "summary": "List loan applications",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_APPROVAL",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan-application register.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LoanApplicationSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listLoanApplications",
+        "description": "Lists pending, approved or rejected loan proposals with snapshotted terms, affordability ratio and booking references."
       },
       "post": {
-        "tags": ["Loans"], "summary": "Submit a loan application", "parameters": [ {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 100}}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoanApplicationWrite"}}}},
-        "responses": {"201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "submitLoanApplication", "description": "An Operator submits exact fictional affordability data against an active loan product and the customer's own currency-matched deposit account. The proposal is idempotent and creates a Supervisor approval item without ledger movement."
+        "tags": [
+          "Loans"
+        ],
+        "summary": "Submit a loan application",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanApplicationWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "submitLoanApplication",
+        "description": "An Operator submits exact fictional affordability data against an active loan product and the customer's own currency-matched deposit account. The proposal is idempotent and creates a Supervisor approval item without ledger movement."
       }
     },
     "/loans/{applicationReference}": {
       "get": {
-        "tags": ["Loans"], "summary": "Get a loan application", "parameters": [{"$ref": "#/components/parameters/LoanApplicationReference"}],
-        "responses": {"200": {"description": "Loan application, decision evidence, booking references and schedule.", "content": {"application/json": {"schema": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/LoanApplication"}}}}}}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "getLoanApplication", "description": "Returns exact terms, affordability inputs, maker-checker evidence and the generated repayment schedule after approval."
+        "tags": [
+          "Loans"
+        ],
+        "summary": "Get a loan application",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LoanApplicationReference"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan application, decision evidence, booking references and schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/LoanApplication"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getLoanApplication",
+        "description": "Returns exact terms, affordability inputs, maker-checker evidence and the generated repayment schedule after approval."
       }
     },
     "/loans/{applicationReference}/decision": {
       "post": {
-        "tags": ["Loans"], "summary": "Approve or reject a loan application", "parameters": [{"$ref": "#/components/parameters/LoanApplicationReference"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoanApplicationDecisionWrite"}}}},
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}},
-        "operationId": "decideLoanApplication", "description": "A distinct Supervisor or Admin locks and rechecks current KYC, restrictions, affordability, product, destination, posting period and terms. Approval creates one loan account, exact schedule, balanced subledger transaction, general-ledger projection and destination credit atomically; rejection creates no financial movement."
+        "tags": [
+          "Loans"
+        ],
+        "summary": "Approve or reject a loan application",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LoanApplicationReference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanApplicationDecisionWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "decideLoanApplication",
+        "description": "A distinct Supervisor or Admin locks and rechecks current KYC, restrictions, affordability, product, destination, posting period and terms. Approval creates one loan account, exact schedule, balanced subledger transaction, general-ledger projection and destination credit atomically; rejection creates no financial movement."
       }
     },
     "/kyc-cases": {
@@ -1621,8 +3010,7 @@
           "KYC"
         ],
         "summary": "Open a KYC case",
-        "parameters": [
-          ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1723,34 +3111,69 @@
     },
     "/kyc-cases/{caseReference}/lock": {
       "post": {
-        "tags": ["KYC"],
+        "tags": [
+          "KYC"
+        ],
         "summary": "Lock or unlock a KYC case",
-        "parameters": [{"$ref": "#/components/parameters/CaseReference"}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseReference"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["locked", "reason", "expectedVersion"],
+                "required": [
+                  "locked",
+                  "reason",
+                  "expectedVersion"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "locked": {"type": "boolean", "description": "True to lock; false to unlock."},
-                  "reason": {"type": "string", "minLength": 5, "description": "Reason for the lock state change."},
-                  "expectedVersion": {"type": "integer", "minimum": 1, "description": "Current KYC case version."}
+                  "locked": {
+                    "type": "boolean",
+                    "description": "True to lock; false to unlock."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 5,
+                    "description": "Reason for the lock state change."
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Current KYC case version."
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": {"$ref": "#/components/responses/ActionSuccess"},
-          "400": {"$ref": "#/components/responses/Error"},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "404": {"$ref": "#/components/responses/Error"},
-          "409": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "postKycCasesCaseReferenceLock",
         "description": "Toggles the KYC case lock. All authenticated staff personas may use this control; while locked, KYC mutations are rejected."
@@ -1951,11 +3374,23 @@
     },
     "/kyc-cases/{caseReference}/evidence/{evidenceReference}": {
       "patch": {
-        "tags": ["KYC"],
+        "tags": [
+          "KYC"
+        ],
         "summary": "Update evidence metadata",
         "parameters": [
-          {"$ref": "#/components/parameters/CaseReference"},
-          {"name": "evidenceReference", "in": "path", "required": true, "schema": {"type": "string"}, "description": "Evidence reference."}
+          {
+            "$ref": "#/components/parameters/CaseReference"
+          },
+          {
+            "name": "evidenceReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Evidence reference."
+          }
         ],
         "requestBody": {
           "required": true,
@@ -1964,31 +3399,77 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["evidenceType", "documentReference", "source", "receivedAt"],
+                "required": [
+                  "evidenceType",
+                  "documentReference",
+                  "source",
+                  "receivedAt"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "evidenceType": {"type": "string"},
-                  "documentReference": {"type": "string"},
-                  "documentNumber": {"type": "string", "nullable": true},
-                  "source": {"type": "string"},
-                  "receivedAt": {"type": "string", "format": "date"},
-                  "issuedAt": {"type": "string", "format": "date", "nullable": true},
-                  "expiresAt": {"type": "string", "format": "date", "nullable": true},
-                  "firstName": {"type": "string", "nullable": true},
-                  "lastName": {"type": "string", "nullable": true},
-                  "reviewerNotes": {"type": "string", "nullable": true}
+                  "evidenceType": {
+                    "type": "string"
+                  },
+                  "documentReference": {
+                    "type": "string"
+                  },
+                  "documentNumber": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "issuedAt": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "reviewerNotes": {
+                    "type": "string",
+                    "nullable": true
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": {"$ref": "#/components/responses/ActionSuccess"},
-          "400": {"$ref": "#/components/responses/Error"},
-          "401": {"$ref": "#/components/responses/Error"},
-          "403": {"$ref": "#/components/responses/Error"},
-          "404": {"$ref": "#/components/responses/Error"},
-          "503": {"$ref": "#/components/responses/Error"}
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         },
         "operationId": "patchKycCasesCaseReferenceEvidenceEvidenceReference",
         "description": "Update evidence metadata. The selected staff actor is permission-checked and the operation returns an ActionState in the standard data envelope."
@@ -2270,8 +3751,7 @@
           "Overdrafts"
         ],
         "summary": "Submit an arranged-overdraft application",
-        "parameters": [
-          ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "description": "Submits an arranged-overdraft application and creates an approval work item.",
@@ -2921,7 +4401,7 @@
                   "properties": {
                     "data": {
                       "type": "array",
-                        "items": {
+                      "items": {
                         "$ref": "#/components/schemas/DocumentMeta"
                       }
                     }
@@ -2947,33 +4427,81 @@
           }
         },
         "operationId": "listCustomerDocuments",
-        "description": "Returns all customer document files with safe metadata. Private Blob locations are excluded."
+        "description": "Returns all customer document files with safe metadata. Use documentReference to retrieve, stream or delete a file."
       },
       "post": {
-        "tags": ["Documents"],
+        "tags": [
+          "Documents"
+        ],
         "summary": "Add a customer document",
         "description": "Adds or replaces a document in the customer document collection. Requires KYC_GATHER.",
-        "parameters": [{"$ref": "#/components/parameters/CustomerNumber"}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomerNumber"
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": {"multipart/form-data": {"schema": {"type": "object", "required": ["documentReference", "documentType", "file"], "properties": {"documentReference": {"type": "string"}, "documentType": {"type": "string"}, "file": {"type": "string", "format": "binary"}}}}}
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "documentReference",
+                  "documentType",
+                  "file"
+                ],
+                "properties": {
+                  "documentReference": {
+                    "type": "string"
+                  },
+                  "documentType": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
         },
-        "responses": {"200": {"$ref": "#/components/responses/ActionSuccess"}, "201": {"$ref": "#/components/responses/ActionSuccess"}, "400": {"$ref": "#/components/responses/Error"}, "401": {"$ref": "#/components/responses/Error"}, "403": {"$ref": "#/components/responses/Error"}, "415": {"$ref": "#/components/responses/Error"}},
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "201": {
+            "$ref": "#/components/responses/ActionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
         "operationId": "addCustomerDocument"
       }
     },
-    "/customers/{customerNumber}/documents/{slot}": {
+    "/customers/{customerNumber}/documents/{documentReference}": {
       "get": {
         "tags": [
           "Documents"
         ],
-        "summary": "Get document-slot metadata",
+        "summary": "Get document-document reference metadata",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
           },
           {
-            "$ref": "#/components/parameters/DocumentSlot"
+            "$ref": "#/components/parameters/DocumentReference"
           }
         ],
         "responses": {
@@ -3014,117 +4542,20 @@
           }
         },
         "operationId": "getCustomerDocumentMetadata",
-        "description": "Returns safe metadata for one Passport or National ID slot. File bytes are available from the /content operation."
-      },
-      "put": {
-        "tags": [
-          "Documents"
-        ],
-        "summary": "Upload or replace a customer document",
-        "description": "Uploads or replaces one private Passport or National ID file. Requires KYC_GATHER; accepts JPEG, PNG or PDF up to exactly 4 MiB after MIME and file-signature validation.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/CustomerNumber"
-          },
-          {
-            "$ref": "#/components/parameters/DocumentSlot"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "file"
-                ],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "Non-empty JPEG, PNG or PDF whose declared MIME type matches its file signature; maximum 4,194,304 bytes."
-                  }
-                }
-              }
-            }
-          },
-          "description": "A single multipart part named file. The route rejects other Content-Types with 415."
-        },
-        "responses": {
-          "200": {
-            "description": "Existing slot replaced",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "Successful response envelope.",
-                  "required": [
-                    "data"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/DocumentMeta"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "New slot created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "Successful response envelope.",
-                  "required": [
-                    "data"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/DocumentMeta"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "415": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "operationId": "putCustomerDocument"
+        "description": "Returns safe metadata for one any customer document document reference. File bytes are available from the /content operation."
       },
       "delete": {
         "tags": [
           "Documents"
         ],
         "summary": "Delete a customer document",
-        "description": "Idempotently deletes one customer file slot. Requires KYC_GATHER and never changes identity-document metadata.",
+        "description": "Idempotently deletes one customer file document reference. Requires KYC_GATHER and never changes identity-document metadata.",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
           },
           {
-            "$ref": "#/components/parameters/DocumentSlot"
+            "$ref": "#/components/parameters/DocumentReference"
           }
         ],
         "responses": {
@@ -3167,19 +4598,19 @@
         "operationId": "deleteCustomerDocument"
       }
     },
-    "/customers/{customerNumber}/documents/{slot}/content": {
+    "/customers/{customerNumber}/documents/{documentReference}/content": {
       "get": {
         "tags": [
           "Documents"
         ],
         "summary": "Stream private document content",
-        "description": "Streams authenticated private Passport or National ID bytes. This operation is not JSON-wrapped and is never cacheable.",
+        "description": "Streams authenticated private any customer document bytes. This operation is not JSON-wrapped and is never cacheable.",
         "parameters": [
           {
             "$ref": "#/components/parameters/CustomerNumber"
           },
           {
-            "$ref": "#/components/parameters/DocumentSlot"
+            "$ref": "#/components/parameters/DocumentReference"
           }
         ],
         "responses": {
@@ -3332,34 +4763,82 @@
         "name": "reversalReference",
         "in": "path",
         "required": true,
-        "schema": {"type": "string", "pattern": "^REV-"}
+        "schema": {
+          "type": "string",
+          "pattern": "^REV-"
+        }
       },
       "PaymentInstructionReference": {
         "name": "instructionReference",
         "in": "path",
         "required": true,
-        "schema": {"type": "string", "pattern": "^PIN-"}
+        "schema": {
+          "type": "string",
+          "pattern": "^PIN-"
+        }
       },
       "DirectDebitMandateReference": {
-        "name": "mandateReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^DDM-"}
+        "name": "mandateReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^DDM-"
+        }
       },
       "EndOfDayRunReference": {
-        "name": "runReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^EOD-"}
+        "name": "runReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^EOD-"
+        }
       },
       "ReconciliationRunReference": {
-        "name": "runReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^REC-"}
+        "name": "runReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^REC-"
+        }
       },
       "ReconciliationItemReference": {
-        "name": "itemReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^RCI-"}
+        "name": "itemReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^RCI-"
+        }
       },
       "AccountingPeriodReference": {
-        "name": "periodReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^ACP-"}
+        "name": "periodReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^ACP-"
+        }
       },
       "GeneralLedgerJournalReference": {
-        "name": "journalReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^(GL-|GLJ-)"}
+        "name": "journalReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^(GL-|GLJ-)"
+        }
       },
       "LoanApplicationReference": {
-        "name": "applicationReference", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^LOA-"}
+        "name": "applicationReference",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^LOA-"
+        }
       },
       "CaseReference": {
         "name": "caseReference",
@@ -3399,6 +4878,15 @@
         "required": true,
         "schema": {
           "$ref": "#/components/schemas/DocumentSlot"
+        }
+      },
+      "DocumentReference": {
+        "name": "documentReference",
+        "in": "path",
+        "required": true,
+        "description": "Stable customer document reference.",
+        "schema": {
+          "type": "string"
         }
       }
     },
@@ -3818,56 +5306,193 @@
       "PaymentReversalRequest": {
         "type": "object",
         "description": "Full-value reversal request; the idempotency key is supplied as a header.",
-        "required": ["reason"],
+        "required": [
+          "reason"
+        ],
         "additionalProperties": false,
-        "properties": {"reason": {"type": "string", "minLength": 10, "maxLength": 500}}
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
       },
       "PaymentInstructionWrite": {
         "type": "object",
         "description": "Future-dated or recurring payment intent. Scheduled instructions require ONCE; standing orders require WEEKLY or MONTHLY.",
-        "required": ["type", "paymentType", "sourceAccountNumber", "amount", "description", "frequency", "startDate"],
+        "required": [
+          "type",
+          "paymentType",
+          "sourceAccountNumber",
+          "amount",
+          "description",
+          "frequency",
+          "startDate"
+        ],
         "additionalProperties": false,
         "properties": {
-          "type": {"type": "string", "enum": ["SCHEDULED", "STANDING_ORDER"]},
-          "paymentType": {"type": "string", "enum": ["INTERNAL", "EXTERNAL"]},
-          "sourceAccountNumber": {"type": "string"},
-          "destinationAccountNumber": {"type": "string", "nullable": true},
-          "beneficiaryId": {"type": "string", "nullable": true},
-          "amount": {"$ref": "#/components/schemas/Money"},
-          "description": {"type": "string", "minLength": 2, "maxLength": 140},
-          "frequency": {"type": "string", "enum": ["ONCE", "WEEKLY", "MONTHLY"]},
-          "startDate": {"type": "string", "format": "date"},
-          "endDate": {"type": "string", "format": "date", "nullable": true}
+          "type": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "STANDING_ORDER"
+            ]
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "EXTERNAL"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "destinationAccountNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "beneficiaryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 140
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "ONCE",
+              "WEEKLY",
+              "MONTHLY"
+            ]
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
         }
       },
       "PaymentInstructionCancellation": {
         "type": "object",
         "description": "Optimistic cancellation request.",
-        "required": ["expectedVersion", "reason"],
+        "required": [
+          "expectedVersion",
+          "reason"
+        ],
         "additionalProperties": false,
         "properties": {
-          "expectedVersion": {"type": "integer", "minimum": 1},
-          "reason": {"type": "string", "minLength": 5, "maxLength": 300}
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
         }
       },
       "PaymentInstructionRunWrite": {
         "type": "object",
         "description": "Business date for a due-instruction run.",
-        "required": ["businessDate"],
+        "required": [
+          "businessDate"
+        ],
         "additionalProperties": false,
-        "properties": {"businessDate": {"type": "string", "format": "date"}}
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
       },
       "DirectDebitMandateWrite": {
-        "type": "object", "description": "Customer authority granted to an owned active beneficiary creditor.", "required": ["sourceAccountNumber", "creditorBeneficiaryId", "creditorMandateReference", "maximumSingleAmount", "validFrom"], "additionalProperties": false,
-        "properties": {"sourceAccountNumber": {"type": "string"}, "creditorBeneficiaryId": {"type": "string", "format": "uuid"}, "creditorMandateReference": {"type": "string", "minLength": 3, "maxLength": 80}, "maximumSingleAmount": {"$ref": "#/components/schemas/Money"}, "validFrom": {"type": "string", "format": "date"}, "validTo": {"type": "string", "format": "date", "nullable": true}}
+        "type": "object",
+        "description": "Customer authority granted to an owned active beneficiary creditor.",
+        "required": [
+          "sourceAccountNumber",
+          "creditorBeneficiaryId",
+          "creditorMandateReference",
+          "maximumSingleAmount",
+          "validFrom"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "creditorBeneficiaryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "creditorMandateReference": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "maximumSingleAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
       },
       "DirectDebitMandateCancellation": {
-        "type": "object", "description": "Optimistic mandate cancellation.", "required": ["expectedVersion", "reason"], "additionalProperties": false,
-        "properties": {"expectedVersion": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "minLength": 5, "maxLength": 300}}
+        "type": "object",
+        "description": "Optimistic mandate cancellation.",
+        "required": [
+          "expectedVersion",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        }
       },
       "DirectDebitCollectionWrite": {
-        "type": "object", "description": "One immediate collection request; the idempotency key is supplied as a header.", "required": ["amount", "collectionDate"], "additionalProperties": false,
-        "properties": {"amount": {"$ref": "#/components/schemas/Money"}, "collectionDate": {"type": "string", "format": "date"}}
+        "type": "object",
+        "description": "One immediate collection request; the idempotency key is supplied as a header.",
+        "required": [
+          "amount",
+          "collectionDate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "collectionDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
       },
       "DocumentSlot": {
         "type": "string",
@@ -3900,8 +5525,8 @@
             "description": "Business document type, such as PASSPORT, NATIONAL_ID or VISA."
           },
           "slot": {
-            "$ref": "#/components/schemas/DocumentSlot"
-            ,"nullable": true
+            "$ref": "#/components/schemas/DocumentSlot",
+            "nullable": true
           },
           "filename": {
             "type": "string",
@@ -3953,17 +5578,6 @@
           }
         },
         "description": "EmptyDocumentSlot API data contract."
-      },
-      "CustomerDocumentSlot": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/DocumentMeta"
-          },
-          {
-            "$ref": "#/components/schemas/EmptyDocumentSlot"
-          }
-        ],
-        "description": "CustomerDocumentSlot API data contract."
       },
       "Address": {
         "type": "object",
@@ -4776,124 +6390,806 @@
       "PaymentReversal": {
         "type": "object",
         "description": "Full-value payment correction request and its independent approval outcome.",
-        "required": ["reference", "status", "originalPaymentReference", "paymentType", "sourceAccountNumber", "destinationReference", "customerNumber", "customerName", "amount", "currency", "reason", "requestedBy", "decisionComment", "reversalTransactionReference", "createdAt", "decidedAt", "version", "workItem"],
+        "required": [
+          "reference",
+          "status",
+          "originalPaymentReference",
+          "paymentType",
+          "sourceAccountNumber",
+          "destinationReference",
+          "customerNumber",
+          "customerName",
+          "amount",
+          "currency",
+          "reason",
+          "requestedBy",
+          "decisionComment",
+          "reversalTransactionReference",
+          "createdAt",
+          "decidedAt",
+          "version",
+          "workItem"
+        ],
         "additionalProperties": false,
         "properties": {
-          "reference": {"type": "string"}, "status": {"type": "string", "enum": ["PENDING_APPROVAL", "BOOKED", "REJECTED"]}, "originalPaymentReference": {"type": "string"},
-          "paymentType": {"type": "string", "enum": ["INTERNAL", "EXTERNAL"]}, "sourceAccountNumber": {"type": "string"}, "destinationReference": {"type": "string"},
-          "customerNumber": {"type": "string"}, "customerName": {"type": "string"}, "amount": {"$ref": "#/components/schemas/Money"}, "currency": {"type": "string"},
-          "reason": {"type": "string"}, "requestedBy": {"type": "string"}, "decisionComment": {"type": "string", "nullable": true}, "reversalTransactionReference": {"type": "string", "nullable": true},
-          "createdAt": {"type": "string", "format": "date-time"}, "decidedAt": {"type": "string", "format": "date-time", "nullable": true}, "version": {"type": "integer", "minimum": 1},
-          "workItem": {"$ref": "#/components/schemas/WorkQueueItem", "nullable": true}
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_APPROVAL",
+              "BOOKED",
+              "REJECTED"
+            ]
+          },
+          "originalPaymentReference": {
+            "type": "string"
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "EXTERNAL"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "destinationReference": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "decisionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversalTransactionReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "workItem": {
+            "$ref": "#/components/schemas/WorkQueueItem",
+            "nullable": true
+          }
         }
       },
       "PaymentInstructionExecution": {
         "type": "object",
         "description": "One scheduled occurrence and its linked payment outcome.",
-        "required": ["scheduledFor", "status", "paymentReference", "failureCode", "failureMessage", "attemptedAt", "completedAt"],
+        "required": [
+          "scheduledFor",
+          "status",
+          "paymentReference",
+          "failureCode",
+          "failureMessage",
+          "attemptedAt",
+          "completedAt"
+        ],
         "additionalProperties": false,
         "properties": {
-          "scheduledFor": {"type": "string", "format": "date"},
-          "status": {"type": "string", "enum": ["PROCESSING", "BOOKED", "PENDING", "FAILED"]},
-          "paymentReference": {"type": "string", "nullable": true},
-          "failureCode": {"type": "string", "nullable": true},
-          "failureMessage": {"type": "string", "nullable": true},
-          "attemptedAt": {"type": "string", "format": "date-time"},
-          "completedAt": {"type": "string", "format": "date-time", "nullable": true}
+          "scheduledFor": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "BOOKED",
+              "PENDING",
+              "FAILED"
+            ]
+          },
+          "paymentReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "attemptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         }
       },
       "PaymentInstruction": {
         "type": "object",
         "description": "Future payment intent, schedule state and occurrence history. It does not represent reserved funds or a ledger booking.",
-        "required": ["reference", "type", "status", "paymentType", "sourceAccountNumber", "customerNumber", "customerName", "destinationReference", "amount", "currency", "description", "frequency", "startDate", "nextExecutionDate", "endDate", "lastExecutionAt", "createdBy", "cancellationReason", "version", "executions"],
+        "required": [
+          "reference",
+          "type",
+          "status",
+          "paymentType",
+          "sourceAccountNumber",
+          "customerNumber",
+          "customerName",
+          "destinationReference",
+          "amount",
+          "currency",
+          "description",
+          "frequency",
+          "startDate",
+          "nextExecutionDate",
+          "endDate",
+          "lastExecutionAt",
+          "createdBy",
+          "cancellationReason",
+          "version",
+          "executions"
+        ],
         "additionalProperties": false,
         "properties": {
-          "reference": {"type": "string"},
-          "type": {"type": "string", "enum": ["SCHEDULED", "STANDING_ORDER"]},
-          "status": {"type": "string", "enum": ["ACTIVE", "PAUSED", "CANCELLED", "COMPLETED", "FAILED"]},
-          "paymentType": {"type": "string", "enum": ["INTERNAL", "EXTERNAL"]},
-          "sourceAccountNumber": {"type": "string"},
-          "customerNumber": {"type": "string"},
-          "customerName": {"type": "string"},
-          "destinationReference": {"type": "string"},
-          "amount": {"$ref": "#/components/schemas/Money"},
-          "currency": {"type": "string"},
-          "description": {"type": "string"},
-          "frequency": {"type": "string", "enum": ["ONCE", "WEEKLY", "MONTHLY"]},
-          "startDate": {"type": "string", "format": "date"},
-          "nextExecutionDate": {"type": "string", "format": "date"},
-          "endDate": {"type": "string", "format": "date", "nullable": true},
-          "lastExecutionAt": {"type": "string", "format": "date-time", "nullable": true},
-          "createdBy": {"type": "string"},
-          "cancellationReason": {"type": "string", "nullable": true},
-          "version": {"type": "integer", "minimum": 1},
-          "executions": {"type": "array", "items": {"$ref": "#/components/schemas/PaymentInstructionExecution"}}
+          "reference": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "STANDING_ORDER"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "CANCELLED",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "EXTERNAL"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "destinationReference": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "ONCE",
+              "WEEKLY",
+              "MONTHLY"
+            ]
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "nextExecutionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "lastExecutionAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "executions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentInstructionExecution"
+            }
+          }
         }
       },
       "ProcessingRun": {
         "type": "object",
         "description": "Outcome counters for one due-instruction processing run.",
-        "required": ["reference", "type", "businessDate", "status", "attempted", "booked", "pending", "failed", "startedAt", "completedAt", "errorMessage"],
+        "required": [
+          "reference",
+          "type",
+          "businessDate",
+          "status",
+          "attempted",
+          "booked",
+          "pending",
+          "failed",
+          "startedAt",
+          "completedAt",
+          "errorMessage"
+        ],
         "additionalProperties": false,
         "properties": {
-          "reference": {"type": "string"},
-          "type": {"type": "string", "enum": ["PAYMENT_INSTRUCTIONS"]},
-          "businessDate": {"type": "string", "format": "date"},
-          "status": {"type": "string", "enum": ["RUNNING", "COMPLETED", "FAILED"]},
-          "attempted": {"type": "integer", "minimum": 0},
-          "booked": {"type": "integer", "minimum": 0},
-          "pending": {"type": "integer", "minimum": 0},
-          "failed": {"type": "integer", "minimum": 0},
-          "startedAt": {"type": "string", "format": "date-time"},
-          "completedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "errorMessage": {"type": "string", "nullable": true}
+          "reference": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PAYMENT_INSTRUCTIONS"
+            ]
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attempted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "booked": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          }
         }
       },
       "DirectDebitCollection": {
-        "type": "object", "description": "A creditor collection and its linked payment outcome.", "required": ["reference", "status", "amount", "currency", "collectionDate", "paymentReference", "failureCode", "failureMessage", "createdAt", "completedAt"], "additionalProperties": false,
-        "properties": {"reference": {"type": "string"}, "status": {"type": "string", "enum": ["PROCESSING", "BOOKED", "PENDING", "REJECTED"]}, "amount": {"$ref": "#/components/schemas/Money"}, "currency": {"type": "string"}, "collectionDate": {"type": "string", "format": "date"}, "paymentReference": {"type": "string", "nullable": true}, "failureCode": {"type": "string", "nullable": true}, "failureMessage": {"type": "string", "nullable": true}, "createdAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time", "nullable": true}}
+        "type": "object",
+        "description": "A creditor collection and its linked payment outcome.",
+        "required": [
+          "reference",
+          "status",
+          "amount",
+          "currency",
+          "collectionDate",
+          "paymentReference",
+          "failureCode",
+          "failureMessage",
+          "createdAt",
+          "completedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "BOOKED",
+              "PENDING",
+              "REJECTED"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "collectionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "paymentReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
       },
       "DirectDebitMandate": {
-        "type": "object", "description": "Direct debit authority, limit, lifecycle and collection history.", "required": ["reference", "status", "sourceAccountNumber", "customerNumber", "customerName", "creditorBeneficiaryId", "creditorName", "creditorAccountNumber", "creditorMandateReference", "maximumSingleAmount", "currency", "validFrom", "validTo", "cancellationReason", "version", "collections"], "additionalProperties": false,
-        "properties": {"reference": {"type": "string"}, "status": {"type": "string", "enum": ["ACTIVE", "SUSPENDED", "CANCELLED", "EXPIRED"]}, "sourceAccountNumber": {"type": "string"}, "customerNumber": {"type": "string"}, "customerName": {"type": "string"}, "creditorBeneficiaryId": {"type": "string"}, "creditorName": {"type": "string"}, "creditorAccountNumber": {"type": "string"}, "creditorMandateReference": {"type": "string"}, "maximumSingleAmount": {"$ref": "#/components/schemas/Money"}, "currency": {"type": "string"}, "validFrom": {"type": "string", "format": "date"}, "validTo": {"type": "string", "format": "date", "nullable": true}, "cancellationReason": {"type": "string", "nullable": true}, "version": {"type": "integer", "minimum": 1}, "collections": {"type": "array", "items": {"$ref": "#/components/schemas/DirectDebitCollection"}}}
+        "type": "object",
+        "description": "Direct debit authority, limit, lifecycle and collection history.",
+        "required": [
+          "reference",
+          "status",
+          "sourceAccountNumber",
+          "customerNumber",
+          "customerName",
+          "creditorBeneficiaryId",
+          "creditorName",
+          "creditorAccountNumber",
+          "creditorMandateReference",
+          "maximumSingleAmount",
+          "currency",
+          "validFrom",
+          "validTo",
+          "cancellationReason",
+          "version",
+          "collections"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "sourceAccountNumber": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "creditorBeneficiaryId": {
+            "type": "string"
+          },
+          "creditorName": {
+            "type": "string"
+          },
+          "creditorAccountNumber": {
+            "type": "string"
+          },
+          "creditorMandateReference": {
+            "type": "string"
+          },
+          "maximumSingleAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "collections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectDebitCollection"
+            }
+          }
+        }
       },
       "KycEvidence": {
         "type": "object",
         "description": "KYC evidence metadata and verification state.",
-        "required": ["reference", "evidenceType", "documentReference", "documentNumber", "source", "receivedAt", "issuedAt", "verificationStatus", "expiresAt", "firstName", "lastName", "reviewerNotes"],
+        "required": [
+          "reference",
+          "evidenceType",
+          "documentReference",
+          "documentNumber",
+          "source",
+          "receivedAt",
+          "issuedAt",
+          "verificationStatus",
+          "expiresAt",
+          "firstName",
+          "lastName",
+          "reviewerNotes"
+        ],
         "additionalProperties": false,
         "properties": {
-          "reference": {"type": "string"},
-          "evidenceType": {"type": "string"},
-          "documentReference": {"type": "string"},
-          "documentNumber": {"type": "string", "nullable": true},
-          "source": {"type": "string"},
-          "receivedAt": {"type": "string", "format": "date"},
-          "issuedAt": {"type": "string", "format": "date", "nullable": true},
-          "verificationStatus": {"type": "string", "enum": ["NOT_VERIFIED", "PENDING", "VERIFIED", "REJECTED", "EXPIRED"]},
-          "expiresAt": {"type": "string", "format": "date", "nullable": true},
-          "firstName": {"type": "string", "nullable": true},
-          "lastName": {"type": "string", "nullable": true},
-          "reviewerNotes": {"type": "string", "nullable": true}
+          "reference": {
+            "type": "string"
+          },
+          "evidenceType": {
+            "type": "string"
+          },
+          "documentReference": {
+            "type": "string"
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": [
+              "NOT_VERIFIED",
+              "PENDING",
+              "VERIFIED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewerNotes": {
+            "type": "string",
+            "nullable": true
+          }
         }
       },
       "KycCaseDetail": {
         "allOf": [
-          {"$ref": "#/components/schemas/KycCaseSummary"},
+          {
+            "$ref": "#/components/schemas/KycCaseSummary"
+          },
           {
             "type": "object",
             "description": "Complete KYC case workspace.",
-            "required": ["finalRiskRating", "overrideReason", "requirements", "profile", "riskFactors", "screenings", "evidence", "restrictions"],
+            "required": [
+              "finalRiskRating",
+              "overrideReason",
+              "requirements",
+              "profile",
+              "riskFactors",
+              "screenings",
+              "evidence",
+              "restrictions"
+            ],
             "additionalProperties": false,
             "properties": {
-              "finalRiskRating": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"], "nullable": true},
-              "overrideReason": {"type": "string", "nullable": true},
-              "requirements": {"type": "array", "items": {"type": "object", "required": ["code", "label", "mandatory"], "additionalProperties": false, "properties": {"code": {"type": "string"}, "label": {"type": "string"}, "mandatory": {"type": "boolean"}}}},
-              "profile": {"type": "object", "nullable": true, "additionalProperties": false, "required": ["accountPurpose", "occupationOrBusiness", "expectedMonthlyCredits", "expectedMonthlyDebits", "expectedCountries", "cashUsage", "sourceOfFunds", "sourceOfWealth", "incomeOrTurnoverBand", "netWorthBand"], "properties": {"accountPurpose": {"type": "string"}, "occupationOrBusiness": {"type": "string"}, "expectedMonthlyCredits": {"$ref": "#/components/schemas/Money"}, "expectedMonthlyDebits": {"$ref": "#/components/schemas/Money"}, "expectedCountries": {"type": "array", "items": {"type": "string"}}, "cashUsage": {"type": "string"}, "sourceOfFunds": {"type": "string"}, "sourceOfWealth": {"type": "string"}, "incomeOrTurnoverBand": {"type": "string"}, "netWorthBand": {"type": "string"}}},
-              "riskFactors": {"type": "array", "items": {"type": "object", "required": ["category", "rule", "score", "explanation"], "additionalProperties": false, "properties": {"category": {"type": "string"}, "rule": {"type": "string"}, "score": {"type": "integer"}, "explanation": {"type": "string"}}}},
-              "screenings": {"type": "array", "items": {"type": "object", "required": ["reference", "subjectType", "subjectReference", "subjectName", "screeningType", "matchScore", "outcome", "resolutionComment", "createdAt"], "additionalProperties": false, "properties": {"reference": {"type": "string"}, "subjectType": {"type": "string"}, "subjectReference": {"type": "string"}, "subjectName": {"type": "string"}, "screeningType": {"type": "string", "enum": ["SANCTIONS", "PEP", "ADVERSE_MEDIA"]}, "matchScore": {"type": "integer"}, "outcome": {"type": "string", "enum": ["CLEAR", "POSSIBLE_MATCH", "FALSE_POSITIVE", "CONFIRMED_MATCH"]}, "resolutionComment": {"type": "string", "nullable": true}, "createdAt": {"type": "string", "format": "date-time"}}}},
-              "evidence": {"type": "array", "items": {"$ref": "#/components/schemas/KycEvidence"}},
-              "restrictions": {"type": "array", "items": {"type": "object", "required": ["reference", "type", "reason", "effectiveFrom", "effectiveTo", "active"], "additionalProperties": false, "properties": {"reference": {"type": "string"}, "type": {"type": "string", "enum": ["DEBIT_BLOCK", "PAYMENT_REVIEW", "ONBOARDING_HOLD"]}, "reason": {"type": "string"}, "effectiveFrom": {"type": "string", "format": "date-time"}, "effectiveTo": {"type": "string", "format": "date-time", "nullable": true}, "active": {"type": "boolean"}}}}
+              "finalRiskRating": {
+                "type": "string",
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH"
+                ],
+                "nullable": true
+              },
+              "overrideReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "label",
+                    "mandatory"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "mandatory": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "profile": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": false,
+                "required": [
+                  "accountPurpose",
+                  "occupationOrBusiness",
+                  "expectedMonthlyCredits",
+                  "expectedMonthlyDebits",
+                  "expectedCountries",
+                  "cashUsage",
+                  "sourceOfFunds",
+                  "sourceOfWealth",
+                  "incomeOrTurnoverBand",
+                  "netWorthBand"
+                ],
+                "properties": {
+                  "accountPurpose": {
+                    "type": "string"
+                  },
+                  "occupationOrBusiness": {
+                    "type": "string"
+                  },
+                  "expectedMonthlyCredits": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "expectedMonthlyDebits": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "expectedCountries": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cashUsage": {
+                    "type": "string"
+                  },
+                  "sourceOfFunds": {
+                    "type": "string"
+                  },
+                  "sourceOfWealth": {
+                    "type": "string"
+                  },
+                  "incomeOrTurnoverBand": {
+                    "type": "string"
+                  },
+                  "netWorthBand": {
+                    "type": "string"
+                  }
+                }
+              },
+              "riskFactors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "category",
+                    "rule",
+                    "score",
+                    "explanation"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "rule": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "integer"
+                    },
+                    "explanation": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "screenings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "reference",
+                    "subjectType",
+                    "subjectReference",
+                    "subjectName",
+                    "screeningType",
+                    "matchScore",
+                    "outcome",
+                    "resolutionComment",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "reference": {
+                      "type": "string"
+                    },
+                    "subjectType": {
+                      "type": "string"
+                    },
+                    "subjectReference": {
+                      "type": "string"
+                    },
+                    "subjectName": {
+                      "type": "string"
+                    },
+                    "screeningType": {
+                      "type": "string",
+                      "enum": [
+                        "SANCTIONS",
+                        "PEP",
+                        "ADVERSE_MEDIA"
+                      ]
+                    },
+                    "matchScore": {
+                      "type": "integer"
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "CLEAR",
+                        "POSSIBLE_MATCH",
+                        "FALSE_POSITIVE",
+                        "CONFIRMED_MATCH"
+                      ]
+                    },
+                    "resolutionComment": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/KycEvidence"
+                }
+              },
+              "restrictions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "reference",
+                    "type",
+                    "reason",
+                    "effectiveFrom",
+                    "effectiveTo",
+                    "active"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "reference": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "DEBIT_BLOCK",
+                        "PAYMENT_REVIEW",
+                        "ONBOARDING_HOLD"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "effectiveFrom": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "effectiveTo": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
             }
           }
         ]
@@ -5074,183 +7370,1206 @@
         }
       },
       "EndOfDayRunWrite": {
-        "type": "object", "required": ["businessDate"], "additionalProperties": false,
-        "properties": {"businessDate": {"type": "string", "format": "date", "description": "Non-future business date claimed at most once."}}
+        "type": "object",
+        "required": [
+          "businessDate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Non-future business date claimed at most once."
+          }
+        }
       },
       "EndOfDayPosting": {
-        "type": "object", "additionalProperties": false,
-        "required": ["reference", "accountNumber", "customerNumber", "customerName", "businessDate", "type", "status", "amount", "currency", "annualRate", "chargeRuleReference", "transactionReference", "failureCode", "failureMessage", "completedAt"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "accountNumber",
+          "customerNumber",
+          "customerName",
+          "businessDate",
+          "type",
+          "status",
+          "amount",
+          "currency",
+          "annualRate",
+          "chargeRuleReference",
+          "transactionReference",
+          "failureCode",
+          "failureMessage",
+          "completedAt"
+        ],
         "properties": {
-          "reference": {"type": "string"}, "accountNumber": {"type": "string"}, "customerNumber": {"type": "string"}, "customerName": {"type": "string"},
-          "businessDate": {"type": "string", "format": "date"}, "type": {"type": "string", "enum": ["CHARGE", "INTEREST"]},
-          "status": {"type": "string", "enum": ["PROCESSING", "BOOKED", "FAILED"]}, "amount": {"$ref": "#/components/schemas/Money"},
-          "currency": {"type": "string"}, "annualRate": {"type": "string", "nullable": true}, "chargeRuleReference": {"type": "string", "nullable": true},
-          "transactionReference": {"type": "string", "nullable": true}, "failureCode": {"type": "string", "nullable": true}, "failureMessage": {"type": "string", "nullable": true},
-          "completedAt": {"type": "string", "format": "date-time", "nullable": true}
+          "reference": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "customerNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "CHARGE",
+              "INTEREST"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "BOOKED",
+              "FAILED"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "annualRate": {
+            "type": "string",
+            "nullable": true
+          },
+          "chargeRuleReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "transactionReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         }
       },
       "EndOfDayRun": {
-        "type": "object", "additionalProperties": false,
-        "required": ["reference", "businessDate", "status", "attempted", "booked", "failed", "chargeCount", "interestCount", "requestedBy", "startedAt", "completedAt", "errorMessage", "postings"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "businessDate",
+          "status",
+          "attempted",
+          "booked",
+          "failed",
+          "chargeCount",
+          "interestCount",
+          "requestedBy",
+          "startedAt",
+          "completedAt",
+          "errorMessage",
+          "postings"
+        ],
         "properties": {
-          "reference": {"type": "string"}, "businessDate": {"type": "string", "format": "date"}, "status": {"type": "string", "enum": ["RUNNING", "COMPLETED", "FAILED"]},
-          "attempted": {"type": "integer"}, "booked": {"type": "integer"}, "failed": {"type": "integer"}, "chargeCount": {"type": "integer"}, "interestCount": {"type": "integer"},
-          "requestedBy": {"type": "string"}, "startedAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "errorMessage": {"type": "string", "nullable": true}, "postings": {"type": "array", "items": {"$ref": "#/components/schemas/EndOfDayPosting"}}
+          "reference": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attempted": {
+            "type": "integer"
+          },
+          "booked": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "chargeCount": {
+            "type": "integer"
+          },
+          "interestCount": {
+            "type": "integer"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "postings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EndOfDayPosting"
+            }
+          }
         }
       },
       "ReconciliationRunWrite": {
-        "type": "object", "required": ["businessDate"], "additionalProperties": false,
-        "properties": {"businessDate": {"type": "string", "format": "date", "description": "Non-future settlement date reconciled at most once."}}
+        "type": "object",
+        "required": [
+          "businessDate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Non-future settlement date reconciled at most once."
+          }
+        }
       },
       "ReconciliationResolutionWrite": {
-        "type": "object", "required": ["expectedVersion", "comment"], "additionalProperties": false,
-        "properties": {"expectedVersion": {"type": "integer", "minimum": 1}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
+        "type": "object",
+        "required": [
+          "expectedVersion",
+          "comment"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
       },
       "ReconciliationItem": {
-        "type": "object", "additionalProperties": false,
-        "required": ["reference", "transactionReference", "type", "status", "internalDirection", "externalDirection", "internalAmount", "externalAmount", "internalCurrency", "externalCurrency", "resolutionComment", "resolvedBy", "resolvedAt", "version"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "transactionReference",
+          "type",
+          "status",
+          "internalDirection",
+          "externalDirection",
+          "internalAmount",
+          "externalAmount",
+          "internalCurrency",
+          "externalCurrency",
+          "resolutionComment",
+          "resolvedBy",
+          "resolvedAt",
+          "version"
+        ],
         "properties": {
-          "reference": {"type": "string"}, "transactionReference": {"type": "string"},
-          "type": {"type": "string", "enum": ["MATCHED", "AMOUNT_MISMATCH", "DIRECTION_MISMATCH", "CURRENCY_MISMATCH", "MISSING_INTERNAL", "MISSING_EXTERNAL"]},
-          "status": {"type": "string", "enum": ["MATCHED", "OPEN", "RESOLVED"]},
-          "internalDirection": {"type": "string", "enum": ["DEBIT", "CREDIT"], "nullable": true}, "externalDirection": {"type": "string", "enum": ["DEBIT", "CREDIT"], "nullable": true},
-          "internalAmount": {"allOf": [{"$ref": "#/components/schemas/Money"}], "nullable": true}, "externalAmount": {"allOf": [{"$ref": "#/components/schemas/Money"}], "nullable": true},
-          "internalCurrency": {"type": "string", "nullable": true}, "externalCurrency": {"type": "string", "nullable": true}, "resolutionComment": {"type": "string", "nullable": true},
-          "resolvedBy": {"type": "string", "nullable": true}, "resolvedAt": {"type": "string", "format": "date-time", "nullable": true}, "version": {"type": "integer"}
+          "reference": {
+            "type": "string"
+          },
+          "transactionReference": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "MATCHED",
+              "AMOUNT_MISMATCH",
+              "DIRECTION_MISMATCH",
+              "CURRENCY_MISMATCH",
+              "MISSING_INTERNAL",
+              "MISSING_EXTERNAL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "MATCHED",
+              "OPEN",
+              "RESOLVED"
+            ]
+          },
+          "internalDirection": {
+            "type": "string",
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "nullable": true
+          },
+          "externalDirection": {
+            "type": "string",
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "nullable": true
+          },
+          "internalAmount": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "nullable": true
+          },
+          "externalAmount": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "nullable": true
+          },
+          "internalCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalCurrency": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolutionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          }
         }
       },
       "ReconciliationRun": {
-        "type": "object", "additionalProperties": false,
-        "required": ["reference", "businessDate", "status", "attempted", "matched", "exceptions", "openExceptions", "requestedBy", "startedAt", "completedAt", "errorMessage", "items"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "businessDate",
+          "status",
+          "attempted",
+          "matched",
+          "exceptions",
+          "openExceptions",
+          "requestedBy",
+          "startedAt",
+          "completedAt",
+          "errorMessage",
+          "items"
+        ],
         "properties": {
-          "reference": {"type": "string"}, "businessDate": {"type": "string", "format": "date"}, "status": {"type": "string", "enum": ["RUNNING", "COMPLETED", "FAILED"]},
-          "attempted": {"type": "integer"}, "matched": {"type": "integer"}, "exceptions": {"type": "integer"}, "openExceptions": {"type": "integer"},
-          "requestedBy": {"type": "string"}, "startedAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "errorMessage": {"type": "string", "nullable": true}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/ReconciliationItem"}}
+          "reference": {
+            "type": "string"
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attempted": {
+            "type": "integer"
+          },
+          "matched": {
+            "type": "integer"
+          },
+          "exceptions": {
+            "type": "integer"
+          },
+          "openExceptions": {
+            "type": "integer"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationItem"
+            }
+          }
         }
       },
       "AccountingPeriodCloseRequestWrite": {
-        "type": "object", "required": ["expectedVersion", "comment"], "additionalProperties": false,
-        "properties": {"expectedVersion": {"type": "integer", "minimum": 1}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
+        "type": "object",
+        "required": [
+          "expectedVersion",
+          "comment"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
       },
       "AccountingPeriodCloseDecisionWrite": {
-        "type": "object", "required": ["workItemReference", "expectedVersion", "decision", "comment"], "additionalProperties": false,
-        "properties": {"workItemReference": {"type": "string", "pattern": "^WRK-"}, "expectedVersion": {"type": "integer", "minimum": 1}, "decision": {"type": "string", "enum": ["APPROVE", "REJECT"]}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
+        "type": "object",
+        "required": [
+          "workItemReference",
+          "expectedVersion",
+          "decision",
+          "comment"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "workItemReference": {
+            "type": "string",
+            "pattern": "^WRK-"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
       },
       "AccountingPeriod": {
-        "type": "object", "additionalProperties": false,
-        "required": ["reference", "code", "startDate", "endDate", "status", "version", "closeRequestedBy", "closeRequestComment", "closeRequestedAt", "closedBy", "closeDecisionComment", "closedAt", "workItem"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "code",
+          "startDate",
+          "endDate",
+          "status",
+          "version",
+          "closeRequestedBy",
+          "closeRequestComment",
+          "closeRequestedAt",
+          "closedBy",
+          "closeDecisionComment",
+          "closedAt",
+          "workItem"
+        ],
         "properties": {
-          "reference": {"type": "string", "pattern": "^ACP-"}, "code": {"type": "string"},
-          "startDate": {"type": "string", "format": "date"}, "endDate": {"type": "string", "format": "date"},
-          "status": {"type": "string", "enum": ["OPEN", "CLOSING", "CLOSED"]}, "version": {"type": "integer", "minimum": 1},
-          "closeRequestedBy": {"type": "string", "nullable": true}, "closeRequestComment": {"type": "string", "nullable": true}, "closeRequestedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "closedBy": {"type": "string", "nullable": true}, "closeDecisionComment": {"type": "string", "nullable": true}, "closedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "workItem": {"allOf": [{"$ref": "#/components/schemas/WorkQueueItem"}], "nullable": true}
+          "reference": {
+            "type": "string",
+            "pattern": "^ACP-"
+          },
+          "code": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "CLOSING",
+              "CLOSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "closeRequestedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeRequestComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeRequestedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeDecisionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "workItem": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkQueueItem"
+              }
+            ],
+            "nullable": true
+          }
         }
       },
       "GeneralLedgerAccount": {
-        "type": "object", "additionalProperties": false,
-        "required": ["code", "name", "type", "currency", "systemControlled", "postingAllowed", "active", "version"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name",
+          "type",
+          "currency",
+          "systemControlled",
+          "postingAllowed",
+          "active",
+          "version"
+        ],
         "properties": {
-          "code": {"type": "string", "pattern": "^[0-9]{4}-[A-Z]{3}$"}, "name": {"type": "string"},
-          "type": {"type": "string", "enum": ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]},
-          "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "systemControlled": {"type": "boolean"}, "postingAllowed": {"type": "boolean"}, "active": {"type": "boolean"}, "version": {"type": "integer", "minimum": 1}
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[A-Z]{3}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "systemControlled": {
+            "type": "boolean"
+          },
+          "postingAllowed": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       },
       "GeneralLedgerLine": {
-        "type": "object", "additionalProperties": false,
-        "required": ["lineNumber", "accountCode", "accountName", "accountType", "direction", "amount", "narrative"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lineNumber",
+          "accountCode",
+          "accountName",
+          "accountType",
+          "direction",
+          "amount",
+          "narrative"
+        ],
         "properties": {
-          "lineNumber": {"type": "integer", "minimum": 1}, "accountCode": {"type": "string"}, "accountName": {"type": "string"},
-          "accountType": {"type": "string", "enum": ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]},
-          "direction": {"type": "string", "enum": ["DEBIT", "CREDIT"]}, "amount": {"$ref": "#/components/schemas/Money"}, "narrative": {"type": "string"}
+          "lineNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accountCode": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "accountType": {
+            "type": "string",
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "narrative": {
+            "type": "string"
+          }
         }
       },
       "GeneralLedgerJournal": {
-        "type": "object", "additionalProperties": false,
-        "required": ["reference", "source", "sourceTransactionReference", "valueDate", "status", "currency", "description", "totalDebit", "totalCredit", "createdBy", "submittedComment", "submittedAt", "decidedBy", "decisionComment", "decidedAt", "postedAt", "version", "lines", "workItem"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "source",
+          "sourceTransactionReference",
+          "valueDate",
+          "status",
+          "currency",
+          "description",
+          "totalDebit",
+          "totalCredit",
+          "createdBy",
+          "submittedComment",
+          "submittedAt",
+          "decidedBy",
+          "decisionComment",
+          "decidedAt",
+          "postedAt",
+          "version",
+          "lines",
+          "workItem"
+        ],
         "properties": {
-          "reference": {"type": "string"}, "source": {"type": "string", "enum": ["SUBLEDGER", "MANUAL"]}, "sourceTransactionReference": {"type": "string", "nullable": true},
-          "valueDate": {"type": "string", "format": "date"}, "status": {"type": "string", "enum": ["PENDING_APPROVAL", "POSTED", "REJECTED"]}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "description": {"type": "string"},
-          "totalDebit": {"$ref": "#/components/schemas/Money"}, "totalCredit": {"$ref": "#/components/schemas/Money"},
-          "createdBy": {"type": "string", "nullable": true}, "submittedComment": {"type": "string", "nullable": true}, "submittedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "decidedBy": {"type": "string", "nullable": true}, "decisionComment": {"type": "string", "nullable": true}, "decidedAt": {"type": "string", "format": "date-time", "nullable": true}, "postedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "version": {"type": "integer", "minimum": 1}, "lines": {"type": "array", "minItems": 2, "items": {"$ref": "#/components/schemas/GeneralLedgerLine"}}, "workItem": {"allOf": [{"$ref": "#/components/schemas/WorkQueueItem"}], "nullable": true}
+          "reference": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "SUBLEDGER",
+              "MANUAL"
+            ]
+          },
+          "sourceTransactionReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "valueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_APPROVAL",
+              "POSTED",
+              "REJECTED"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "totalDebit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "totalCredit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decidedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/GeneralLedgerLine"
+            }
+          },
+          "workItem": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkQueueItem"
+              }
+            ],
+            "nullable": true
+          }
         }
       },
       "TrialBalanceLine": {
-        "type": "object", "additionalProperties": false,
-        "required": ["code", "name", "type", "currency", "systemControlled", "postingAllowed", "active", "version", "debit", "credit", "balance"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name",
+          "type",
+          "currency",
+          "systemControlled",
+          "postingAllowed",
+          "active",
+          "version",
+          "debit",
+          "credit",
+          "balance"
+        ],
         "properties": {
-          "code": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string", "enum": ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]}, "currency": {"type": "string"},
-          "systemControlled": {"type": "boolean"}, "postingAllowed": {"type": "boolean"}, "active": {"type": "boolean"}, "version": {"type": "integer", "minimum": 1},
-          "debit": {"$ref": "#/components/schemas/Money"}, "credit": {"$ref": "#/components/schemas/Money"}, "balance": {"type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$"}
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "systemControlled": {
+            "type": "boolean"
+          },
+          "postingAllowed": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "debit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "credit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$"
+          }
         }
       },
       "TrialBalance": {
-        "type": "object", "additionalProperties": false,
-        "required": ["fromDate", "toDate", "currency", "totalDebit", "totalCredit", "balanced", "lines"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fromDate",
+          "toDate",
+          "currency",
+          "totalDebit",
+          "totalCredit",
+          "balanced",
+          "lines"
+        ],
         "properties": {
-          "fromDate": {"type": "string", "format": "date", "nullable": true}, "toDate": {"type": "string", "format": "date"}, "currency": {"type": "string", "nullable": true},
-          "totalDebit": {"$ref": "#/components/schemas/Money"}, "totalCredit": {"$ref": "#/components/schemas/Money"}, "balanced": {"type": "boolean"}, "lines": {"type": "array", "items": {"$ref": "#/components/schemas/TrialBalanceLine"}}
+          "fromDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalDebit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "totalCredit": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "balanced": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrialBalanceLine"
+            }
+          }
         }
       },
       "ManualGeneralLedgerJournalWrite": {
-        "type": "object", "additionalProperties": false, "required": ["valueDate", "currency", "debitAccountCode", "creditAccountCode", "amount", "description", "comment"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "valueDate",
+          "currency",
+          "debitAccountCode",
+          "creditAccountCode",
+          "amount",
+          "description",
+          "comment"
+        ],
         "properties": {
-          "valueDate": {"type": "string", "format": "date"}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "debitAccountCode": {"type": "string"}, "creditAccountCode": {"type": "string"},
-          "amount": {"$ref": "#/components/schemas/Money"}, "description": {"type": "string", "minLength": 5, "maxLength": 200}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}
+          "valueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "debitAccountCode": {
+            "type": "string"
+          },
+          "creditAccountCode": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 200
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
         }
       },
       "GeneralLedgerJournalDecisionWrite": {
-        "type": "object", "additionalProperties": false, "required": ["workItemReference", "expectedVersion", "decision", "comment"],
-        "properties": {"workItemReference": {"type": "string", "pattern": "^WRK-"}, "expectedVersion": {"type": "integer", "minimum": 1}, "decision": {"type": "string", "enum": ["APPROVE", "REJECT"]}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workItemReference",
+          "expectedVersion",
+          "decision",
+          "comment"
+        ],
+        "properties": {
+          "workItemReference": {
+            "type": "string",
+            "pattern": "^WRK-"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
       },
       "LoanApplicationSummary": {
         "type": "object",
-        "required": ["reference", "customerNumber", "customerName", "productCode", "destinationAccountNumber", "principal", "approvedPrincipal", "currency", "termMonths", "annualInterestRate", "firstPaymentDate", "projectedInstallment", "debtServiceRatio", "riskGrade", "purpose", "status", "loanAccountNumber", "submittedBy", "submittedAt", "decidedBy", "decisionComment", "decidedAt", "version", "workItem"],
+        "required": [
+          "reference",
+          "customerNumber",
+          "customerName",
+          "productCode",
+          "destinationAccountNumber",
+          "principal",
+          "approvedPrincipal",
+          "currency",
+          "termMonths",
+          "annualInterestRate",
+          "firstPaymentDate",
+          "projectedInstallment",
+          "debtServiceRatio",
+          "riskGrade",
+          "purpose",
+          "status",
+          "loanAccountNumber",
+          "submittedBy",
+          "submittedAt",
+          "decidedBy",
+          "decisionComment",
+          "decidedAt",
+          "version",
+          "workItem"
+        ],
         "properties": {
-          "reference": {"type": "string", "pattern": "^LOA-"}, "customerNumber": {"type": "string", "pattern": "^C[0-9]{6}$"}, "customerName": {"type": "string"},
-          "productCode": {"type": "string"}, "destinationAccountNumber": {"type": "string"}, "principal": {"$ref": "#/components/schemas/Money"},
-          "approvedPrincipal": {"allOf": [{"$ref": "#/components/schemas/Money"}], "nullable": true}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
-          "termMonths": {"type": "integer", "minimum": 6, "maximum": 60}, "annualInterestRate": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,4})?$"},
-          "firstPaymentDate": {"type": "string", "format": "date"}, "projectedInstallment": {"$ref": "#/components/schemas/Money"},
-          "debtServiceRatio": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"}, "riskGrade": {"type": "string", "enum": ["A", "B", "C"]},
-          "purpose": {"type": "string"}, "status": {"type": "string", "enum": ["PENDING_APPROVAL", "APPROVED", "REJECTED"]},
-          "loanAccountNumber": {"type": "string", "nullable": true}, "submittedBy": {"type": "string"}, "submittedAt": {"type": "string", "format": "date-time"},
-          "decidedBy": {"type": "string", "nullable": true}, "decisionComment": {"type": "string", "nullable": true}, "decidedAt": {"type": "string", "format": "date-time", "nullable": true},
-          "version": {"type": "integer", "minimum": 1}, "workItem": {"allOf": [{"$ref": "#/components/schemas/WorkQueueItem"}], "nullable": true}
+          "reference": {
+            "type": "string",
+            "pattern": "^LOA-"
+          },
+          "customerNumber": {
+            "type": "string",
+            "pattern": "^C[0-9]{6}$"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "destinationAccountNumber": {
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "approvedPrincipal": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ],
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "termMonths": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 60
+          },
+          "annualInterestRate": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,4})?$"
+          },
+          "firstPaymentDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "projectedInstallment": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "debtServiceRatio": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+          },
+          "riskGrade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_APPROVAL",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "loanAccountNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedBy": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionComment": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "workItem": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkQueueItem"
+              }
+            ],
+            "nullable": true
+          }
         }
       },
       "LoanScheduleLine": {
-        "type": "object", "additionalProperties": false,
-        "required": ["sequence", "dueDate", "paidAt", "principal", "interest", "status"],
-        "properties": {"sequence": {"type": "integer", "minimum": 1, "nullable": true}, "dueDate": {"type": "string", "format": "date"}, "paidAt": {"type": "string", "format": "date", "nullable": true}, "principal": {"$ref": "#/components/schemas/Money"}, "interest": {"$ref": "#/components/schemas/Money"}, "status": {"type": "string"}}
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "dueDate",
+          "paidAt",
+          "principal",
+          "interest",
+          "status"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "interest": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
       },
       "LoanApplication": {
         "allOf": [
-          {"$ref": "#/components/schemas/LoanApplicationSummary"},
-          {"type": "object", "required": ["monthlyIncome", "monthlyCommitments", "originationTransactionReference", "schedule"], "properties": {
-            "monthlyIncome": {"$ref": "#/components/schemas/Money"}, "monthlyCommitments": {"$ref": "#/components/schemas/Money"},
-            "originationTransactionReference": {"type": "string", "nullable": true}, "schedule": {"type": "array", "items": {"$ref": "#/components/schemas/LoanScheduleLine"}}
-          }}
+          {
+            "$ref": "#/components/schemas/LoanApplicationSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "monthlyIncome",
+              "monthlyCommitments",
+              "originationTransactionReference",
+              "schedule"
+            ],
+            "properties": {
+              "monthlyIncome": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "monthlyCommitments": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "originationTransactionReference": {
+                "type": "string",
+                "nullable": true
+              },
+              "schedule": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LoanScheduleLine"
+                }
+              }
+            }
+          }
         ]
       },
       "LoanApplicationWrite": {
-        "type": "object", "additionalProperties": false,
-        "required": ["customerNumber", "productCode", "destinationAccountNumber", "principal", "termMonths", "firstPaymentDate", "monthlyIncome", "monthlyCommitments", "purpose", "riskGrade"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "customerNumber",
+          "productCode",
+          "destinationAccountNumber",
+          "principal",
+          "termMonths",
+          "firstPaymentDate",
+          "monthlyIncome",
+          "monthlyCommitments",
+          "purpose",
+          "riskGrade"
+        ],
         "properties": {
-          "customerNumber": {"type": "string", "pattern": "^C[0-9]{6}$"}, "productCode": {"type": "string"}, "destinationAccountNumber": {"type": "string"},
-          "principal": {"$ref": "#/components/schemas/Money"}, "termMonths": {"type": "integer", "minimum": 6, "maximum": 60}, "firstPaymentDate": {"type": "string", "format": "date"},
-          "monthlyIncome": {"$ref": "#/components/schemas/Money"}, "monthlyCommitments": {"$ref": "#/components/schemas/Money"},
-          "purpose": {"type": "string", "minLength": 10, "maxLength": 500}, "riskGrade": {"type": "string", "enum": ["A", "B", "C"]}
+          "customerNumber": {
+            "type": "string",
+            "pattern": "^C[0-9]{6}$"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "destinationAccountNumber": {
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "termMonths": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 60
+          },
+          "firstPaymentDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "monthlyIncome": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "monthlyCommitments": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "riskGrade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ]
+          }
         }
       },
       "LoanApplicationDecisionWrite": {
-        "type": "object", "additionalProperties": false, "required": ["workItemReference", "expectedVersion", "decision", "comment"],
-        "properties": {"workItemReference": {"type": "string", "pattern": "^WRK-"}, "expectedVersion": {"type": "integer", "minimum": 1}, "decision": {"type": "string", "enum": ["APPROVE", "REJECT"]}, "comment": {"type": "string", "minLength": 10, "maxLength": 500}}
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workItemReference",
+          "expectedVersion",
+          "decision",
+          "comment"
+        ],
+        "properties": {
+          "workItemReference": {
+            "type": "string",
+            "pattern": "^WRK-"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        }
       },
       "AuditEvent": {
         "type": "object",

@@ -1,12 +1,10 @@
 import { requireUser } from "@/lib/auth/session";
-import { isDocumentSlot } from "@/modules/domain/document-policy";
-import { getCustomerDocumentMetadata } from "@/modules/services/documents";
+import { getCustomerDocumentByReference } from "@/modules/services/documents";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ customerNumber: string; slot: string }> }) {
   await requireUser();
-  const { customerNumber, slot } = await params;
-  if (!isDocumentSlot(slot)) return Response.json({ error: { code: "INVALID_DOCUMENT_SLOT", message: "Document slot is invalid." } }, { status: 400, headers: { "Cache-Control": "no-store" } });
-  const document = await getCustomerDocumentMetadata(customerNumber, slot);
+  const { customerNumber, slot: documentReference } = await params;
+  const document = await getCustomerDocumentByReference(customerNumber, documentReference);
   if (!document) return Response.json({ error: { code: "DOCUMENT_NOT_FOUND", message: "Document not found." } }, { status: 404, headers: { "Cache-Control": "no-store" } });
-  return Response.json({ data: document }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ data: { documentReference: document.documentReference, documentType: document.documentType, slot: document.slot, filename: document.filename, mimeType: document.mimeType, sizeBytes: document.sizeBytes, uploadedBy: document.uploadedBy, uploadedAt: document.uploadedAt.toISOString() } }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -83,8 +83,8 @@ Consequential decisions use work items, optimistic versions, row/advisory locks,
 
 ## Customer-document invariants
 
-- Neon stores the customer/slot relationship and safe metadata; private Blob stores bytes.
-- Exactly one file may occupy each `PASSPORT` or `NATIONAL_ID` slot.
+- Neon stores the customer/document-reference relationship and safe metadata; private Blob stores bytes.
+- Each customer may have many document types, with one current file per `documentReference`.
 - Files are non-empty JPEG, PNG, or PDF, no larger than 4 MB, with matching declared type and signature.
 - DTOs and audits exclude private Blob URL/pathname/ETag and content bytes.
 - Replacements are concurrency-safe, remove obsolete non-seed blobs after persistence, and rotate the versioned preview URL without remounting the stable card.
