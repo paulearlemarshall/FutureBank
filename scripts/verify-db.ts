@@ -46,6 +46,18 @@ async function main() {
       (d.slot = 'NATIONAL_ID' and d.size_bytes = 85430 and d.sha256 = 'a42d421f5a1133e95497081f51144fc8a6f7589a2b111a2577f2250c15151be3')
     )
   `), 2);
+  expectEqual("Amelia KYC is in progress", await scalar(sql`
+    select count(*)::int as value from kyc_cases k join customers c on c.id = k.customer_id
+    where c.customer_number = 'C000001' and k.reference = 'KYC-000001' and k.status = 'IN_PROGRESS'
+  `), 1);
+  expectEqual("Amelia KYC evidence is unverified passport and ID", await scalar(sql`
+    select count(*)::int as value from kyc_evidence e join kyc_cases k on k.id = e.kyc_case_id
+    where k.reference = 'KYC-000001' and e.evidence_type in ('PASSPORT', 'NATIONAL_ID') and e.verification_status = 'NOT_VERIFIED'
+  `), 2);
+  expectEqual("Amelia requires a fresh screening run", await scalar(sql`
+    select count(*)::int as value from screening_checks s join kyc_cases k on k.id = s.kyc_case_id
+    where k.reference = 'KYC-000001'
+  `), 0);
   expectEqual("accounts", await scalar(sql`select count(*)::int as value from bank_accounts`), 19);
   expectEqual("product charge rules", await scalar(sql`select count(*)::int as value from product_charge_rules where active`), 2);
   expectEqual("failed end-of-day scenarios", await scalar(sql`
