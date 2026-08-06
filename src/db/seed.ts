@@ -181,7 +181,7 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   ]);
 
   const caseRows = [
-    { customerNumber: "C000001", reference: "KYC-000001", type: "PERIODIC_REVIEW" as const, jurisdiction: "GB", status: "APPROVED" as const, score: 0, calculated: "LOW" as const, final: "LOW" as const, edd: false, dueAt: "2026-07-15T17:00:00.000Z", submittedAt: "2026-07-11T10:00:00.000Z", decidedAt: "2026-07-12T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "Standard due diligence complete." },
+    { customerNumber: "C000001", reference: "KYC-000001", type: "PERIODIC_REVIEW" as const, jurisdiction: "GB", status: "IN_PROGRESS" as const, score: 0, calculated: "LOW" as const, final: null, edd: false, dueAt: "2026-08-15T17:00:00.000Z", submittedAt: null, decidedAt: null, decidedBy: null, comment: null },
     { customerNumber: "C000002", reference: "KYC-000002", type: "TRIGGER_EVENT" as const, jurisdiction: "AE", status: "APPROVED" as const, score: 40, calculated: "MEDIUM" as const, final: "MEDIUM" as const, edd: true, dueAt: "2026-07-16T17:00:00.000Z", submittedAt: "2026-07-12T10:00:00.000Z", decidedAt: "2026-07-13T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "PEP relationship approved after EDD and source-of-wealth review." },
     { customerNumber: "C000003", reference: "KYC-000003", type: "PERIODIC_REVIEW" as const, jurisdiction: "AE", status: "AWAITING_INFORMATION" as const, score: 0, calculated: "LOW" as const, final: null, edd: false, dueAt: timeline.instant(25, 17).toISOString(), submittedAt: null, decidedAt: null, decidedBy: null, comment: null },
     { customerNumber: "C000004", reference: "KYC-000004", type: "PERIODIC_REVIEW" as const, jurisdiction: "GB", status: "APPROVED" as const, score: 15, calculated: "LOW" as const, final: "MEDIUM" as const, edd: false, dueAt: "2026-07-17T17:00:00.000Z", submittedAt: "2026-07-13T10:00:00.000Z", decidedAt: "2026-07-14T12:00:00.000Z", decidedBy: staffId("compliance"), comment: "Ownership verified; sanctions candidate resolved as a false positive." },
@@ -194,7 +194,9 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     id: kycCaseId(item.customerNumber), reference: item.reference, customerId: customerId(item.customerNumber), type: item.type,
     jurisdiction: item.jurisdiction, status: item.status, calculatedRiskScore: item.score, calculatedRiskRating: item.calculated,
     finalRiskRating: item.final, enhancedDueDiligence: item.edd,
-    requirements: ["C000003", "C000007", "C000009"].includes(item.customerNumber)
+    requirements: item.customerNumber === "C000001"
+      ? [{ code: "PASSPORT", label: "Passport", mandatory: true }, { code: "NATIONAL_ID", label: "National ID", mandatory: true }]
+      : ["C000003", "C000007", "C000009"].includes(item.customerNumber)
       ? [{ code: "EMIRATES_ID", label: "Emirates ID", mandatory: true }, { code: "PASSPORT", label: "Passport", mandatory: true }, { code: "RESIDENCY", label: "Residency evidence", mandatory: true }]
       : baselineCustomers.find((customer) => customer.customerNumber === item.customerNumber)?.partyType === "SME"
         ? [{ code: "INCORPORATION", label: "Trade licence or incorporation evidence", mandatory: true }, { code: "OWNERSHIP", label: "Ownership and control structure", mandatory: true }, { code: "CONTROLLERS", label: "Directors and authorised signatories", mandatory: true }, { code: "BENEFICIAL_OWNERS", label: "Verified beneficial owners", mandatory: true }]
@@ -226,17 +228,18 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
   ]);
   const evidenceRows = caseRows.flatMap((item) => {
     const customer = baselineCustomers.find((candidate) => candidate.customerNumber === item.customerNumber)!;
-    const types = ["C000003", "C000007", "C000009"].includes(item.customerNumber) ? ["EMIRATES_ID", "PASSPORT", "RESIDENCY"] : customer.partyType === "SME" ? ["INCORPORATION", "OWNERSHIP", "CONTROLLERS", "BENEFICIAL_OWNERS"] : ["IDENTITY", "ADDRESS"];
+    const types = item.customerNumber === "C000001" ? ["PASSPORT", "NATIONAL_ID"] : ["C000003", "C000007", "C000009"].includes(item.customerNumber) ? ["EMIRATES_ID", "PASSPORT", "RESIDENCY"] : customer.partyType === "SME" ? ["INCORPORATION", "OWNERSHIP", "CONTROLLERS", "BENEFICIAL_OWNERS"] : ["IDENTITY", "ADDRESS"];
     return types.map((evidenceType, index) => ({
       id: stableUuid(`evidence-${item.customerNumber}-${evidenceType}`), reference: `EVD-${item.customerNumber.slice(-3)}-${index + 1}`,
-      kycCaseId: kycCaseId(item.customerNumber), evidenceType, documentReference: item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? "PASSPORT-123456789" : `FICT-${item.customerNumber}-${evidenceType}`,
-      ...(item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? { documentNumber: "123456789", issuedAt: "2025-01-01", firstName: "Amelia", lastName: "Hart" } : {}),
+      kycCaseId: kycCaseId(item.customerNumber), evidenceType, documentReference: item.customerNumber === "C000001" ? `IDN-C000001-${evidenceType}` : `FICT-${item.customerNumber}-${evidenceType}`,
+      ...(item.customerNumber === "C000001" && evidenceType === "PASSPORT" ? { documentNumber: "123456789", issuedAt: "2025-01-01", firstName: "Amelia", lastName: "Hart" } : {}),
+      ...(item.customerNumber === "C000001" && evidenceType === "NATIONAL_ID" ? { documentNumber: "784-1987-1234567-1", issuedAt: "1987-04-16", firstName: "Amelia", lastName: "Hart" } : {}),
       source: "Customer supplied fictional metadata", receivedAt: item.customerNumber === "C000009" ? "2024-06-10" : timeline.date(-10),
-      verificationStatus: item.customerNumber === "C000009" ? "EXPIRED" as const : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "PENDING" as const : "VERIFIED" as const,
-      verifiedBy: ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? null : staffId("operator"),
-      verifiedAt: ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? null : item.customerNumber === "C000009" ? new Date("2024-06-11T10:00:00.000Z") : timeline.instant(-9, 10),
-      expiresAt: item.customerNumber === "C000001" && evidenceType === "IDENTITY" ? "2035-01-01" : item.customerNumber === "C000009" ? timeline.date(-30) : item.customerNumber === "C000003" && evidenceType === "EMIRATES_ID" ? timeline.date(20) : timeline.date(730),
-      reviewerNotes: item.customerNumber === "C000009" ? "Evidence expired; relationship inactive and debits blocked." : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "Updated residency evidence requested." : "Fictional evidence verified for demonstration.",
+      verificationStatus: item.customerNumber === "C000001" ? "NOT_VERIFIED" as const : item.customerNumber === "C000009" ? "EXPIRED" as const : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "PENDING" as const : "VERIFIED" as const,
+      verifiedBy: item.customerNumber === "C000001" || (["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY") ? null : staffId("operator"),
+      verifiedAt: item.customerNumber === "C000001" || (["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY") ? null : item.customerNumber === "C000009" ? new Date("2024-06-11T10:00:00.000Z") : timeline.instant(-9, 10),
+      expiresAt: item.customerNumber === "C000001" ? "2035-01-01" : item.customerNumber === "C000009" ? timeline.date(-30) : item.customerNumber === "C000003" && evidenceType === "EMIRATES_ID" ? timeline.date(20) : timeline.date(730),
+      reviewerNotes: item.customerNumber === "C000001" ? "Awaiting operator verification during the KYC demonstration." : item.customerNumber === "C000009" ? "Evidence expired; relationship inactive and debits blocked." : ["C000003", "C000007"].includes(item.customerNumber) && evidenceType === "RESIDENCY" ? "Updated residency evidence requested." : "Fictional evidence verified for demonstration.",
     }));
   });
   await tx.insert(tables.kycEvidence).values(evidenceRows);
@@ -248,7 +251,6 @@ export async function seedBaseline(tx: SeedDb, preparedDocuments: PreparedSeedDo
     { id: stableUuid("watch-yousef-possible"), reference: "FWL-SAN-005", screeningType: "SANCTIONS", subjectName: "Yusuf Al Haddad", aliases: ["Yousef Haddad"], country: "JO", details: "Fictional near-name entry requiring Compliance resolution." },
   ]);
   await tx.insert(tables.screeningChecks).values([
-    { id: stableUuid("screen-c1-clear"), reference: "SCR-000001", kycCaseId: kycCaseId("C000001"), customerId: customerId("C000001"), subjectType: "CUSTOMER", subjectReference: "C000001", subjectName: "Amelia Hart", screeningType: "SANCTIONS", matchScore: 0, outcome: "CLEAR" },
     { id: stableUuid("screen-c2-pep"), reference: "SCR-000002", kycCaseId: kycCaseId("C000002"), customerId: customerId("C000002"), subjectType: "CUSTOMER", subjectReference: "C000002", subjectName: "عمر المنصوري", screeningType: "PEP", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-13T11:00:00.000Z"), resolutionComment: "PEP confirmed; EDD completed. PEP status is not a sanctions rejection." },
     { id: stableUuid("screen-c4-false"), reference: "SCR-000004", kycCaseId: kycCaseId("C000004"), customerId: customerId("C000004"), subjectType: "CUSTOMER", subjectReference: "C000004", subjectName: "Northstar Sustainable Logistics Ltd", screeningType: "SANCTIONS", matchScore: 82, outcome: "FALSE_POSITIVE", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-14T11:00:00.000Z"), resolutionComment: "Different legal entity, country and registration number." },
     { id: stableUuid("screen-c5-sanctions"), reference: "SCR-000005", kycCaseId: kycCaseId("C000005"), customerId: customerId("C000005"), subjectType: "CUSTOMER", subjectReference: "C000005", subjectName: "شركة الهلال للتجارة الرقمية ش.م.ح-ذ.م.م", screeningType: "SANCTIONS", matchScore: 100, outcome: "CONFIRMED_MATCH", resolvedBy: staffId("compliance"), resolvedAt: new Date("2026-07-15T11:00:00.000Z"), resolutionComment: "Confirmed fictional match; relationship rejected and debit block applied." },

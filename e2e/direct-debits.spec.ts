@@ -21,7 +21,7 @@ test("creates, collects and cancels a direct debit mandate", async ({ page }) =>
   await bp(page, "direct-debit-collection-mandate").selectOption(reference!);
   await bp(page, "direct-debit-collection-amount").fill("2.34");
   await bp(page, "direct-debit-collection-submit").click();
-  await expect(bp(page, "status-direct-debit-collection-status")).toContainText(/is booked/i);
+  await expect(bp(page, "status-direct-debit-collection-status")).toContainText(/is pending/i);
 
   await page.goto(`/direct-debits/${reference}`);
   await expectReady(page, "direct-debit-detail");

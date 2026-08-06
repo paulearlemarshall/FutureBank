@@ -67,6 +67,7 @@ describe("baseline seed manifest", () => {
     expect(baselineCustomers.slice(0, 5).map(({ customerNumber }) => customerNumber)).toEqual(["C000001", "C000002", "C000003", "C000004", "C000005"]);
     expect(baselineAccounts.slice(0, 14).map(({ accountNumber }) => accountNumber)).toEqual(Array.from({ length: 14 }, (_, index) => `10000000${(index + 1).toString().padStart(2, "0")}`));
     expect(new Set(baselineCustomers.map(({ kycStatus }) => kycStatus))).toEqual(new Set(["NOT_STARTED", "IN_PROGRESS", "PENDING_APPROVAL", "APPROVED", "DUE", "REJECTED", "EXPIRED"]));
+    expect(baselineCustomers.find(({ customerNumber }) => customerNumber === "C000001")?.kycStatus).toBe("IN_PROGRESS");
   });
 
   it("includes searchable Arabic retail and SME scenarios with Arabic addresses", () => {

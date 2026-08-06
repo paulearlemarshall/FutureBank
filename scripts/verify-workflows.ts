@@ -108,14 +108,16 @@ async function main() {
     const collectionKey = "VERIFY-DIRECT-DEBIT-EXACTLY-ONCE";
     const firstCollection = await submitDirectDebitCollection({ mandateReference: "DDM-000001", amount: "3.21", collectionDate, idempotencyKey: collectionKey, today: collectionDate }, operator);
     const duplicateCollection = await submitDirectDebitCollection({ mandateReference: "DDM-000001", amount: "3.21", collectionDate, idempotencyKey: collectionKey, today: collectionDate }, operator);
-    if (firstCollection.status !== "BOOKED" || duplicateCollection.reference !== firstCollection.reference || !duplicateCollection.duplicate) throw new Error("Direct debit idempotency did not return the original booked collection");
+    if (firstCollection.status !== "PENDING" || duplicateCollection.reference !== firstCollection.reference || !duplicateCollection.duplicate) throw new Error("Direct debit idempotency did not return the original pending collection");
     const collectionResult = await db.execute(sql`
       select
-        (select count(*)::int from direct_debit_collections where idempotency_key = ${collectionKey} and status = 'BOOKED') as collections,
-        (select count(*)::int from payment_orders where idempotency_key like 'direct-debit:%' and status = 'BOOKED') as payments,
+        (select count(*)::int from direct_debit_collections where idempotency_key = ${collectionKey} and status = 'PENDING') as collections,
+        (select count(*)::int from payment_orders where idempotency_key like 'direct-debit:%' and status = 'PENDING') as payments,
         (select count(*)::int from ledger_transactions l join payment_orders p on p.id = l.payment_order_id where p.idempotency_key like 'direct-debit:%') as ledger_transactions
     `);
-    for (const [label, value] of Object.entries(collectionResult.rows[0] as unknown as Record<string, number>)) if (Number(value) !== 1) throw new Error(`direct debit ${label}: expected 1, received ${value}`);
+    const collectionRow = collectionResult.rows[0] as unknown as Record<string, number>;
+    for (const label of ["collections", "payments"]) if (Number(collectionRow[label]) !== 1) throw new Error(`direct debit ${label}: expected 1, received ${collectionRow[label]}`);
+    if (Number(collectionRow.ledger_transactions) !== 0) throw new Error(`direct debit ledger_transactions: expected 0, received ${collectionRow.ledger_transactions}`);
     const reversalAttempts = await Promise.allSettled([
       decidePaymentReversal({ reversalReference: "REV-000001", workItemReference: "WRK-000010", expectedVersion: 1, comment: "Concurrent reversal approval A", decision: "APPROVE" }, supervisor),
       decidePaymentReversal({ reversalReference: "REV-000001", workItemReference: "WRK-000010", expectedVersion: 1, comment: "Concurrent reversal approval B", decision: "APPROVE" }, supervisor),
