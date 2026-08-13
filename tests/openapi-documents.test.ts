@@ -8,7 +8,7 @@ describe("OpenAPI customer document contract", () => {
     const specification = await SwaggerParser.validate(fileURLToPath(new URL("../openapi/futurebank.v1.json", import.meta.url))) as {
       openapi: string;
       security: Array<Record<string, unknown>>;
-      paths: Record<string, Record<string, { operationId?: string; description?: string; responses?: Record<string, unknown> }>>;
+      paths: Record<string, Record<string, { operationId?: string; description?: string; parameters?: unknown[]; responses?: Record<string, unknown> }>>;
       components: { schemas: Record<string, { enum?: string[] }>; securitySchemes: Record<string, unknown> };
     };
     expect(specification.openapi).toBe("3.0.3");
@@ -35,6 +35,10 @@ describe("OpenAPI customer document contract", () => {
     expect(specification.paths["/customers/{customerNumber}/documents/{documentReference}"].delete).toBeDefined();
     expect(specification.paths["/customers/{customerNumber}/documents/{documentReference}/content"].get).toBeDefined();
     expect(specification.components.schemas.DocumentMeta).toBeDefined();
+    expect(specification.components.schemas.Base64DocumentContent).toBeDefined();
+    expect(specification.paths["/customers/{customerNumber}/documents/{documentReference}/content"].get.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "encoding", in: "query" }),
+    ]));
     expect(operationIds.size).toBe(88);
   });
 

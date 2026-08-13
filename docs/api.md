@@ -242,12 +242,16 @@ curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" --output passport.jpg
 
+# Compatibility response for clients that cannot preserve binary HTTP bodies
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content?encoding=base64" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" --output passport.json
+
 # Delete by document reference (idempotent; reset restores Amelia Hart's seeded originals)
 curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 ```
 
-`POST` accepts `documentReference`, `documentType` and one `multipart/form-data` field named `file`, returning `201` for a new reference or `200` when replacing it. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../{documentReference}/content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. All other document operations use the standard JSON envelope.
+`POST` accepts `documentReference`, `documentType` and one `multipart/form-data` field named `file`, returning `201` for a new reference or `200` when replacing it. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../{documentReference}/content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. For connectors that cannot preserve binary response bodies, add `?encoding=base64`; the response is JSON-wrapped and its `data.contentBase64` field decodes to the exact original bytes. All other document operations use the standard JSON envelope.
 
 ## OpenAPI
 

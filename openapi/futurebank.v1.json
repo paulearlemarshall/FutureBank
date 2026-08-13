@@ -4611,6 +4611,18 @@
           },
           {
             "$ref": "#/components/parameters/DocumentReference"
+          },
+          {
+            "name": "encoding",
+            "in": "query",
+            "required": false,
+            "description": "Set to base64 for a JSON-wrapped compatibility response when the client cannot preserve binary HTTP bodies.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "base64"
+              ]
+            }
           }
         ],
         "responses": {
@@ -4648,6 +4660,11 @@
               }
             },
             "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Base64DocumentContent"
+                }
+              },
               "image/jpeg": {
                 "schema": {
                   "type": "string",
@@ -5558,6 +5575,47 @@
           }
         },
         "description": "Safe document metadata. Private Blob URLs, paths, hashes and file bytes are never returned."
+      },
+      "Base64DocumentContent": {
+        "type": "object",
+        "description": "JSON compatibility representation for clients that cannot preserve binary HTTP response bodies.",
+        "required": [
+          "encoding",
+          "contentType",
+          "filename",
+          "sizeBytes",
+          "contentBase64"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "base64"
+            ]
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "filename": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "contentBase64": {
+            "type": "string",
+            "format": "byte",
+            "description": "Base64 encoding of the exact document bytes."
+          }
+        }
       },
       "EmptyDocumentSlot": {
         "type": "object",

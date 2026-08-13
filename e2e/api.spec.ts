@@ -70,6 +70,13 @@ test("reads Amelia Hart's seeded private document metadata and content", async (
   expect(content.headers().etag).toBeTruthy();
   expect(content.headers()["cache-control"]).toBe("no-store");
   expect((await content.body()).byteLength).toBe(58533);
+
+  const encoded = await request.get("/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content?encoding=base64", { headers });
+  expect(encoded.ok()).toBe(true);
+  expect(encoded.headers()["content-type"]).toContain("application/json");
+  const encodedBody = (await encoded.json()).data;
+  expect(encodedBody).toMatchObject({ encoding: "base64", contentType: "image/jpeg", filename: "Passport-AmeliaHart.jpg", sizeBytes: 58533 });
+  expect(Buffer.from(encodedBody.contentBase64, "base64").byteLength).toBe(58533);
 });
 
 test("requires multipart form data for customer document uploads", async ({ request }) => {

@@ -122,6 +122,18 @@ export async function routeApiRequest(request: Request, segments: string[]): Pro
     if (segments[0] === "customers" && segments.length === 5 && segments[2] === "documents" && segments[4] === "content") {
       const content = await getCustomerDocumentContentByReference(segments[1], segments[3]);
       if (!content) notFound("Customer document");
+      const encoding = url.searchParams.get("encoding");
+      if (encoding && encoding !== "base64") throw new ApiError(400, "INVALID_QUERY", "encoding must be base64 when supplied.");
+      if (encoding === "base64") {
+        const bytes = Buffer.from(await new Response(content.stream).arrayBuffer());
+        return jsonResponse({
+          encoding: "base64",
+          contentType: content.document.mimeType,
+          filename: content.document.filename,
+          sizeBytes: content.document.sizeBytes,
+          contentBase64: bytes.toString("base64"),
+        });
+      }
       return binaryStreamResponse(content.stream, content.document.mimeType, content.document.filename, {
         sizeBytes: content.document.sizeBytes,
         etag: content.document.blobEtag ?? undefined,
