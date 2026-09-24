@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -984,3 +985,15 @@ export const accountHolds = pgTable("account_holds", {
   releaseReason: text("release_reason"),
   ...timestamps,
 }, (table) => [index("account_holds_account_idx").on(table.accountId, table.status), index("account_holds_expiry_idx").on(table.status, table.expiresAt)]);
+
+export const brandLogos = pgTable("brand_logos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  filename: text("filename").notNull(),
+  blobUrl: text("blob_url").notNull().unique(),
+  blobPathname: text("blob_pathname").notNull().unique(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  active: boolean("active").notNull().default(false),
+  uploadedBy: text("uploaded_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+  ...timestamps,
+}, (table) => [uniqueIndex("brand_logos_single_active_idx").on(table.active).where(sql`${table.active} = true`)]);

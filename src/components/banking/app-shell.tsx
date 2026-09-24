@@ -2,6 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { logoutAction } from "@/modules/actions/auth";
 import type { SessionUser } from "@/modules/contracts";
+import { BrandManager } from "@/components/banking/brand-manager";
+
+type BrandLogo = { id: string; filename: string; url: string; mimeType: string; sizeBytes: number; active: boolean };
 
 const navGroups = [
   {
@@ -39,17 +42,11 @@ const navGroups = [
   },
 ] as const;
 
-export function AppShell({ children, user }: { children: ReactNode; user: SessionUser }) {
+export function AppShell({ children, user, logos }: { children: ReactNode; user: SessionUser; logos: BrandLogo[] }) {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link className="brand" href="/dashboard" data-bp="brand-home">
-          <span className="brand-mark" aria-hidden="true">FB</span>
-          <span>
-            <strong>FutureBank</strong>
-            <small>CORE OPERATIONS</small>
-          </span>
-        </Link>
+        <BrandManager logos={logos} activeLogo={logos.find((logo) => logo.active) ?? null} canManage={user.role === "ADMIN"} />
         <form className="global-search" action="/search" method="get" role="search">
           <label className="sr-only" htmlFor="global-search-query">Search customers or accounts</label>
           <input
