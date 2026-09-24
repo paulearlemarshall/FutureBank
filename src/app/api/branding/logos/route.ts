@@ -25,8 +25,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "BRANDING_FAILED";
+    const knownErrors = ["UNAUTHENTICATED", "FORBIDDEN", "LOGO_NOT_FOUND", "INVALID_SIZE", "INVALID_IMAGE"];
+    console.error("Branding request failed", knownErrors.includes(message) ? message : "STORAGE_OR_DATABASE_FAILURE");
     const status = message === "UNAUTHENTICATED" ? 401 : message === "FORBIDDEN" ? 403 : message === "LOGO_NOT_FOUND" ? 404 : 400;
-    const text = message === "INVALID_SIZE" ? "Logo must be between 1 byte and 3 MB." : message === "INVALID_IMAGE" ? "Upload a valid PNG, JPEG or WebP image." : message === "LOGO_NOT_FOUND" ? "That logo is no longer available." : "The logo change could not be completed.";
-    return NextResponse.json({ error: text }, { status, headers: { "Cache-Control": "no-store" } });
+    const text = message === "INVALID_SIZE" ? "Logo must be between 1 byte and 3 MB." : message === "INVALID_IMAGE" ? "Upload a valid PNG, JPEG or WebP image." : message === "LOGO_NOT_FOUND" ? "That logo is no longer available." : message === "UNAUTHENTICATED" ? "Sign in to manage logos." : message === "FORBIDDEN" ? "Only an administrator can manage logos." : "The logo could not be saved. Try again, and contact an administrator if it persists.";
+    const responseStatus = knownErrors.includes(message) ? status : 500;
+    return NextResponse.json({ error: text }, { status: responseStatus, headers: { "Cache-Control": "no-store" } });
   }
 }

@@ -12,6 +12,7 @@ export function BrandManager({ logos, activeLogo, canManage }: { logos: BrandLog
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedLogoId, setSelectedLogoId] = useState("");
 
   async function update(intent: "select" | "delete", id: string) {
     setBusy(true);
@@ -20,6 +21,7 @@ export function BrandManager({ logos, activeLogo, canManage }: { logos: BrandLog
       const response = await fetch("/api/branding/logos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent, id }) });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "The logo change failed.");
+      if (intent === "delete" && selectedLogoId === id) setSelectedLogoId("");
       setMessage(intent === "select" ? "Active logo updated." : "Logo deleted.");
       router.refresh();
     } catch (error) {
@@ -48,7 +50,7 @@ export function BrandManager({ logos, activeLogo, canManage }: { logos: BrandLog
   }
 
   return <>
-    <button type="button" className="brand-cell" onClick={() => { setOpen(true); setMessage(""); }} aria-label="Open brand manager" title="Brand manager" data-bp="brand-manager-open">
+    <button type="button" className="brand-cell" onClick={() => { setOpen(true); setMessage(""); setSelectedLogoId(activeLogo?.id ?? ""); }} aria-label="Open brand manager" title="Brand manager" data-bp="brand-manager-open">
       {activeLogo ? <Image src={activeLogo.url} alt="" width={260} height={140} unoptimized /> : <span className="brand-placeholder">FutureBank</span>}
     </button>
     {open ? <div className="brand-manager-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
@@ -57,14 +59,20 @@ export function BrandManager({ logos, activeLogo, canManage }: { logos: BrandLog
         <p className="brand-manager-help">Choose the logo shown in the top-left corner of the application.</p>
         {canManage ? <div className="brand-manager-upload"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" aria-label="Choose a logo image" onChange={(event) => void upload(event.target.files?.[0])} data-bp="brand-logo-upload" /><small>PNG, JPEG or WebP · up to 3 MB</small></div> : <p className="brand-manager-help">An administrator can upload, select or delete logos.</p>}
         <div className="brand-logo-gallery" data-bp="brand-logo-gallery">
-          {logos.length ? logos.map((logo) => <article className={`brand-logo-card${logo.active ? " is-active" : ""}`} key={logo.id}>
-            <div className="brand-logo-preview"><Image src={logo.url} alt={logo.filename} width={260} height={140} unoptimized /></div>
-            <strong title={logo.filename}>{logo.filename}</strong>
-            {logo.active ? <span className="brand-logo-active">Active logo</span> : canManage ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void update("select", logo.id)} data-bp={`brand-logo-select-${logo.id}`}>Use this logo</button> : <span className="brand-logo-inactive">Available</span>}
-            {canManage ? <button className="brand-logo-delete" type="button" disabled={busy} onClick={() => void update("delete", logo.id)} data-bp={`brand-logo-delete-${logo.id}`}>Delete</button> : null}
+          {logos.length ? logos.map((logo) => <article className={`brand-logo-card${logo.active ? " is-active" : ""}${selectedLogoId === logo.id ? " is-selected" : ""}`} key={logo.id}>
+            <button className="brand-logo-tile" type="button" onClick={() => setSelectedLogoId(logo.id)} aria-pressed={selectedLogoId === logo.id} data-bp={`brand-logo-tile-${logo.id}`}>
+              <span className="brand-logo-preview"><Image src={logo.url} alt="" width={260} height={140} unoptimized /></span>
+              <strong title={logo.filename}>{logo.filename}</strong>
+              {logo.active ? <span className="brand-logo-active">Active</span> : null}
+              {selectedLogoId === logo.id ? <span className="brand-logo-selected">Selected</span> : null}
+            </button>
+            {canManage ? <button className="brand-logo-delete" type="button" disabled={busy} onClick={() => void update("delete", logo.id)} data-bp={`brand-logo-delete-${logo.id}`}>Delete image</button> : null}
           </article>) : <p className="brand-manager-empty">No logos uploaded yet.</p>}
         </div>
-        <div className="brand-manager-status" role="status" aria-live="polite" data-bp="brand-manager-status">{message}</div>
+        <footer className="brand-manager-footer">
+          <div className="brand-manager-status" role="status" aria-live="polite" data-bp="brand-manager-status">{message}</div>
+          {canManage ? <button className="primary-button" type="button" disabled={busy || !selectedLogoId || selectedLogoId === activeLogo?.id} onClick={() => void update("select", selectedLogoId)} data-bp="brand-logo-apply">Apply selected logo</button> : null}
+        </footer>
       </section>
     </div> : null}
   </>;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { del, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { brandLogos } from "@/db/schema";
@@ -14,8 +14,9 @@ export function brandingBlobPrefix(): string {
 }
 
 export async function listBrandLogos() {
-  return db.select({ id: brandLogos.id, filename: brandLogos.filename, url: brandLogos.blobUrl, mimeType: brandLogos.mimeType, sizeBytes: brandLogos.sizeBytes, active: brandLogos.active })
+  const rows = await db.select({ id: brandLogos.id, filename: brandLogos.filename, mimeType: brandLogos.mimeType, sizeBytes: brandLogos.sizeBytes, active: brandLogos.active })
     .from(brandLogos).orderBy(asc(brandLogos.createdAt));
+  return rows.map((logo) => ({ ...logo, url: `/api/branding/logos/${logo.id}/image` }));
 }
 
 export async function getActiveBrandLogo() {
@@ -37,7 +38,7 @@ export async function uploadBrandLogo(file: File, actorId: string) {
   if (!validImageContent(file.type, bytes)) throw new Error("INVALID_IMAGE");
   const filename = safeDocumentSegment(file.name).slice(-100) || "logo";
   const pathname = `${brandingBlobPrefix()}${crypto.randomUUID()}-${filename}`;
-  const blob = await put(pathname, bytes, { access: "public", addRandomSuffix: false, contentType: file.type, cacheControlMaxAge: 31536000 });
+  const blob = await put(pathname, bytes, { access: "private", addRandomSuffix: false, contentType: file.type, cacheControlMaxAge: 60 });
   try {
     const [logo] = await db.insert(brandLogos).values({ filename: file.name.slice(0, 255), blobUrl: blob.url, blobPathname: blob.pathname, mimeType: file.type, sizeBytes: bytes.byteLength, uploadedBy: actorId }).returning({ id: brandLogos.id });
     return logo;
@@ -45,6 +46,15 @@ export async function uploadBrandLogo(file: File, actorId: string) {
     await del(blob.url);
     throw error;
   }
+}
+
+export async function getBrandLogoImage(id: string) {
+  const [logo] = await db.select({ blobPathname: brandLogos.blobPathname, mimeType: brandLogos.mimeType })
+    .from(brandLogos).where(eq(brandLogos.id, id)).limit(1);
+  if (!logo) return null;
+  const result = await get(logo.blobPathname, { access: "private", useCache: false });
+  if (!result || result.statusCode !== 200) return null;
+  return { stream: result.stream, mimeType: logo.mimeType };
 }
 
 export async function selectBrandLogo(id: string) {

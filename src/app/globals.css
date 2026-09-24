@@ -148,18 +148,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand-manager-upload input { max-width: 330px; font-size: 12px; }
 .brand-manager-upload small { color: var(--muted); font-size: 11px; }
 .brand-logo-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 0 24px 18px; overflow-y: auto; }
-.brand-logo-card { min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; }
-.brand-logo-card.is-active { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.brand-logo-card { min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; }
+.brand-logo-card.is-active { border-color: #9bc9ae; }
+.brand-logo-card.is-selected { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.brand-logo-tile { min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 7px; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer; }
+.brand-logo-tile:focus-visible { outline: 3px solid rgba(12, 96, 137, .28); outline-offset: 2px; }
 .brand-logo-preview { height: 92px; display: grid; place-items: center; padding: 6px; background: white; }
 .brand-logo-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.brand-logo-card > strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.brand-logo-card .secondary-button { min-height: 30px; font-size: 11px; }
+.brand-logo-tile > strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .brand-logo-active { color: var(--success); font-size: 11px; font-weight: 700; }
-.brand-logo-inactive { color: var(--muted); font-size: 11px; }
+.brand-logo-selected { color: var(--brand); font-size: 11px; font-weight: 700; }
 .brand-logo-delete { align-self: flex-start; border: 0; padding: 2px 0; background: transparent; color: var(--danger); font-size: 11px; text-decoration: underline; cursor: pointer; }
 .brand-logo-delete:disabled { opacity: .55; cursor: wait; }
 .brand-manager-empty { grid-column: 1 / -1; padding: 24px 0; color: var(--muted); text-align: center; }
-.brand-manager-status { min-height: 38px; padding: 10px 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.brand-manager-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding: 10px 24px; }
+.brand-manager-status { min-height: 18px; color: var(--muted); font-size: 12px; }
 
 .global-search {
   display: flex;
