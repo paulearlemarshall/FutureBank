@@ -25,6 +25,21 @@ Authorization: Bearer <actor-owned-key>
 
 The key owner is passed through the normal application control layer. Operator, Supervisor, Compliance and Admin permissions, maker-checker separation, optimistic versions, account locks, idempotency, KYC restrictions, payment holds, double-entry posting and audit events are still enforced.
 
+## Read-only MCP server
+
+The remote MCP endpoint is available at `/mcp` over Streamable HTTP. It uses the same actor-owned API key authentication as `/api/v1`; configure the MCP client to send the key as `Authorization: Bearer <actor-owned-key>` or `X-API-Key`. Each request is authenticated, and read calls run through the existing API router and actor permission context.
+
+The initial read-only tools are:
+
+| Tool | Purpose |
+| --- | --- |
+| `search_customers` | Search fictional customers by name or customer number |
+| `get_customer` | Read a customer by customer number |
+| `get_account` | Read account details and balance |
+| `get_account_statement` | Read an account statement as CSV |
+
+The MCP endpoint exposes no mutation tools. Existing API restrictions on account statements and customer data still apply. Requests with unapproved Host or Origin headers are rejected. Localhost and the production domain are allowed by default; add comma-separated hostnames to `MCP_ALLOWED_HOSTS` when serving from a custom domain. For example, an MCP client connecting to production uses `https://future-bank-demo.vercel.app/mcp` and must be configured with an actor-owned key. The key should be stored in the MCP client's secret or environment configuration, not committed to a project file.
+
 Payment-instruction permissions are separated: Operator maintains instructions and Supervisor executes due-instruction runs. Admin can do both. An occurrence is initiated under the instruction creator's identity, so an external payment that becomes pending still requires an independent payment checker.
 
 End-of-day execution is restricted to Supervisor and Admin. Product charge rules and product interest rates are read from the database; callers cannot supply a rate or amount in the run request.
@@ -242,12 +257,16 @@ curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN
 curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" --output passport.jpg
 
+# Compatibility response for clients that cannot preserve binary HTTP bodies
+curl "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT/content?encoding=base64" \
+  -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY" --output passport.json
+
 # Delete by document reference (idempotent; reset restores Amelia Hart's seeded originals)
 curl -X DELETE "https://future-bank-demo.vercel.app/api/v1/customers/C000001/documents/IDN-C000001-PASSPORT" \
   -H "X-API-Key: $FUTUREBANK_ACTOR_API_KEY"
 ```
 
-`POST` accepts `documentReference`, `documentType` and one `multipart/form-data` field named `file`, returning `201` for a new reference or `200` when replacing it. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../{documentReference}/content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. All other document operations use the standard JSON envelope.
+`POST` accepts `documentReference`, `documentType` and one `multipart/form-data` field named `file`, returning `201` for a new reference or `200` when replacing it. Only non-empty JPEG, PNG and PDF files up to 4,194,304 bytes are accepted; the declared MIME type must match the file signature. `GET .../{documentReference}/content` returns raw authenticated bytes with `Content-Type`, `Content-Length`, `Content-Disposition`, `ETag` and `Cache-Control: no-store`. For connectors that cannot preserve binary response bodies, add `?encoding=base64`; the response is JSON-wrapped and its `data.contentBase64` field decodes to the exact original bytes. All other document operations use the standard JSON envelope.
 
 ## OpenAPI
 

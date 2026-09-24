@@ -31,6 +31,7 @@
   "dependencies": {
     "@better-auth/api-key": "1.6.23",
     "@better-auth/drizzle-adapter": "1.6.23",
+    "@modelcontextprotocol/server": "^2.1.0",
     "@vercel/blob": "2.6.1",
     "@vercel/functions": "^3.7.5",
     "better-auth": "1.6.23",
