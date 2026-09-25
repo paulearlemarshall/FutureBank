@@ -64,7 +64,7 @@ export async function openKycCaseAction(_previous: ActionState, formData: FormDa
       return reference;
     });
     revalidatePath("/kyc"); revalidatePath(`/customers/${parsed.data.customerNumber}`);
-    return { ok: true, code: "KYC_CASE_OPENED", message: `KYC case ${reference} was opened.` };
+    return { ok: true, code: "KYC_CASE_OPENED", message: `KYC case ${reference} was opened.`, result: { caseReference: reference } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -109,7 +109,7 @@ export async function recordKycEvidenceAction(caseReference: string, _previous: 
     await db.insert(kycEvidence).values({ reference, kycCaseId: kycCase.id, ...parsed.data, verificationStatus: "PENDING" });
     await db.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "KYC_EVIDENCE_RECORDED", entityType: "KYC_EVIDENCE", entityReference: reference, correlationId: crypto.randomUUID(), before: null, after: { caseReference, evidenceType: parsed.data.evidenceType } });
     revalidatePath(`/kyc/${caseReference}`);
-    return { ok: true, code: "EVIDENCE_RECORDED", message: `Evidence ${reference} was recorded.` };
+    return { ok: true, code: "EVIDENCE_RECORDED", message: `Evidence ${reference} was recorded.`, result: { evidenceReference: reference } };
   } catch (error) { return failedAction(error); }
 }
 

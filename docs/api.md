@@ -25,11 +25,11 @@ Authorization: Bearer <actor-owned-key>
 
 The key owner is passed through the normal application control layer. Operator, Supervisor, Compliance and Admin permissions, maker-checker separation, optimistic versions, account locks, idempotency, KYC restrictions, payment holds, double-entry posting and audit events are still enforced.
 
-## Read-only MCP server
+## MCP server
 
 The remote MCP endpoint is available at `/mcp` over Streamable HTTP. It uses the same actor-owned API key authentication as `/api/v1`; configure the MCP client to send the key as `Authorization: Bearer <actor-owned-key>` or `X-API-Key`. Each request is authenticated, and read calls run through the existing API router and actor permission context.
 
-The initial read-only tools are:
+The server exposes these read tools:
 
 | Tool | Purpose |
 | --- | --- |
@@ -37,8 +37,22 @@ The initial read-only tools are:
 | `get_customer` | Read a customer by customer number |
 | `get_account` | Read account details and balance |
 | `get_account_statement` | Read an account statement as CSV |
+| `list_kyc_cases` | List KYC case summaries |
+| `get_kyc_case` | Read a case, its version, CDD profile, evidence, screening checks and restrictions |
 
-The MCP endpoint exposes no mutation tools. Existing API restrictions on account statements and customer data still apply. Requests with unapproved Host or Origin headers are rejected. Localhost and the production domain are allowed by default; add comma-separated hostnames to `MCP_ALLOWED_HOSTS` when serving from a custom domain. For example, an MCP client connecting to production uses `https://future-bank-demo.vercel.app/mcp` and must be configured with an actor-owned key. The key should be stored in the MCP client's secret or environment configuration, not committed to a project file.
+The initial write slice covers fictional KYC intake and preparation:
+
+| Tool | Purpose | Permission |
+| --- | --- | --- |
+| `open_kyc_case` | Open a case; returns its reference in structured result data | `KYC_GATHER` |
+| `update_kyc_cdd` | Create or replace a case's complete CDD profile | `KYC_GATHER` |
+| `record_kyc_evidence` | Record fictional evidence metadata only; returns the evidence reference | `KYC_GATHER` |
+| `update_kyc_evidence` | Update evidence metadata within the specified case | `KYC_GATHER` |
+| `run_kyc_screening` | Run fictional screening rules and create screening history | `KYC_SCREEN` |
+
+These tools validate inputs at the MCP boundary and dispatch through the existing API router, so the same actor context, permission checks, audit events and KYC rules apply. Successful write calls return structured status and the API ActionState; a successful case or evidence creation also returns its reference in `data.result`. A tool success indicates the requested KYC operation succeeded, not that the case was approved. Evidence metadata does not upload file bytes. These are the first write tools; the remaining API mutation capabilities are not exposed through MCP yet.
+
+Existing API restrictions on account statements and customer data still apply. Requests with unapproved Host or Origin headers are rejected. Localhost and the production domain are allowed by default; add comma-separated hostnames to `MCP_ALLOWED_HOSTS` when serving from a custom domain. For example, an MCP client connecting to production uses `https://future-bank-demo.vercel.app/mcp` and must be configured with an actor-owned key. The key should be stored in the MCP client's secret or environment configuration, not committed to a project file.
 
 Payment-instruction permissions are separated: Operator maintains instructions and Supervisor executes due-instruction runs. Admin can do both. An occurrence is initiated under the instruction creator's identity, so an external payment that becomes pending still requires an independent payment checker.
 

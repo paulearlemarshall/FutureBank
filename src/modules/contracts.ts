@@ -13,6 +13,7 @@ export type ActionState = {
   code: string;
   message: string;
   fieldErrors?: FieldErrors;
+  result?: Record<string, unknown>;
 };
 
 export const initialActionState: ActionState = {
