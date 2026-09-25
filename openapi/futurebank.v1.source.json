@@ -4939,6 +4939,11 @@
                 "type": "string"
               }
             }
+          },
+          "result": {
+            "type": "object",
+            "description": "Structured identifiers or operation metadata returned by a successful mutation.",
+            "additionalProperties": true
           }
         },
         "description": "ActionState API data contract."
