@@ -19,7 +19,9 @@ const apiOperations: ApiOperation[] = Object.entries(openApi.paths).flatMap(([pa
         group: operation.tags?.[0] ?? "Other",
         summary: operation.summary ?? `${method.toUpperCase()} ${path}`,
         description: operation.description ?? operation.summary ?? "See the OpenAPI schema for request and response details.",
-        parameters: (operation.parameters ?? []).map((parameter) => `${parameter.name}${parameter.required ? " (required)" : ""}`),
+        parameters: (operation.parameters ?? [])
+          .filter((parameter): parameter is { name: string; required?: boolean } => typeof parameter.name === "string" && parameter.name.length > 0)
+          .map((parameter) => `${parameter.name}${parameter.required ? " (required)" : ""}`),
       };
     }),
 );
