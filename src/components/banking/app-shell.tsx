@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { logoutAction } from "@/modules/actions/auth";
 import type { SessionUser } from "@/modules/contracts";
 import { BrandManager } from "@/components/banking/brand-manager";
+import { ApiMcpManual } from "@/components/banking/api-mcp-manual";
 
 type BrandLogo = { id: string; filename: string; url: string; mimeType: string; sizeBytes: number; active: boolean };
 
@@ -67,6 +68,7 @@ export function AppShell({ children, user, logos }: { children: ReactNode; user:
           <form action={logoutAction}>
             <button id="sign-out" name="intent" value="sign-out" data-bp="sign-out" className="text-button" type="submit">Sign out</button>
           </form>
+          <ApiMcpManual />
         </div>
       </header>
 
