@@ -26,7 +26,7 @@
     "auth:provision": "dotenv -e .env.local -- tsx scripts/seed-staff.ts",
     "db:reset": "dotenv -e .env.local -- tsx scripts/reset.ts",
     "db:verify": "dotenv -e .env.local -- tsx scripts/verify-db.ts",
-    "db:verify-workflows": "dotenv -e .env.local -- node --conditions=react-server --import tsx scripts/verify-workflows.ts"
+    "db:verify-workflows": "dotenv -e .env.local -- node --conditions=react-server --import ./scripts/next-test-shims.mjs --import tsx scripts/verify-workflows.ts"
   },
   "dependencies": {
     "@better-auth/api-key": "1.6.23",
