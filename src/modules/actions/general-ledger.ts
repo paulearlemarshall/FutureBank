@@ -25,7 +25,7 @@ export async function createManualGeneralLedgerJournalAction(_previous: ActionSt
     const actor = await requirePermission("GENERAL_LEDGER_JOURNAL_INITIATE");
     const result = await createManualGeneralLedgerJournal(parsed.data, actor);
     revalidatePath("/general-ledger"); revalidatePath(`/general-ledger/journals/${result.reference}`); revalidatePath("/work-queue");
-    return { ok: true, code: result.duplicate ? "GENERAL_LEDGER_JOURNAL_DUPLICATE" : "GENERAL_LEDGER_JOURNAL_SUBMITTED", message: result.duplicate ? `${result.reference} already owns this idempotency key.` : `${result.reference} entered independent Admin review as ${result.workItemReference}.` };
+    return { ok: true, code: result.duplicate ? "GENERAL_LEDGER_JOURNAL_DUPLICATE" : "GENERAL_LEDGER_JOURNAL_SUBMITTED", message: result.duplicate ? `${result.reference} already owns this idempotency key.` : `${result.reference} entered independent Admin review as ${result.workItemReference}.`, result: { journalReference: result.reference, workItemReference: result.workItemReference, status: result.status, duplicate: result.duplicate } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -36,6 +36,6 @@ export async function decideManualGeneralLedgerJournalAction(_previous: ActionSt
     const actor = await requirePermission("GENERAL_LEDGER_JOURNAL_DECIDE");
     await decideManualGeneralLedgerJournal(parsed.data, actor);
     revalidatePath("/general-ledger"); revalidatePath(`/general-ledger/journals/${parsed.data.journalReference}`); revalidatePath("/work-queue");
-    return { ok: true, code: parsed.data.decision === "APPROVE" ? "GENERAL_LEDGER_JOURNAL_POSTED" : "GENERAL_LEDGER_JOURNAL_REJECTED", message: `${parsed.data.journalReference} was ${parsed.data.decision === "APPROVE" ? "posted to the general ledger" : "rejected without posting"}.` };
+    return { ok: true, code: parsed.data.decision === "APPROVE" ? "GENERAL_LEDGER_JOURNAL_POSTED" : "GENERAL_LEDGER_JOURNAL_REJECTED", message: `${parsed.data.journalReference} was ${parsed.data.decision === "APPROVE" ? "posted to the general ledger" : "rejected without posting"}.`, result: { journalReference: parsed.data.journalReference, workItemReference: parsed.data.workItemReference, decision: parsed.data.decision, status: parsed.data.decision === "APPROVE" ? "POSTED" : "REJECTED" } };
   } catch (error) { return failedAction(error); }
 }

@@ -22,6 +22,7 @@ export async function runEndOfDayAction(_previous: ActionState, formData: FormDa
       ok: true,
       code: result.duplicate ? "END_OF_DAY_ALREADY_RUN" : result.failed ? "END_OF_DAY_COMPLETED_WITH_FAILURES" : "END_OF_DAY_COMPLETED",
       message: `${result.reference}: ${result.booked} booked (${result.charges} charges, ${result.interests} interest), ${result.failed} failed${result.duplicate ? "; existing run returned" : ""}.`,
+      result: { runReference: result.reference, duplicate: result.duplicate, attempted: result.attempted, booked: result.booked, failed: result.failed, chargeCount: result.charges, interestCount: result.interests },
     };
   } catch (error) { return failedAction(error); }
 }

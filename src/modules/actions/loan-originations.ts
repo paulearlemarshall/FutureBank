@@ -28,7 +28,8 @@ export async function submitLoanApplicationAction(_previous: ActionState, formDa
     const result = await submitLoanApplication(parsed.data, actor);
     revalidatePath("/loans"); revalidatePath(`/loans/${result.reference}`); revalidatePath("/work-queue");
     return { ok: true, code: result.duplicate ? "LOAN_APPLICATION_DUPLICATE" : "LOAN_APPLICATION_SUBMITTED",
-      message: result.duplicate ? `${result.reference} already owns this idempotency key.` : `${result.reference} entered independent review as ${result.workItemReference}.` };
+      message: result.duplicate ? `${result.reference} already owns this idempotency key.` : `${result.reference} entered independent review as ${result.workItemReference}.`,
+      result: { applicationReference: result.reference, workItemReference: result.workItemReference, status: result.status, duplicate: result.duplicate } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -41,6 +42,7 @@ export async function decideLoanApplicationAction(_previous: ActionState, formDa
     const result = await decideLoanApplication(parsed.data, actor);
     revalidatePath("/loans"); revalidatePath(`/loans/${result.reference}`); revalidatePath("/work-queue"); revalidatePath("/accounts"); revalidatePath("/general-ledger");
     return { ok: true, code: parsed.data.decision === "APPROVE" ? "LOAN_ORIGINATION_APPROVED" : "LOAN_APPLICATION_REJECTED",
-      message: parsed.data.decision === "APPROVE" ? `${result.reference} was approved, booked to ${result.loanAccountNumber}, and disbursed.` : `${result.reference} was rejected without account or ledger movement.` };
+      message: parsed.data.decision === "APPROVE" ? `${result.reference} was approved, booked to ${result.loanAccountNumber}, and disbursed.` : `${result.reference} was rejected without account or ledger movement.`,
+      result: { applicationReference: result.reference, workItemReference: parsed.data.workItemReference, decision: parsed.data.decision, status: parsed.data.decision === "APPROVE" ? "APPROVED" : "REJECTED", loanAccountNumber: result.loanAccountNumber ?? null } };
   } catch (error) { return failedAction(error); }
 }

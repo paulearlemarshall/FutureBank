@@ -18,7 +18,7 @@ export async function approvePendingPaymentAction(_previous: ActionState, formDa
     const actor = await requirePermission("PAYMENT_DECIDE");
     await approvePendingPayment(parsed.data, actor);
     revalidatePath("/payments"); revalidatePath(`/payments/${parsed.data.paymentReference}`); revalidatePath("/accounts"); revalidatePath("/work-queue");
-    return { ok: true, code: "PAYMENT_APPROVED", message: `Payment ${parsed.data.paymentReference} was approved and booked exactly once.` };
+    return { ok: true, code: "PAYMENT_APPROVED", message: `Payment ${parsed.data.paymentReference} was approved and booked exactly once.`, result: { paymentReference: parsed.data.paymentReference, workItemReference: parsed.data.workItemReference, decision: "APPROVE", status: "BOOKED" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -29,7 +29,7 @@ export async function rejectPendingPaymentAction(_previous: ActionState, formDat
     const actor = await requirePermission("PAYMENT_DECIDE");
     await rejectPendingPayment(parsed.data, actor);
     revalidatePath("/payments"); revalidatePath(`/payments/${parsed.data.paymentReference}`); revalidatePath("/accounts"); revalidatePath("/work-queue");
-    return { ok: true, code: "PAYMENT_REJECTED", message: `Payment ${parsed.data.paymentReference} was rejected and its hold released.` };
+    return { ok: true, code: "PAYMENT_REJECTED", message: `Payment ${parsed.data.paymentReference} was rejected and its hold released.`, result: { paymentReference: parsed.data.paymentReference, workItemReference: parsed.data.workItemReference, decision: "REJECT", status: "REJECTED" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -38,6 +38,6 @@ export async function expirePendingPaymentsAction(): Promise<ActionState> {
     await requirePermission("PAYMENT_DECIDE");
     const count = await expirePendingPayments();
     revalidatePath("/payments"); revalidatePath("/accounts"); revalidatePath("/work-queue");
-    return { ok: true, code: "PAYMENTS_EXPIRED", message: `${count} stale pending payment(s) expired and released.` };
+    return { ok: true, code: "PAYMENTS_EXPIRED", message: `${count} stale pending payment(s) expired and released.`, result: { expiredCount: count } };
   } catch (error) { return failedAction(error); }
 }

@@ -22,7 +22,7 @@ export async function applyForOverdraftAction(_previous: ActionState, formData: 
   if (!parsed.success) return invalidAction(parsed.error);
   try {
     const actor = await requirePermission("OVERDRAFT_INITIATE");
-    const reference = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(738_204_032)`);
       const result = await tx.execute(sql`
         select a.id, a.customer_id, a.currency, a.status, p.kind, c.kyc_status
@@ -46,12 +46,12 @@ export async function applyForOverdraftAction(_previous: ActionState, formData: 
         affordabilityInformation: { monthlyIncomeOrTurnover: parsed.data.monthlyIncomeOrTurnover, monthlyCommittedOutgoings: parsed.data.monthlyCommittedOutgoings, fictional: true },
         riskGrade: parsed.data.riskGrade, status: "PENDING_APPROVAL", createdBy: actor.id, submittedAt: new Date(),
       });
-      await createApprovalWorkItem(tx, { type: "OVERDRAFT_APPROVAL", entityType: "OVERDRAFT", entityReference: reference, title: `Approve overdraft ${reference}`, description: `Requested limit ${parsed.data.requestedLimit} ${account.currency}; review affordability and KYC.`, requiredRole: "SUPERVISOR", dueAt: new Date(Date.now() + 2 * 86_400_000) }, actor);
+      const workItem = await createApprovalWorkItem(tx, { type: "OVERDRAFT_APPROVAL", entityType: "OVERDRAFT", entityReference: reference, title: `Approve overdraft ${reference}`, description: `Requested limit ${parsed.data.requestedLimit} ${account.currency}; review affordability and KYC.`, requiredRole: "SUPERVISOR", dueAt: new Date(Date.now() + 2 * 86_400_000) }, actor);
       await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "OVERDRAFT_SUBMITTED", entityType: "OVERDRAFT", entityReference: reference, correlationId: crypto.randomUUID(), before: null, after: parsed.data });
-      return reference;
+      return { reference, workItemReference: workItem.reference };
     });
     revalidatePath("/overdrafts"); revalidatePath("/work-queue");
-    return { ok: true, code: "OVERDRAFT_SUBMITTED", message: `Overdraft application ${reference} was submitted for independent approval.` };
+    return { ok: true, code: "OVERDRAFT_SUBMITTED", message: `Overdraft application ${result.reference} was submitted for independent approval.`, result: { facilityReference: result.reference, workItemReference: result.workItemReference, status: "PENDING_APPROVAL" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -60,7 +60,7 @@ export async function requestOverdraftLimitChangeAction(facilityReference: strin
   if (!parsed.success) return invalidAction(parsed.error);
   try {
     const actor = await requirePermission("OVERDRAFT_INITIATE");
-    await db.transaction(async (tx) => {
+    const workItemReference = await db.transaction(async (tx) => {
       const result = await tx.execute(sql`select id, account_id, status, approved_limit, version from overdraft_facilities where reference = ${facilityReference} for update`);
       const facility = (result.rows as unknown as Array<{ id: string; account_id: string; status: string; approved_limit: string; version: number }>)[0];
       if (!facility || facility.status !== "ACTIVE") throw new BankingError("FACILITY_NOT_ACTIVE", "Only an active facility can be changed.");
@@ -69,10 +69,11 @@ export async function requestOverdraftLimitChangeAction(facilityReference: strin
       const [holds] = await tx.select({ value: sql<string>`coalesce(sum(${accountHolds.amount}) filter (where ${accountHolds.status} = 'ACTIVE'), 0)::text` }).from(accountHolds).where(eq(accountHolds.accountId, facility.account_id));
       if (!validateLimitReduction(parsed.data.requestedLimit, account.balance, holds.value)) throw new BankingError("LIMIT_BELOW_COMMITMENTS", "The new limit cannot be below current utilization plus active holds.");
       await tx.update(overdraftFacilities).set({ requestedLimit: parsed.data.requestedLimit, status: "PENDING_CHANGE", version: facility.version + 1, updatedAt: new Date() }).where(eq(overdraftFacilities.id, facility.id));
-      await createApprovalWorkItem(tx, { type: "OVERDRAFT_CHANGE", entityType: "OVERDRAFT", entityReference: facilityReference, title: `Approve limit change ${facilityReference}`, description: `${parsed.data.reason}; requested limit ${parsed.data.requestedLimit}.`, requiredRole: "SUPERVISOR", dueAt: new Date(Date.now() + 2 * 86_400_000) }, actor);
+      const workItem = await createApprovalWorkItem(tx, { type: "OVERDRAFT_CHANGE", entityType: "OVERDRAFT", entityReference: facilityReference, title: `Approve limit change ${facilityReference}`, description: `${parsed.data.reason}; requested limit ${parsed.data.requestedLimit}.`, requiredRole: "SUPERVISOR", dueAt: new Date(Date.now() + 2 * 86_400_000) }, actor);
+      return workItem.reference;
     });
     revalidatePath(`/overdrafts/${facilityReference}`); revalidatePath("/work-queue");
-    return { ok: true, code: "OVERDRAFT_CHANGE_SUBMITTED", message: "The limit change was submitted for independent approval." };
+    return { ok: true, code: "OVERDRAFT_CHANGE_SUBMITTED", message: "The limit change was submitted for independent approval.", result: { facilityReference, workItemReference, status: "PENDING_CHANGE", requestedLimit: parsed.data.requestedLimit } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -81,7 +82,7 @@ export async function decideOverdraftAction(_previous: ActionState, formData: Fo
   if (!parsed.success) return invalidAction(parsed.error);
   try {
     const actor = await requirePermission("OVERDRAFT_DECIDE");
-    await db.transaction(async (tx) => {
+    const resultingStatus = await db.transaction(async (tx) => {
       const item = await lockApprovalWorkItem(tx, { reference: parsed.data.workItemReference, entityType: "OVERDRAFT", entityReference: parsed.data.entityReference, expectedVersion: parsed.data.expectedVersion }, actor);
       const result = await tx.execute(sql`
         select f.id, f.account_id, f.status, f.requested_limit, f.approved_limit, f.currency, f.version,
@@ -110,9 +111,10 @@ export async function decideOverdraftAction(_previous: ActionState, formData: Fo
       }
       await decideWorkItem(tx, item, approved ? "APPROVED" : "REJECTED", parsed.data.comment, actor);
       await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: approved ? "OVERDRAFT_APPROVED" : "OVERDRAFT_DECLINED", entityType: "OVERDRAFT", entityReference: parsed.data.entityReference, correlationId: crypto.randomUUID(), before: { status: facility.status }, after: { status: approved ? "ACTIVE" : "DECLINED", limit: facility.requested_limit } });
+      return approved ? "ACTIVE" : facility.status === "PENDING_CHANGE" ? "ACTIVE" : "DECLINED";
     });
     revalidatePath(`/overdrafts/${parsed.data.entityReference}`); revalidatePath("/overdrafts"); revalidatePath("/work-queue"); revalidatePath("/accounts");
-    return { ok: true, code: parsed.data.decision === "APPROVE" ? "OVERDRAFT_APPROVED" : "OVERDRAFT_DECLINED", message: `Overdraft ${parsed.data.entityReference} was ${parsed.data.decision === "APPROVE" ? "approved" : "declined"}.` };
+    return { ok: true, code: parsed.data.decision === "APPROVE" ? "OVERDRAFT_APPROVED" : "OVERDRAFT_DECLINED", message: `Overdraft ${parsed.data.entityReference} was ${parsed.data.decision === "APPROVE" ? "approved" : "declined"}.`, result: { facilityReference: parsed.data.entityReference, workItemReference: parsed.data.workItemReference, decision: parsed.data.decision, status: resultingStatus } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -121,6 +123,7 @@ export async function setOverdraftStatusAction(facilityReference: string, _previ
   if (!parsed.success) return invalidAction(parsed.error);
   try {
     const actor = await requirePermission("OVERDRAFT_DECIDE");
+    const resultingStatus = parsed.data.action === "SUSPEND" ? "SUSPENDED" : "CLOSED";
     await db.transaction(async (tx) => {
       const result = await tx.execute(sql`select id, account_id, approved_limit, status from overdraft_facilities where reference = ${facilityReference} for update`);
       const facility = (result.rows as unknown as Array<{ id: string; account_id: string; approved_limit: string; status: string }>)[0];
@@ -136,7 +139,7 @@ export async function setOverdraftStatusAction(facilityReference: string, _previ
     });
     revalidatePath(`/overdrafts/${facilityReference}`); revalidatePath("/accounts");
     const outcome = parsed.data.action === "SUSPEND" ? "suspended" : "closed";
-    return { ok: true, code: `OVERDRAFT_${parsed.data.action}`, message: `The facility was ${outcome}.` };
+    return { ok: true, code: `OVERDRAFT_${parsed.data.action}`, message: `The facility was ${outcome}.`, result: { facilityReference, status: resultingStatus } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -157,6 +160,6 @@ export async function resolveOverdraftAlertAction(alertReference: string, _previ
       }
     });
     revalidatePath("/overdrafts"); revalidatePath("/work-queue");
-    return { ok: true, code: "OVERDRAFT_ALERT_RESOLVED", message: `Alert ${alertReference} was resolved.` };
+    return { ok: true, code: "OVERDRAFT_ALERT_RESOLVED", message: `Alert ${alertReference} was resolved.`, result: { alertReference, status: "RESOLVED", intervention: parsed.data.intervention } };
   } catch (error) { return failedAction(error); }
 }

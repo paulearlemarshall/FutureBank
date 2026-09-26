@@ -27,7 +27,7 @@ export async function toggleKycCaseLockAction(caseReference: string, _previous: 
   if (!parsed.success) return invalidAction(parsed.error);
   try {
     const actor = await requirePermission("KYC_LOCK");
-    await db.transaction(async (tx) => {
+      await db.transaction(async (tx) => {
       const result = await tx.execute(sql`select id, locked, version from kyc_cases where reference = ${caseReference} for update`);
       const row = (result.rows as unknown as Array<{ id: string; locked: boolean; version: number }>)[0];
       if (!row) throw new BankingError("KYC_CASE_NOT_FOUND", "KYC case not found.");
@@ -187,7 +187,7 @@ export async function submitKycCaseAction(caseReference: string, _previous: Acti
   void _previous; void _formData;
   try {
     const actor = await requirePermission("KYC_GATHER");
-    await db.transaction(async (tx) => {
+      const workItemReference = await db.transaction(async (tx) => {
       const result = await tx.execute(sql`select id, customer_id, status, requirements from kyc_cases where reference = ${caseReference} for update`);
       const kycCase = (result.rows as unknown as Array<{ id: string; customer_id: string; status: string; requirements: KycCaseRequirements }>)[0];
       if (!kycCase || !["OPEN", "IN_PROGRESS", "AWAITING_INFORMATION"].includes(kycCase.status)) throw new BankingError("KYC_CASE_NOT_SUBMITTABLE", "The KYC case cannot be submitted from its current state.");
@@ -202,10 +202,11 @@ export async function submitKycCaseAction(caseReference: string, _previous: Acti
       if (checks.some((check) => check.outcome === "POSSIBLE_MATCH")) throw new BankingError("SCREENING_UNRESOLVED", "Resolve all possible screening matches before submission.");
       await tx.update(kycCases).set({ status: "PENDING_APPROVAL", submittedAt: new Date(), updatedAt: new Date() }).where(eq(kycCases.id, kycCase.id));
       await tx.update(customers).set({ kycStatus: "PENDING_APPROVAL", updatedAt: new Date() }).where(eq(customers.id, kycCase.customer_id));
-      await createApprovalWorkItem(tx, { type: "KYC_APPROVAL", entityType: "KYC_CASE", entityReference: caseReference, title: `Approve KYC case ${caseReference}`, description: "Review CDD, risk, fictional screening, evidence and ownership.", requiredRole: "COMPLIANCE", dueAt: new Date(Date.now() + 2 * 86_400_000) }, actor);
+      const item = await createApprovalWorkItem(tx, { type: "KYC_APPROVAL", entityType: "KYC_CASE", entityReference: caseReference, title: `Approve KYC case ${caseReference}`, description: "Review CDD, risk, fictional screening, evidence and ownership.", requiredRole: "COMPLIANCE", dueAt: new Date(Date.now() + 2 * 86_400_000) }, actor);
+      return item.reference;
     });
     revalidatePath(`/kyc/${caseReference}`); revalidatePath("/work-queue");
-    return { ok: true, code: "KYC_SUBMITTED", message: `KYC case ${caseReference} was submitted for independent approval.` };
+    return { ok: true, code: "KYC_SUBMITTED", message: `KYC case ${caseReference} was submitted for independent approval.`, result: { caseReference, workItemReference } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -253,7 +254,7 @@ export async function applyRestrictionAction(customerNumber: string, _previous: 
     await db.insert(customerRestrictions).values({ reference, customerId: customer.id, type: parsed.data.type, reason: parsed.data.reason, appliedBy: actor.id });
     if (parsed.data.type === "DEBIT_BLOCK") await db.update(customers).set({ status: "RESTRICTED", updatedAt: new Date() }).where(eq(customers.id, customer.id));
     revalidatePath(`/customers/${customerNumber}`);
-    return { ok: true, code: "RESTRICTION_APPLIED", message: `Restriction ${reference} was applied.` };
+    return { ok: true, code: "RESTRICTION_APPLIED", message: `Restriction ${reference} was applied.`, result: { restrictionReference: reference, customerNumber, type: parsed.data.type, active: true } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -266,6 +267,6 @@ export async function liftRestrictionAction(customerNumber: string, _previous: A
     if (!restriction?.restriction.active) throw new BankingError("RESTRICTION_NOT_ACTIVE", "The restriction is not active.");
     await db.update(customerRestrictions).set({ active: false, effectiveTo: new Date(), liftedBy: actor.id, liftedAt: new Date(), liftReason: parsed.data.reason, updatedAt: new Date() }).where(eq(customerRestrictions.id, restriction.restriction.id));
     revalidatePath(`/customers/${customerNumber}`);
-    return { ok: true, code: "RESTRICTION_LIFTED", message: `Restriction ${parsed.data.restrictionReference} was lifted.` };
+    return { ok: true, code: "RESTRICTION_LIFTED", message: `Restriction ${parsed.data.restrictionReference} was lifted.`, result: { restrictionReference: parsed.data.restrictionReference, customerNumber, active: false } };
   } catch (error) { return failedAction(error); }
 }

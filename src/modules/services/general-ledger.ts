@@ -78,8 +78,8 @@ export async function createManualGeneralLedgerJournal(input: {
   if (input.idempotencyKey.trim().length < 8 || input.idempotencyKey.trim().length > 100) throw new BankingError("IDEMPOTENCY_KEY_REQUIRED", "Provide an idempotency key between 8 and 100 characters.");
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(738_204_041)`);
-    const [existing] = await tx.select({ reference: generalLedgerJournals.reference }).from(generalLedgerJournals).where(eq(generalLedgerJournals.idempotencyKey, input.idempotencyKey.trim())).limit(1);
-    if (existing) return { reference: existing.reference, workItemReference: null, duplicate: true };
+    const [existing] = await tx.select({ reference: generalLedgerJournals.reference, status: generalLedgerJournals.status }).from(generalLedgerJournals).where(eq(generalLedgerJournals.idempotencyKey, input.idempotencyKey.trim())).limit(1);
+    if (existing) return { reference: existing.reference, workItemReference: null, status: existing.status, duplicate: true };
     await assertPostingDateOpen(tx, input.valueDate);
     const accountResult = await tx.execute(sql`
       select id, code, currency, active, posting_allowed from general_ledger_accounts
@@ -114,7 +114,7 @@ export async function createManualGeneralLedgerJournal(input: {
       entityReference: reference, correlationId: input.idempotencyKey.trim(), before: null,
       after: { status: "PENDING_APPROVAL", valueDate: input.valueDate, currency: input.currency, amount: policy.amount, debitAccount: debitAccount.code, creditAccount: creditAccount.code, workItemReference: workItem.reference },
     });
-    return { reference, workItemReference: workItem.reference, duplicate: false };
+    return { reference, workItemReference: workItem.reference, status: "PENDING_APPROVAL" as const, duplicate: false };
   });
 }
 

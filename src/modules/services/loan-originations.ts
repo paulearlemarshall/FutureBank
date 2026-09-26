@@ -89,8 +89,8 @@ export async function submitLoanApplication(input: SubmissionInput, actor: Sessi
   if (idempotencyKey.length < 8 || idempotencyKey.length > 100) throw new BankingError("IDEMPOTENCY_KEY_REQUIRED", "Provide an idempotency key between 8 and 100 characters.");
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${idempotencyKey}))`);
-    const [duplicate] = await tx.select({ reference: loanApplications.reference }).from(loanApplications).where(eq(loanApplications.idempotencyKey, idempotencyKey)).limit(1);
-    if (duplicate) return { reference: duplicate.reference, workItemReference: null, duplicate: true };
+    const [duplicate] = await tx.select({ reference: loanApplications.reference, status: loanApplications.status }).from(loanApplications).where(eq(loanApplications.idempotencyKey, idempotencyKey)).limit(1);
+    if (duplicate) return { reference: duplicate.reference, workItemReference: null, status: duplicate.status, duplicate: true };
     const result = await tx.execute(sql`
       select customer.id as customer_id, customer.status::text as customer_status, customer.kyc_status::text,
              product.id as product_id, product.kind::text as product_kind, product.currency as product_currency,
@@ -143,7 +143,7 @@ export async function submitLoanApplication(input: SubmissionInput, actor: Sessi
         principal: policy.principal, currency: record.product_currency, termMonths: input.termMonths, projectedInstallment: policy.projectedInstallment,
         debtServiceRatio: policy.debtServiceRatio, riskGrade: policy.riskGrade, workItemReference: workItem.reference },
     });
-    return { reference, workItemReference: workItem.reference, duplicate: false };
+    return { reference, workItemReference: workItem.reference, status: "PENDING_APPROVAL" as const, duplicate: false };
   });
 }
 

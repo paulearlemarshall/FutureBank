@@ -110,7 +110,7 @@ export async function createCustomerAction(_previous: ActionState, formData: For
       return next;
     });
     revalidatePath("/customers");
-    return { ok: true, code: "CUSTOMER_CREATED", message: `Customer ${customerNumber} was created.` };
+    return { ok: true, code: "CUSTOMER_CREATED", message: `Customer ${customerNumber} was created.`, result: { customerNumber } };
   } catch (error) { return failure(error); }
 }
 
@@ -138,7 +138,7 @@ export async function updateCustomerAction(customerNumber: string, _previous: Ac
       await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "CUSTOMER_UPDATED", entityType: "CUSTOMER", entityReference: customerNumber, correlationId: crypto.randomUUID(), before: { shortName: existing.shortName, kycStatus: existing.kycStatus, riskRating: existing.riskRating }, after: customerValues });
     });
     revalidatePath(`/customers/${customerNumber}`); revalidatePath("/customers");
-    return { ok: true, code: "CUSTOMER_UPDATED", message: `Customer ${customerNumber} was updated.` };
+    return { ok: true, code: "CUSTOMER_UPDATED", message: `Customer ${customerNumber} was updated.`, result: { customerNumber } };
   } catch (error) { return failure(error); }
 }
 
@@ -185,7 +185,7 @@ export async function openAccountAction(_previous: ActionState, formData: FormDa
       return next;
     });
     revalidatePath("/accounts");
-    return { ok: true, code: "ACCOUNT_OPENED", message: `Account ${accountNumber} was opened.` };
+    return { ok: true, code: "ACCOUNT_OPENED", message: `Account ${accountNumber} was opened.`, result: { accountNumber, status: "ACTIVE", openingDeposit: parsed.data.initialDeposit } };
   } catch (error) { return failure(error); }
 }
 
@@ -210,7 +210,7 @@ export async function updateAccountStatusAction(accountNumber: string, _previous
       await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "ACCOUNT_STATUS_UPDATED", entityType: "ACCOUNT", entityReference: accountNumber, correlationId: crypto.randomUUID(), before: { status: existing.status }, after: parsed.data });
     });
     revalidatePath(`/accounts/${accountNumber}`); revalidatePath("/accounts");
-    return { ok: true, code: "ACCOUNT_STATUS_UPDATED", message: `Account ${accountNumber} is now ${parsed.data.status.toLowerCase()}.` };
+    return { ok: true, code: "ACCOUNT_STATUS_UPDATED", message: `Account ${accountNumber} is now ${parsed.data.status.toLowerCase()}.`, result: { accountNumber, status: parsed.data.status } };
   } catch (error) { return failure(error); }
 }
 
@@ -227,7 +227,7 @@ export async function createBeneficiaryAction(_previous: ActionState, formData: 
     const [created] = await db.insert(beneficiaries).values({ customerId: customer.id, name: parsed.data.name, bankName: parsed.data.bankName, accountNumber: parsed.data.accountNumber, iban: parsed.data.iban, swiftBic: parsed.data.swiftBic, currency: parsed.data.currency, status: "ACTIVE" }).returning();
     await audit(actor, "BENEFICIARY_CREATED", "BENEFICIARY", created.id, null, parsed.data);
     revalidatePath("/beneficiaries");
-    return { ok: true, code: "BENEFICIARY_CREATED", message: `Beneficiary ${created.name} was created.` };
+    return { ok: true, code: "BENEFICIARY_CREATED", message: `Beneficiary ${created.name} was created.`, result: { beneficiaryId: created.id, customerNumber: parsed.data.customerNumber } };
   } catch (error) { return failure(error); }
 }
 
@@ -241,7 +241,7 @@ export async function updateBeneficiaryAction(beneficiaryId: string, _previous: 
     await db.update(beneficiaries).set({ status: status.data, updatedAt: new Date() }).where(eq(beneficiaries.id, beneficiaryId));
     await audit(actor, "BENEFICIARY_UPDATED", "BENEFICIARY", beneficiaryId, { status: existing.status }, { status: status.data });
     revalidatePath("/beneficiaries");
-    return { ok: true, code: "BENEFICIARY_UPDATED", message: `Beneficiary ${existing.name} was updated.` };
+    return { ok: true, code: "BENEFICIARY_UPDATED", message: `Beneficiary ${existing.name} was updated.`, result: { beneficiaryId, status: status.data } };
   } catch (error) { return failure(error); }
 }
 
@@ -257,7 +257,7 @@ export async function submitPaymentAction(_previous: ActionState, formData: Form
       : await bookExternalPayment({ ...base, beneficiaryId: parsed.data.beneficiaryId ?? "" }, actor);
     const pending = "pending" in result && result.pending;
     revalidatePath("/payments"); revalidatePath("/accounts");
-    return { ok: true, code: result.duplicate ? "PAYMENT_ALREADY_BOOKED" : pending ? "PAYMENT_PENDING_APPROVAL" : "PAYMENT_BOOKED", message: result.duplicate ? `Payment ${result.reference} already exists; no duplicate was created.` : pending ? `Payment ${result.reference} is pending approval and its funds are on hold.` : `Payment ${result.reference} was booked.` };
+    return { ok: true, code: result.duplicate ? "PAYMENT_ALREADY_BOOKED" : pending ? "PAYMENT_PENDING_APPROVAL" : "PAYMENT_BOOKED", message: result.duplicate ? `Payment ${result.reference} already exists; no duplicate was created.` : pending ? `Payment ${result.reference} is pending approval and its funds are on hold.` : `Payment ${result.reference} was booked.`, result: { paymentReference: result.reference, status: pending ? "PENDING" : "BOOKED", duplicate: result.duplicate } };
   } catch (error) { return failure(error); }
 }
 
