@@ -30,7 +30,7 @@ export async function claimWorkItemAction(_previous: ActionState, formData: Form
       await tx.insert(workItemEvents).values({ workItemId: item.id, eventType: "ASSIGNED", fromStatus: item.status as "OPEN" | "ASSIGNED", toStatus: "ASSIGNED", actorUserId: actor.id, actorUsername: actor.username, comment: "Work item claimed." });
     });
     revalidatePath("/work-queue");
-    return { ok: true, code: "WORK_ITEM_CLAIMED", message: `Work item ${parsed.data.reference} was assigned to you.` };
+    return { ok: true, code: "WORK_ITEM_CLAIMED", message: `Work item ${parsed.data.reference} was assigned to you.`, result: { workItemReference: parsed.data.reference, version: parsed.data.expectedVersion + 1 } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -49,6 +49,6 @@ export async function releaseWorkItemAction(_previous: ActionState, formData: Fo
       await tx.insert(workItemEvents).values({ workItemId: item.id, eventType: "RELEASED", fromStatus: "ASSIGNED", toStatus: "OPEN", actorUserId: actor.id, actorUsername: actor.username, comment: "Work item released." });
     });
     revalidatePath("/work-queue");
-    return { ok: true, code: "WORK_ITEM_RELEASED", message: `Work item ${parsed.data.reference} was released.` };
+    return { ok: true, code: "WORK_ITEM_RELEASED", message: `Work item ${parsed.data.reference} was released.`, result: { workItemReference: parsed.data.reference, version: parsed.data.expectedVersion + 1 } };
   } catch (error) { return failedAction(error); }
 }

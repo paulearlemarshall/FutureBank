@@ -82,7 +82,12 @@ export async function deleteCustomerDocumentByReference(input: { customerNumber:
   const customer = await customerIdentity(input.customerNumber);
   let removed: typeof customerDocumentFiles.$inferSelect | undefined;
   await db.transaction(async (tx) => {
-    [removed] = await tx.delete(customerDocumentFiles).where(and(eq(customerDocumentFiles.customerId, customer.id), eq(customerDocumentFiles.documentReference, input.documentReference))).returning();
+    const [document] = await tx.select().from(customerDocumentFiles)
+      .where(and(eq(customerDocumentFiles.customerId, customer.id), eq(customerDocumentFiles.documentReference, input.documentReference)))
+      .for("update").limit(1);
+    if (!document) return;
+    if (document.isSeeded) throw new BankingError("FORBIDDEN", "Seeded baseline documents cannot be deleted.");
+    [removed] = await tx.delete(customerDocumentFiles).where(eq(customerDocumentFiles.id, document.id)).returning();
     if (removed) await tx.insert(auditEvents).values({ actorUserId: actor.id, actorUsername: actor.username, action: "DOCUMENT_DELETED", entityType: "CUSTOMER", entityReference: customer.customerNumber, correlationId: crypto.randomUUID(), before: { documentReference: removed.documentReference, documentType: removed.documentType, filename: removed.filename, mimeType: removed.mimeType, sizeBytes: removed.sizeBytes }, after: null });
   });
   if (removed && !removed.isSeeded) await deleteDocumentBlob(removed.blobUrl).catch(() => undefined);

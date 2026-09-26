@@ -18,7 +18,7 @@ export async function createDirectDebitMandateAction(_previous: ActionState, for
     const actor = await requirePermission("DIRECT_DEBIT_MAINTAIN");
     const reference = await createDirectDebitMandate(parsed.data, actor);
     revalidatePath("/direct-debits");
-    return { ok: true, code: "DIRECT_DEBIT_MANDATE_CREATED", message: `Direct debit mandate ${reference} was created.` };
+    return { ok: true, code: "DIRECT_DEBIT_MANDATE_CREATED", message: `Direct debit mandate ${reference} was created.`, result: { mandateReference: reference, status: "ACTIVE" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -30,7 +30,7 @@ export async function cancelDirectDebitMandateAction(_previous: ActionState, for
     const actor = await requirePermission("DIRECT_DEBIT_MAINTAIN");
     await cancelDirectDebitMandate(parsed.data, actor);
     revalidatePath("/direct-debits"); revalidatePath(`/direct-debits/${parsed.data.reference}`);
-    return { ok: true, code: "DIRECT_DEBIT_MANDATE_CANCELLED", message: `Direct debit mandate ${parsed.data.reference} was cancelled.` };
+    return { ok: true, code: "DIRECT_DEBIT_MANDATE_CANCELLED", message: `Direct debit mandate ${parsed.data.reference} was cancelled.`, result: { mandateReference: parsed.data.reference, status: "CANCELLED" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -42,6 +42,6 @@ export async function submitDirectDebitCollectionAction(_previous: ActionState, 
     const actor = await requirePermission("DIRECT_DEBIT_COLLECT");
     const result = await submitDirectDebitCollection(parsed.data, actor);
     revalidatePath("/direct-debits"); revalidatePath(`/direct-debits/${parsed.data.mandateReference}`); revalidatePath("/accounts"); revalidatePath("/payments"); revalidatePath("/work-queue");
-    return { ok: true, code: `DIRECT_DEBIT_COLLECTION_${result.status}`, message: result.status === "REJECTED" ? `Collection ${result.reference} was rejected: ${result.message ?? result.code}.` : `Collection ${result.reference} is ${result.status.toLowerCase()}${result.duplicate ? " (existing idempotent result)" : ""}.` };
+    return { ok: true, code: `DIRECT_DEBIT_COLLECTION_${result.status}`, message: result.status === "REJECTED" ? `Collection ${result.reference} was rejected: ${result.message ?? result.code}.` : `Collection ${result.reference} is ${result.status.toLowerCase()}${result.duplicate ? " (existing idempotent result)" : ""}.`, result: { collectionReference: result.reference, status: result.status, duplicate: result.duplicate } };
   } catch (error) { return failedAction(error); }
 }

@@ -44,12 +44,15 @@ export async function invokeMcpApi(
   segments: string[],
   body?: Record<string, unknown>,
   router: ApiRouter = routeApiRequest,
+  headers?: Record<string, string>,
 ): Promise<McpApiResult> {
   const path = `/api/v1/${segments.map(encodeURIComponent).join("/")}`;
   const url = new URL(path, "http://futurebank.internal");
   const init: RequestInit = { method };
+  if (body !== undefined || headers !== undefined) {
+    init.headers = { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...headers };
+  }
   if (body !== undefined) {
-    init.headers = { "Content-Type": "application/json" };
     init.body = JSON.stringify(body);
   }
 

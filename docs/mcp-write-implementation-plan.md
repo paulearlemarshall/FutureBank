@@ -1,13 +1,23 @@
 # FutureBank MCP write implementation plan
 
-Status: implementation in progress. The first KYC intake and preparation slice is implemented locally; the remaining catalog is still proposed.
+Status: implementation in progress. This branch now includes customer/account controls, beneficiary operations, KYC maker-checker and work-item tools, immediate payments/reversals, scheduled payment instructions, direct debits, overdrafts, accounting workflows, loan origination, and customer-document deletion. Full database verification remains a release gate; full-size document upload still needs a staging and binary-transfer flow.
 Baseline: `c34b183`, inspected 25 September 2026.
 
 ### First implementation slice (25 September 2026)
 
 Implemented in the working tree: `list_kyc_cases`, `get_kyc_case`, `open_kyc_case`, `update_kyc_cdd`, `record_kyc_evidence`, `update_kyc_evidence`, and `run_kyc_screening`. These are low-scope preparation operations that do not decide cases or book financial movements. Create responses now include machine-readable case/evidence references. The MCP API adapter preserves structured API validation errors and converts thrown route failures through the same safe API error boundary. Adapter tests cover success, error fidelity, unexpected failures and malformed success envelopes.
 
-Not yet established by this slice: end-to-end authenticated MCP execution against a disposable database, full CI/browser journey, production credentials or deployment. Proceed with later mutation groups only after exercising the KYC flow with distinct Operator/Compliance actors in an isolated seeded database and checking the resulting audit identity and UI state.
+This branch adds the KYC completion and work-item tools, plus a disposable-DB integration verification in `scripts/verify-workflows.ts`. It exercises Operator preparation/submission, rejects Operator decision, then lets Compliance claim and approve, checking the structured references, read projection and audit identities. The local Docker daemon and PostgreSQL service are unavailable, and `.env.local` targets an existing Neon development branch; do not run the destructive reset verifier against that branch. The new database gate still needs to run in CI or a new isolated Neon branch before treating the prerequisite as complete.
+
+The current slice adds payment and reversal list/detail reads, immediate payment submission, approval/rejection, pending-payment expiry, reversal initiation and independent reversal decisions. Idempotency keys are forwarded in the API's `Idempotency-Key` header; action responses expose references and resulting states in structured data. The routes retain the existing permission, hold, ledger, maker-checker and audit behavior. This slice still needs CI's disposable-database workflow verification before release.
+
+The scheduled-payment instruction and direct-debit slice adds mandate/collection reads and writes, including processing history. Cancellation uses the API's optimistic version and reason fields, due instruction processing is explicit by business date, and direct-debit collection idempotency is sent in the API header. Responses carry created references, run totals and collection state as structured data. Database-backed workflow verification remains outstanding.
+
+The customer/account slice adds restriction application/lifting and account opening/status control, along with account and product discovery reads. Account opening returns its generated account number and opening-deposit amount; any positive deposit is booked by the existing balanced-ledger transaction. Account status changes and restriction actions preserve the action-layer authority and audit trail. This slice also requires database-backed workflow verification.
+
+The current slice adds facility and alert reads plus overdraft applications, limit-change requests, maker-checker decisions, suspend/close and alert resolution. Application and limit-change actions now return both facility and work-item references; decision responses report the resulting state, including declined limit changes that leave an existing facility active. Existing KYC, debit-block, utilization, hold and checker controls remain authoritative. Database-backed verification is still outstanding.
+
+The current slice completes EOD, reconciliation, accounting-period close, manual GL journal and loan-origination capabilities, together with their read models. Date-scoped runs return durable references and outcomes; journal/loan submission keys are sent as API headers; maker-checker responses expose references and resulting states. EOD and loan approval can book ledger movements, period close can block posting dates, and these tools are documented with those effects. Database-backed verification remains outstanding.
 
 ## 1. Outcome and scope
 
@@ -31,10 +41,10 @@ Owners inspected:
 
 Specific gaps to resolve:
 
-1. The MCP helper assumes GET and JSON, and reduces API errors to message strings. Writes need explicit method, headers, payload, status and structured error handling, including exceptions thrown by the internal router.
-2. Many writes return `ActionState` with a code/message rather than structured identifiers. A client must not extract a newly created account/customer reference from prose.
+1. Resolved for current JSON operations: the MCP API adapter accepts an explicit method, body and headers, returns status and structured errors, and converts thrown router failures through the safe API error boundary. File-upload transport remains separate.
+2. Mostly resolved for implemented domains: write responses now expose structured references/statuses where clients need them. Document finalization and its receipt/retry contract remain to be designed.
 3. Existing idempotency is not universal. Explicit API header contracts cover payments, reversals, direct-debit collections, manual journals and loan applications. Other operations use varying version, date or state controls; audit each separately.
-4. The existing four reads cannot support work-item decisions, beneficiary selection, KYC remediation or processing-run recovery.
+4. Supporting reads are now exposed for accounts, products, work items, approvals, runs, periods, ledgers and loans. Document staging/finalization reads and any missing UI branch-choice discovery remain to be assessed.
 5. A 4 MB document cannot fit in a 64 KB MCP request. Base64 also adds roughly one third to byte size. Raising the global limit does not by itself solve hosting or client payload limits.
 6. Some business rules live directly in Server Actions. Reuse the established router/action path initially; extract shared services only where a concrete response, retry or file-transfer change requires it.
 7. Production authentication remains an unresolved release prerequisite: the previous production probe rejected the locally available key. That result does not establish why it was rejected or that it is exclusively a development key. Diagnose before issuing or rotating any credentials.

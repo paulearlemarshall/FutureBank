@@ -49,7 +49,7 @@ export async function createPaymentInstructionAction(_previous: ActionState, for
     const reference = await createPaymentInstruction(parsed.data, actor);
     revalidatePath("/payments");
     revalidatePath(`/payment-instructions/${reference}`);
-    return { ok: true, code: "PAYMENT_INSTRUCTION_CREATED", message: `Payment instruction ${reference} was created without reserving funds.` };
+    return { ok: true, code: "PAYMENT_INSTRUCTION_CREATED", message: `Payment instruction ${reference} was created without reserving funds.`, result: { instructionReference: reference, status: "ACTIVE" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -71,7 +71,7 @@ export async function cancelPaymentInstructionAction(_previous: ActionState, for
     await cancelPaymentInstruction(parsed.data, actor);
     revalidatePath("/payments");
     revalidatePath(`/payment-instructions/${parsed.data.reference}`);
-    return { ok: true, code: "PAYMENT_INSTRUCTION_CANCELLED", message: `Payment instruction ${parsed.data.reference} was cancelled.` };
+    return { ok: true, code: "PAYMENT_INSTRUCTION_CANCELLED", message: `Payment instruction ${parsed.data.reference} was cancelled.`, result: { instructionReference: parsed.data.reference, status: "CANCELLED" } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -90,6 +90,7 @@ export async function runPaymentInstructionsAction(_previous: ActionState, formD
       ok: true,
       code: "PAYMENT_INSTRUCTIONS_PROCESSED",
       message: `${result.reference}: ${result.booked} booked, ${result.pending} pending approval, ${result.failed} failed.`,
+      result: { runReference: result.reference, attempted: result.attempted, booked: result.booked, pending: result.pending, failed: result.failed },
     };
   } catch (error) { return failedAction(error); }
 }

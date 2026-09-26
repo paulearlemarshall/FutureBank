@@ -37,8 +37,36 @@ The server exposes these read tools:
 | `get_customer` | Read a customer by customer number |
 | `get_account` | Read account details and balance |
 | `get_account_statement` | Read an account statement as CSV |
+| `list_accounts` | Search accounts by account or customer details |
+| `list_products` | Read product currency, active status and minimum opening balance |
+| `list_overdraft_facilities` | List facilities with requested and approved limits, utilization and headroom |
+| `get_overdraft_facility` | Read terms, holds, version, alerts and limit history |
+| `list_end_of_day_runs` | List recent daily charge/interest processing runs |
+| `get_end_of_day_run` | Read a daily run and its posting outcomes |
+| `list_reconciliation_runs` | List recent clearing reconciliation runs |
+| `get_reconciliation_run` | Read a run's matched and exception items |
+| `list_accounting_periods` | List period status and close evidence |
+| `get_accounting_period` | Read a period version and latest close work item |
+| `list_general_ledger_accounts` | List GL accounts and posting controls |
+| `get_trial_balance` | Read a posted trial balance by date/currency |
+| `list_general_ledger_journals` | List journal lines and decision state |
+| `get_general_ledger_journal` | Read a journal and its approval work item |
+| `list_loan_applications` | List loan applications by status |
+| `get_loan_application` | Read terms, decision evidence and repayment schedule |
+| `list_beneficiaries` | List beneficiaries, optionally filtered by customer |
+| `list_payments` | List payments, optionally filtered by status |
+| `get_payment` | Read a payment, its approval work item, hold and reversal state |
+| `list_payment_reversals` | List payment reversal requests, optionally filtered by status |
+| `get_payment_reversal` | Read a reversal request, decision work item and any posted transaction |
+| `list_payment_instructions` | List scheduled payments and standing orders with execution history |
+| `get_payment_instruction` | Read a schedule, current version and execution history |
+| `list_payment_instruction_runs` | List recent scheduled-payment processing runs |
+| `list_direct_debit_mandates` | List mandates with status, version and collection history |
+| `get_direct_debit_mandate` | Read a mandate and collection history |
 | `list_kyc_cases` | List KYC case summaries |
 | `get_kyc_case` | Read a case, its version, CDD profile, evidence, screening checks and restrictions |
+| `list_work_items` | List work items using status, type, priority, assignee or overdue filters |
+| `get_work_item` | Read a work item's version, assignment, state and event history |
 
 The initial write slice covers fictional KYC intake and preparation:
 
@@ -47,10 +75,98 @@ The initial write slice covers fictional KYC intake and preparation:
 | `open_kyc_case` | Open a case; returns its reference in structured result data | `KYC_GATHER` |
 | `update_kyc_cdd` | Create or replace a case's complete CDD profile | `KYC_GATHER` |
 | `record_kyc_evidence` | Record fictional evidence metadata only; returns the evidence reference | `KYC_GATHER` |
+| `delete_customer_document` | Delete an uploaded document by customer and document reference; seeded baseline files are protected | `KYC_GATHER` |
 | `update_kyc_evidence` | Update evidence metadata within the specified case | `KYC_GATHER` |
 | `run_kyc_screening` | Run fictional screening rules and create screening history | `KYC_SCREEN` |
+| `set_kyc_case_lock` | Lock or unlock a KYC case with reason and expected version | `KYC_LOCK` |
+| `verify_kyc_evidence` | Verify or reject recorded evidence with reviewer notes | `KYC_GATHER` |
+| `resolve_kyc_screening` | Resolve a possible fictional match with a decision comment | `KYC_DECIDE` |
+| `submit_kyc_case` | Submit a complete case and create a Compliance work item | `KYC_GATHER` |
+| `decide_kyc_case` | Approve or reject a submitted case using the current work-item version | `KYC_DECIDE` |
+| `claim_work_item` | Claim an eligible work item using its current version | Work-item role eligibility |
+| `release_work_item` | Release an item assigned to the authenticated actor | Current assignee or Admin |
 
-These tools validate inputs at the MCP boundary and dispatch through the existing API router, so the same actor context, permission checks, audit events and KYC rules apply. Successful write calls return structured status and the API ActionState; a successful case or evidence creation also returns its reference in `data.result`. A tool success indicates the requested KYC operation succeeded, not that the case was approved. Evidence metadata does not upload file bytes. These are the first write tools; the remaining API mutation capabilities are not exposed through MCP yet.
+These tools validate inputs at the MCP boundary and dispatch through the existing API router, so the same actor context, permission checks, audit events and KYC rules apply. Successful write calls return structured status and the API ActionState; a successful case or evidence creation also returns its reference in `data.result`. A tool success indicates the requested KYC operation succeeded, not that the case was approved. Evidence metadata does not upload file bytes.
+
+`delete_customer_document` uses the existing document API and service, preserving actor permissions and audit history. It reports whether a reference was deleted; an unknown reference is safe, and seeded baseline documents are rejected. Document upload is not available through MCP yet: the MCP request body limit cannot carry the REST API's supported 4 MB files. Full-size upload needs an authenticated, short-lived staging flow and a separate binary transfer step.
+
+Customer and beneficiary tools include:
+
+| Tool | Purpose | Actor requirement |
+| --- | --- | --- |
+| `list_beneficiaries` | List beneficiaries, optionally filtered by customer | Any authenticated actor allowed by the API |
+| `create_customer` | Create a retail or SME customer; returns `customerNumber` in `data.result` | Operator or Admin |
+| `update_customer` | Replace the supported mutable CRM fields; this is not a partial patch | Operator or Admin |
+| `create_beneficiary` | Create a customer's external beneficiary; returns `beneficiaryId` in `data.result` | Operator or Admin |
+| `set_beneficiary_status` | Activate or deactivate a beneficiary | Operator or Admin |
+
+Beneficiary creation retains the API's KYC and debit-restriction checks. All customer and beneficiary mutations use the existing UI/API validation and audit path. Customer creation and update responses now include the customer number as structured result data; beneficiary creation and status updates return the beneficiary ID and status.
+
+Customer and account controls are available through MCP:
+
+| Tool | Purpose | Important behavior |
+| --- | --- | --- |
+| `apply_customer_restriction` | Apply a debit block, payment review or onboarding hold | A debit block also marks the customer restricted; returns the reference needed for lifting. |
+| `lift_customer_restriction` | Lift an active restriction with a reason | Does not automatically restore customer status after a debit block. |
+| `open_account` | Open an account using an active product and branch | Returns account number; any opening deposit posts through the balanced ledger path. |
+| `set_account_status` | Activate, block or close an account | Closing requires zero balance and no pending outgoing payments; loan accounts remain read-only. |
+
+`list_accounts` and `list_products` support discovery for these operations. All writes use the same existing action permissions, validation and audit path as the API and UI.
+
+The KYC workflow can now be completed through MCP: an Operator gathers CDD and evidence, runs the existing screening flow, and submits the case; a distinct Compliance actor can claim the resulting work item and decide the case. The server returns the work-item reference and incremented version in structured result data where required. The same permission, completeness and maker-checker rules remain enforced by the API actions.
+
+Arranged overdrafts are available through these MCP tools:
+
+| Tool | Purpose | Important behavior |
+| --- | --- | --- |
+| `apply_for_overdraft` | Submit a limit application | Only eligible active current accounts with approved KYC and no debit block qualify; creates a Supervisor work item. |
+| `request_overdraft_limit_change` | Request a changed limit on an active facility | A reduction cannot go below utilization plus active holds; creates an independent approval item. |
+| `decide_overdraft` | Approve or decline an application or change | Requires the current work-item version, comment and `OVERDRAFT_DECIDE`; approval rechecks eligibility and commitments. |
+| `set_overdraft_status` | Suspend or close a facility | Closure requires utilization and active holds cleared. |
+| `resolve_overdraft_alert` | Record an intervention and resolve an alert | Requires `OVERDRAFT_ALERT_RESOLVE`; completes its open work item when present. |
+
+Facility detail returns its alerts and history; use `list_work_items` with type `OVERDRAFT_APPROVAL`, `OVERDRAFT_CHANGE` or `OVERDRAFT_ALERT` to discover the relevant work item. Application and limit-change responses include facility and work-item references. Decisions and status changes return the resulting facility status in `data.result`.
+
+Accounting and lending workflows are also available through MCP:
+
+| Tool | Purpose | Important behavior |
+| --- | --- | --- |
+| `run_end_of_day` | Post configured daily overdraft charges and product interest | Date is claimed once; can post balanced ledger movements. |
+| `run_reconciliation` | Reconcile existing settlement evidence | Date is reconciled at most once; creates matched/exception records without changing ledger postings. |
+| `resolve_reconciliation_item` | Resolve an open exception | Requires current item version and comment; does not change settlement or ledger records. |
+| `request_accounting_period_close` | Request close review | Uses period version and close gates; the period freezes while under review. |
+| `decide_accounting_period_close` | Approve or reject period close | Requires current work-item version and a distinct Admin; approval rechecks all gates. |
+| `submit_manual_journal` | Submit an exact two-line, same-currency journal | Requires idempotency key; remains pending until a distinct Admin approves. |
+| `decide_manual_journal` | Approve or reject a manual journal | Approval rechecks period, account controls and balance before posting. |
+| `submit_loan_application` | Submit a loan with fictional affordability evidence | Requires idempotency key; creates a Supervisor work item without moving funds. |
+| `decide_loan_application` | Approve or reject a loan | Approval rechecks KYC, restrictions, product, destination and period, then books account, schedule and disbursement atomically. |
+
+Processing run, journal, period and loan write results include machine-readable references, statuses and counts where applicable. Use `list_work_items` to discover approval references and current versions. Idempotency keys are forwarded in the API header for manual journals and loan submissions. These tools reuse the established actor permissions, maker-checker rules, posting guards and audit records.
+
+Payment operations are also available through MCP:
+
+| Tool | Purpose | Important behavior |
+| --- | --- | --- |
+| `submit_payment` | Submit an internal transfer or external payment | Requires an idempotency key. Eligible internal transfers can book immediately; external payments may be held for independent approval. |
+| `decide_payment` | Approve or reject a pending payment | Requires the current work-item version, a decision comment and `PAYMENT_DECIDE`; approval books, rejection releases the hold. |
+| `expire_pending_payments` | Expire eligible stale pending payments | Requires `PAYMENT_DECIDE`; may affect multiple payments and release holds. |
+| `request_payment_reversal` | Request a full-value reversal | Requires an idempotency key and `PAYMENT_REVERSAL_INITIATE`; the original posting is unchanged until approval. |
+| `decide_payment_reversal` | Approve or reject a reversal request | Requires an independent checker, current work-item version and decision comment; approval posts a linked equal-and-opposite transaction. |
+
+The submit and reversal-request tools return their payment or reversal reference, resulting status and duplicate indicator in `data.result`. Decision tools return the resulting reference, decision and status. These tools reuse the same API actions and services as the UI, including actor permissions, holds, balanced ledger posting, maker-checker separation, optimistic versions, idempotency and audit events. For retries, reuse the same idempotency key with the same operation payload.
+
+Scheduled payments and direct debits are available through these additional MCP tools:
+
+| Tool | Purpose | Important behavior |
+| --- | --- | --- |
+| `create_payment_instruction` | Create a future-dated payment or standing order | Reserves no funds; scheduled and standing-order frequencies are validated. |
+| `cancel_payment_instruction` | Cancel an instruction | Requires its current version and a reason. |
+| `run_payment_instructions` | Process due occurrences for a business date | Can book, create pending payments with holds or record failures; requires `PAYMENT_SCHEDULE_EXECUTE`. |
+| `create_direct_debit_mandate` | Create a mandate for an owned active creditor beneficiary | Reserves no funds; account ownership, currency, KYC and debit restrictions are checked. |
+| `cancel_direct_debit_mandate` | Cancel an active or suspended mandate | Requires current version and reason; blocked during a processing collection. |
+| `submit_direct_debit_collection` | Submit a collection against a mandate | Requires `Idempotency-Key`; may book, become pending with a hold, or be rejected. |
+
+Create, cancel and run results include machine-readable references, status or run totals under `data.result`. Collections also return a duplicate indicator. The operation tools reuse the same permission checks, scheduling and mandate policies, payment service, maker-checker controls, idempotency and audit events as the REST API and UI.
 
 Existing API restrictions on account statements and customer data still apply. Requests with unapproved Host or Origin headers are rejected. Localhost and the production domain are allowed by default; add comma-separated hostnames to `MCP_ALLOWED_HOSTS` when serving from a custom domain. For example, an MCP client connecting to production uses `https://future-bank-demo.vercel.app/mcp` and must be configured with an actor-owned key. The key should be stored in the MCP client's secret or environment configuration, not committed to a project file.
 

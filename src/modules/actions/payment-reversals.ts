@@ -15,7 +15,7 @@ export async function requestPaymentReversalAction(_previous: ActionState, formD
   try {
     const actor = await requirePermission("PAYMENT_REVERSAL_INITIATE");
     const result = await requestPaymentReversal(parsed.data, actor);
-    return { ok: true, code: result.duplicate ? "REVERSAL_DUPLICATE" : "REVERSAL_REQUESTED", message: `Reversal ${result.reference} is pending independent approval.` };
+    return { ok: true, code: result.duplicate ? "REVERSAL_DUPLICATE" : "REVERSAL_REQUESTED", message: `Reversal ${result.reference} is pending independent approval.`, result: { reversalReference: result.reference, status: "PENDING_APPROVAL", duplicate: result.duplicate } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -25,6 +25,6 @@ export async function decidePaymentReversalAction(_previous: ActionState, formDa
   try {
     const actor = await requirePermission("PAYMENT_REVERSAL_DECIDE");
     await decidePaymentReversal(parsed.data, actor);
-    return { ok: true, code: parsed.data.decision === "APPROVE" ? "REVERSAL_BOOKED" : "REVERSAL_REJECTED", message: `Reversal ${parsed.data.reversalReference} was ${parsed.data.decision === "APPROVE" ? "booked exactly once" : "rejected"}.` };
+    return { ok: true, code: parsed.data.decision === "APPROVE" ? "REVERSAL_BOOKED" : "REVERSAL_REJECTED", message: `Reversal ${parsed.data.reversalReference} was ${parsed.data.decision === "APPROVE" ? "booked exactly once" : "rejected"}.`, result: { reversalReference: parsed.data.reversalReference, workItemReference: parsed.data.workItemReference, decision: parsed.data.decision, status: parsed.data.decision === "APPROVE" ? "BOOKED" : "REJECTED" } };
   } catch (error) { return failedAction(error); }
 }

@@ -17,7 +17,7 @@ export async function requestAccountingPeriodCloseAction(_previous: ActionState,
     const actor = await requirePermission("ACCOUNTING_PERIOD_CLOSE_INITIATE");
     const workItemReference = await requestAccountingPeriodClose(parsed.data, actor);
     revalidatePath("/accounting-periods"); revalidatePath(`/accounting-periods/${parsed.data.periodReference}`); revalidatePath("/work-queue");
-    return { ok: true, code: "ACCOUNTING_PERIOD_CLOSE_REQUESTED", message: `${parsed.data.periodReference} entered close review as ${workItemReference}.` };
+    return { ok: true, code: "ACCOUNTING_PERIOD_CLOSE_REQUESTED", message: `${parsed.data.periodReference} entered close review as ${workItemReference}.`, result: { periodReference: parsed.data.periodReference, workItemReference, status: "CLOSING", version: parsed.data.expectedVersion + 1 } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -28,6 +28,6 @@ export async function decideAccountingPeriodCloseAction(_previous: ActionState, 
     const actor = await requirePermission("ACCOUNTING_PERIOD_CLOSE_DECIDE");
     await decideAccountingPeriodClose(parsed.data, actor);
     revalidatePath("/accounting-periods"); revalidatePath(`/accounting-periods/${parsed.data.periodReference}`); revalidatePath("/work-queue");
-    return { ok: true, code: parsed.data.decision === "APPROVE" ? "ACCOUNTING_PERIOD_CLOSED" : "ACCOUNTING_PERIOD_CLOSE_REJECTED", message: `${parsed.data.periodReference} was ${parsed.data.decision === "APPROVE" ? "closed; posting dates in the period are now blocked" : "returned to open"}.` };
+    return { ok: true, code: parsed.data.decision === "APPROVE" ? "ACCOUNTING_PERIOD_CLOSED" : "ACCOUNTING_PERIOD_CLOSE_REJECTED", message: `${parsed.data.periodReference} was ${parsed.data.decision === "APPROVE" ? "closed; posting dates in the period are now blocked" : "returned to open"}.`, result: { periodReference: parsed.data.periodReference, workItemReference: parsed.data.workItemReference, decision: parsed.data.decision, status: parsed.data.decision === "APPROVE" ? "CLOSED" : "OPEN" } };
   } catch (error) { return failedAction(error); }
 }

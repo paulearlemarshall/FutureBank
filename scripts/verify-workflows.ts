@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db, pool } from "../src/db";
+import { runWithApiUser } from "../src/lib/auth/api-context";
+import { invokeMcpApi, type McpApiResult } from "../src/lib/mcp/api-adapter";
 import { resetBaseline } from "../src/db/seed";
 import { seedDemoStaff } from "../src/db/seed-auth";
 import { stableUuid } from "../src/db/seed-manifest";
@@ -13,14 +15,87 @@ import { assertPostingDateOpen, decideAccountingPeriodClose, requestAccountingPe
 import { decideManualGeneralLedgerJournal } from "../src/modules/services/general-ledger";
 import { decideLoanApplication } from "../src/modules/services/loan-originations";
 import { BankingError } from "../src/modules/services/errors";
+import type { SessionUser } from "../src/modules/contracts";
+
+async function mcpCall(actor: SessionUser, method: string, segments: string[], body?: Record<string, unknown>): Promise<McpApiResult> {
+  return runWithApiUser(actor, () => invokeMcpApi(method, segments, body));
+}
+
+function requireMcpSuccess(result: McpApiResult, operation: string): Extract<McpApiResult, { ok: true }> {
+  if (!result.ok) throw new Error(`${operation} failed: ${result.error.code} (${result.error.message})`);
+  return result;
+}
+
+async function verifyMcpKycMakerChecker(operator: SessionUser, compliance: SessionUser) {
+  const opened = requireMcpSuccess(await mcpCall(operator, "POST", ["kyc-cases"], { customerNumber: "C000006", type: "ONBOARDING" }), "MCP KYC open");
+  const caseReference = String(opened.data.result && (opened.data.result as Record<string, unknown>).caseReference || "");
+  if (!caseReference) throw new Error("MCP KYC open did not return a structured case reference");
+
+  requireMcpSuccess(await mcpCall(operator, "PATCH", ["kyc-cases", caseReference, "cdd"], {
+    accountPurpose: "Fictional personal banking", occupationOrBusiness: "Teacher", expectedMonthlyCredits: "4000.00",
+    expectedMonthlyDebits: "2500.00", expectedCountries: "GB", cashUsage: "Low cash usage",
+    sourceOfFunds: "Fictional salary", sourceOfWealth: "Fictional employment income",
+    incomeOrTurnoverBand: "GBP 30,000 to 50,000", netWorthBand: "Below GBP 100,000",
+  }), "MCP KYC CDD update");
+
+  const evidenceReferences: string[] = [];
+  for (const [evidenceType, documentReference] of [["IDENTITY", "TEST-IDENTITY"], ["ADDRESS", "TEST-ADDRESS"]]) {
+    const recorded = requireMcpSuccess(await mcpCall(operator, "POST", ["kyc-cases", caseReference, "evidence"], {
+      evidenceType, documentReference, documentNumber: null, source: "Fictional CI verification", receivedAt: new Date().toISOString().slice(0, 10),
+      issuedAt: null, expiresAt: "2099-12-31", firstName: "Sophie", lastName: "Turner", reviewerNotes: "Fictional CI verification only.",
+    }), `MCP KYC ${evidenceType} record`);
+    const reference = String(recorded.data.result && (recorded.data.result as Record<string, unknown>).evidenceReference || "");
+    if (!reference) throw new Error(`MCP KYC ${evidenceType} record did not return a structured evidence reference`);
+    evidenceReferences.push(reference);
+    requireMcpSuccess(await mcpCall(operator, "POST", ["kyc-cases", caseReference, "evidence-verification"], {
+      evidenceReference: reference, outcome: "VERIFIED", reviewerNotes: "Fictional CI evidence verified.",
+    }), `MCP KYC ${evidenceType} verification`);
+  }
+
+  requireMcpSuccess(await mcpCall(operator, "POST", ["kyc-cases", caseReference, "screening"], {}), "MCP KYC screening");
+  const submitted = requireMcpSuccess(await mcpCall(operator, "POST", ["kyc-cases", caseReference, "submission"], {}), "MCP KYC submission");
+  const workItemReference = String(submitted.data.result && (submitted.data.result as Record<string, unknown>).workItemReference || "");
+  if (!workItemReference) throw new Error("MCP KYC submission did not return a structured work-item reference");
+
+  const selfDecision = await mcpCall(operator, "POST", ["kyc-cases", caseReference, "decision"], {
+    workItemReference, expectedVersion: 1, decision: "APPROVE", comment: "Operator self-approval must be denied.",
+  });
+  if (selfDecision.ok || selfDecision.error.code !== "FORBIDDEN") throw new Error("Operator KYC decision was not rejected by the Compliance permission boundary");
+
+  const claimed = requireMcpSuccess(await mcpCall(compliance, "POST", ["work-items", workItemReference, "claim"], { expectedVersion: 1 }), "Compliance work-item claim");
+  const claimedVersion = Number(claimed.data.result && (claimed.data.result as Record<string, unknown>).version || 0);
+  if (claimedVersion !== 2) throw new Error("Compliance work-item claim did not return the incremented version");
+  requireMcpSuccess(await mcpCall(compliance, "POST", ["kyc-cases", caseReference, "decision"], {
+    workItemReference, expectedVersion: claimedVersion, decision: "APPROVE", comment: "Independent fictional Compliance review approved.",
+  }), "Compliance KYC decision");
+
+  const projected = requireMcpSuccess(await mcpCall(compliance, "GET", ["kyc-cases", caseReference]), "MCP KYC read-back");
+  if (projected.data.status !== "APPROVED") throw new Error("MCP KYC read-back did not show the approved case state");
+  const workItemRead = requireMcpSuccess(await mcpCall(compliance, "GET", ["work-items", workItemReference]), "MCP work-item read-back");
+  if (workItemRead.data.status !== "APPROVED" || workItemRead.data.createdBy !== operator.id) throw new Error("MCP work-item read-back did not show independent maker/checker state");
+  const evidenceResult = await db.execute(sql`
+    select
+      (select count(*)::int from kyc_evidence where kyc_case_id = (select id from kyc_cases where reference = ${caseReference}) and verification_status = 'VERIFIED' and verified_by = ${operator.id}) as verified_evidence,
+      (select count(*)::int from work_items where reference = ${workItemReference} and created_by = ${operator.id} and decided_by = ${compliance.id} and status = 'APPROVED') as independent_approval,
+      (select count(*)::int from audit_events where entity_reference = ${caseReference} and action = 'KYC_CASE_OPENED' and actor_user_id = ${operator.id}) as operator_audit,
+      (select count(*)::int from audit_events where entity_reference = ${caseReference} and action = 'KYC_APPROVED' and actor_user_id = ${compliance.id}) as compliance_audit
+  `);
+  const row = evidenceResult.rows[0] as unknown as { verified_evidence: number; independent_approval: number; operator_audit: number; compliance_audit: number };
+  if (Number(row.verified_evidence) !== evidenceReferences.length || Number(row.independent_approval) !== 1 || Number(row.operator_audit) !== 1 || Number(row.compliance_audit) !== 1) {
+    throw new Error("KYC evidence, maker-checker identity, or Compliance audit verification failed");
+  }
+  console.info("MCP KYC integration verification passed: Operator prepared and submitted the case; Operator self-decision was denied; Compliance claimed and approved the work item; the API read projection and audit identity match the completed workflow.");
+}
 
 async function main() {
   const admin = { id: stableUuid("auth-user-admin"), username: "bp.admin", name: "Blue Prism Admin", role: "ADMIN" as const };
   const supervisor = { id: stableUuid("auth-user-supervisor"), username: "bp.supervisor", name: "Blue Prism Supervisor", role: "SUPERVISOR" as const };
   const operator = { id: stableUuid("auth-user-operator"), username: "bp.operator", name: "Blue Prism Operator", role: "OPERATOR" as const };
+  const compliance = { id: stableUuid("auth-user-compliance"), username: "bp.compliance", name: "Blue Prism Compliance", role: "COMPLIANCE" as const };
   if (process.env.SKIP_DEMO_STAFF_SEED !== "true") await seedDemoStaff(db);
   await resetBaseline(db, admin);
   try {
+    await verifyMcpKycMakerChecker(operator, compliance);
     const attempts = await Promise.allSettled([
       approvePendingPayment({ paymentReference: "PAY-000001", workItemReference: "WRK-000001", expectedVersion: 1, comment: "Concurrent integration approval A" }, supervisor),
       approvePendingPayment({ paymentReference: "PAY-000001", workItemReference: "WRK-000001", expectedVersion: 1, comment: "Concurrent integration approval B" }, supervisor),

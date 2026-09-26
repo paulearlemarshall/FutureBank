@@ -17,7 +17,7 @@ export async function runReconciliationAction(_previous: ActionState, formData: 
     const actor = await requirePermission("RECONCILIATION_EXECUTE");
     const result = await runClearingReconciliation(parsed.data, actor);
     revalidatePath("/reconciliation"); revalidatePath(`/reconciliation/${result.reference}`);
-    return { ok: true, code: result.duplicate ? "RECONCILIATION_ALREADY_RUN" : "RECONCILIATION_COMPLETED", message: `${result.reference}: ${result.matched} matched, ${result.exceptions} exceptions${result.duplicate ? "; existing run returned" : ""}.` };
+    return { ok: true, code: result.duplicate ? "RECONCILIATION_ALREADY_RUN" : "RECONCILIATION_COMPLETED", message: `${result.reference}: ${result.matched} matched, ${result.exceptions} exceptions${result.duplicate ? "; existing run returned" : ""}.`, result: { runReference: result.reference, duplicate: result.duplicate, attempted: result.attempted, matched: result.matched, exceptions: result.exceptions } };
   } catch (error) { return failedAction(error); }
 }
 
@@ -28,6 +28,6 @@ export async function resolveReconciliationItemAction(_previous: ActionState, fo
     const actor = await requirePermission("RECONCILIATION_RESOLVE");
     await resolveReconciliationItem(parsed.data, actor);
     revalidatePath("/reconciliation"); revalidatePath(`/reconciliation/${parsed.data.runReference}`);
-    return { ok: true, code: "RECONCILIATION_EXCEPTION_RESOLVED", message: `Exception ${parsed.data.itemReference} was resolved without changing the ledger.` };
+    return { ok: true, code: "RECONCILIATION_EXCEPTION_RESOLVED", message: `Exception ${parsed.data.itemReference} was resolved without changing the ledger.`, result: { runReference: parsed.data.runReference, itemReference: parsed.data.itemReference, status: "RESOLVED", version: parsed.data.expectedVersion + 1 } };
   } catch (error) { return failedAction(error); }
 }
